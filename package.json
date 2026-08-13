@@ -1,0 +1,44 @@
+{
+  "name": "sortboard-mvp",
+  "private": true,
+  "description": "Local-first card sorting app for open sort, closed sort, and Q-Sort workflows.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --project=chromium --grep @smoke",
+    "test:e2e:full": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:install": "playwright install chromium firefox webkit"
+  },
+  "dependencies": {
+    "framer-motion": "^11.0.0",
+    "idb": "^8.0.3",
+    "jszip": "^3.10.1",
+    "nanoid": "^5.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^28.1.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.1",
+    "vitest": "^2.1.9"
+  }
+}
