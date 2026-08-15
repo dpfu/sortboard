@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type {
   CardData,
-  ClosedContainerData,
   PreSortWidgetData,
   QSortWidgetData,
   SortWorkflowData,
@@ -11,8 +10,6 @@ import {
   WIDGET_ZONE_CONTENT,
   createWorkflowForTemplate,
   getQSortWidget,
-  migrateLegacyClosedCardAssignments,
-  migrateLegacyClosedContainersToWorkflow,
 } from './workflow';
 import {
   assignCardsToWidgetZone,
@@ -43,76 +40,6 @@ function makeCard(id: string): CardData {
 }
 
 describe('widgetSort workflow helpers', () => {
-  it('migrates legacy closed containers and card assignments into the widget workflow model', () => {
-    const legacyContainers: ClosedContainerData[] = [
-      {
-        id: 'source-1',
-        kind: 'source',
-        name: 'Source',
-        createdAt: 1,
-        x: 40,
-        y: 420,
-        w: 360,
-        h: 220,
-        layout: 'stack',
-      },
-      {
-        id: 'target-1',
-        kind: 'target',
-        name: 'Target 1',
-        createdAt: 2,
-        x: 520,
-        y: 80,
-        w: 300,
-        h: 220,
-        rowOrder: 0,
-        description: 'Cats',
-        visibleInSort: true,
-        capacityMode: 'limited',
-        capacity: 2,
-        allowedTags: ['cat'],
-        layout: 'fan',
-      },
-    ];
-    const workflow = migrateLegacyClosedContainersToWorkflow(legacyContainers);
-    const stageId = workflow.stages[0]?.id;
-    const cards = migrateLegacyClosedCardAssignments(
-      [
-        { ...makeCard('card-a'), closedContainerId: 'target-1', closedContainerOrder: 1 },
-        { ...makeCard('card-b') },
-      ],
-      legacyContainers,
-      stageId
-    );
-
-    expect(workflow.templateId).toBe('closed');
-    expect(workflow.stages[0]?.kind).toBe('closed-sort');
-    expect(workflow.widgets).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'source-1', kind: 'source', title: 'Source' }),
-        expect.objectContaining({
-          id: 'target-1',
-          kind: 'category',
-          title: 'Target 1',
-          description: 'Cats',
-          capacityMode: 'limited',
-          capacity: 2,
-          allowedTags: ['cat'],
-        }),
-      ])
-    );
-    expect(cards[0].widgetAssignments?.[stageId]).toEqual({
-      widgetId: 'target-1',
-      zoneId: WIDGET_ZONE_CONTENT,
-      order: 1,
-    });
-    expect(cards[1].widgetAssignments?.[stageId]).toEqual({
-      widgetId: 'source-1',
-      zoneId: WIDGET_ZONE_CONTENT,
-      order: 0,
-    });
-  });
-
   it('transitions cards from pre-sort zones into separate q-sort lanes', () => {
     const workflow: SortWorkflowData = {
       templateId: 'qsort',

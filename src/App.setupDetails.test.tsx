@@ -151,11 +151,13 @@ describe('App setup details panel', () => {
 
     await persist.persistPutBoard({
       ...board!,
+      version: 2,
       cardLayoutMode: 'as-is',
       cards: [
         {
           id: imageA.id,
           kind: 'image',
+          createdAt: 1,
           assetId: 'asset-a',
           x: 20,
           y: 20,
@@ -165,6 +167,7 @@ describe('App setup details panel', () => {
         {
           id: imageB.id,
           kind: 'image',
+          createdAt: 2,
           assetId: 'asset-b',
           x: 320,
           y: 20,

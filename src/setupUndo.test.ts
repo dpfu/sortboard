@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SetupSnapshotV1 } from './persist';
 import {
   MAX_SETUP_UNDO_SNAPSHOTS,
   appendSetupSnapshot,
@@ -7,33 +8,40 @@ import {
 } from './setupUndo';
 
 describe('setup undo helpers', () => {
-  const base = {
-    sortConfig: { type: 'open' as const, columns: 3 },
-    cards: [{ id: 'c1', kind: 'text' as const, x: 10, y: 20, z: 1 }],
+  const base: SetupSnapshotV1 = {
+    cardLayoutMode: 'as-is',
+    sortConfig: { type: 'open' },
+    stacks: [],
+    workflow: { templateId: 'open', stages: [], widgets: [] },
+    cards: [
+      {
+        id: 'c1',
+        kind: 'text',
+        createdAt: 1,
+        meta: { name: 'Card 1', notes: '', tags: [], frontText: 'Card 1', color: 'slate' },
+        x: 10,
+        y: 20,
+        z: 1,
+      },
+    ],
   };
 
   it('detects equal snapshots', () => {
-    const clone = {
-      sortConfig: { ...base.sortConfig },
-      cards: base.cards.map((c) => ({ ...c })),
-    };
+    const clone = structuredClone(base);
     expect(isSetupSnapshotEqual(base, clone)).toBe(true);
   });
 
   it('dedupes when appending identical snapshot', () => {
     const past = [base];
-    const next = appendSetupSnapshot(past, {
-      sortConfig: { ...base.sortConfig },
-      cards: base.cards.map((c) => ({ ...c })),
-    });
+    const next = appendSetupSnapshot(past, structuredClone(base));
     expect(next).toBe(past);
   });
 
   it('appends when snapshot changes', () => {
     const past = [base];
     const next = appendSetupSnapshot(past, {
-      sortConfig: { type: 'closed', columns: 3 },
-      cards: base.cards.map((c) => ({ ...c })),
+      ...structuredClone(base),
+      cards: base.cards.map((card) => ({ ...card, x: card.x + 1 })),
     });
     expect(next).toHaveLength(2);
   });
@@ -52,21 +60,48 @@ describe('setup undo helpers', () => {
     expect(past.at(-1)?.cards[0].x).toBe(MAX_SETUP_UNDO_SNAPSHOTS + 4);
   });
 
-  it('treats closed container layout changes as setup changes', () => {
-    const a = {
-      sortConfig: { type: 'closed' as const, columns: 3 },
-      closedContainers: [
-        { id: 'source-1', kind: 'source' as const, name: 'Source', createdAt: 1, x: 0, y: 0, w: 200, h: 200, layout: 'stack' as const },
-      ],
-      cards: [{ id: 'c1', kind: 'text' as const, x: 10, y: 20, z: 1 }],
+  it('detects workflow, active-stage, and widget-assignment changes', () => {
+    const a: SetupSnapshotV1 = {
+      ...structuredClone(base),
+      sortConfig: { type: 'closed' },
+      workflow: {
+        templateId: 'closed',
+        stages: [{ id: 'closed-stage', kind: 'closed-sort', name: 'Closed sort', order: 0 }],
+        widgets: [
+          {
+            id: 'source-1',
+            kind: 'source',
+            stageId: 'closed-stage',
+            title: 'Source',
+            createdAt: 1,
+            x: 0,
+            y: 0,
+            w: 200,
+            h: 200,
+            z: 1,
+            layout: 'stack',
+          },
+        ],
+      },
+      activeStageId: 'closed-stage',
+      cards: base.cards.map((card) => ({
+        ...card,
+        widgetAssignments: {
+          'closed-stage': { widgetId: 'source-1', zoneId: 'content', order: 0 },
+        },
+      })),
     };
-    const b = {
-      ...a,
-      closedContainers: [
-        { ...a.closedContainers[0], layout: 'fan' as const },
-      ],
-    };
-    expect(isSetupSnapshotEqual(a, b)).toBe(false);
+    const workflowChanged = structuredClone(a);
+    const sourceWidget = workflowChanged.workflow.widgets[0];
+    if (sourceWidget?.kind !== 'source') throw new Error('Expected source widget fixture');
+    sourceWidget.layout = 'fan';
+    const stageChanged = { ...structuredClone(a), activeStageId: 'another-stage' };
+    const assignmentChanged = structuredClone(a);
+    assignmentChanged.cards[0].widgetAssignments!['closed-stage']!.order = 1;
+
+    expect(isSetupSnapshotEqual(a, workflowChanged)).toBe(false);
+    expect(isSetupSnapshotEqual(a, stageChanged)).toBe(false);
+    expect(isSetupSnapshotEqual(a, assignmentChanged)).toBe(false);
   });
 
   it('detects editable targets', () => {

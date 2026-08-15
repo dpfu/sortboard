@@ -59,7 +59,14 @@ async function seedOpenReplaySession(page: Page) {
             id: string;
             cardW: number;
             cardH: number;
-            sortConfig: { type: 'open' | 'closed' | 'qsort'; columns?: number };
+            cardLayoutMode: 'as-is' | 'fixed-16-9' | 'fixed-9-16';
+            sortConfig: { type: 'open' | 'closed' | 'qsort' };
+            workflow: {
+              templateId: 'open' | 'closed' | 'qsort';
+              stages: Array<{ id: string; kind: string; name: string; order: number }>;
+              widgets: Array<Record<string, unknown>>;
+            };
+            activeStageId?: string;
             cards: Array<{
               id: string;
               x: number;
@@ -92,7 +99,9 @@ async function seedOpenReplaySession(page: Page) {
               boardW: 1200,
               boardH: 800,
               sortConfig: board.sortConfig,
-              closedContainersAtStart: [],
+              cardLayoutModeAtStart: board.cardLayoutMode,
+              workflowAtStart: board.workflow,
+              activeStageIdAtStart: board.activeStageId,
               cardsAtStart: board.cards.map((card) => ({ ...card })),
               segments: [
                 {

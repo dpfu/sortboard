@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { cardFromTop, cards, dragLocatorBy, openFreshApp, waitForAppReady } from './helpers/app';
+import { cardFromTop, cards, dragLocatorBy, dragMouseFromTo, openFreshApp, waitForAppReady } from './helpers/app';
 
 type Point = { x: number; y: number };
 
@@ -124,7 +124,7 @@ async function waitForStableBox(locator: Locator, label: string) {
       stableSamples = key === previousKey ? stableSamples + 1 : 1;
       previousKey = key;
       return stableSamples >= 3;
-    }, { message: `wait for ${label} to finish reflowing` })
+    }, { message: `wait for ${label} to finish reflowing`, timeout: 10_000 })
     .toBe(true);
 }
 
@@ -155,10 +155,11 @@ async function dragCardTo(page: Page, card: Locator, target: Locator) {
     throw new Error('Could not resolve card and target bounds');
   }
 
-  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 20 });
-  await page.mouse.up();
+  await dragMouseFromTo(
+    page,
+    { x: cardBox.x + cardBox.width / 2, y: cardBox.y + cardBox.height / 2 },
+    { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 }
+  );
 }
 
 test.describe('replay state isolation', () => {

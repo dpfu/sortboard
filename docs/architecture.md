@@ -23,7 +23,7 @@ Workflow templates add structure to the shared board:
 - `src/App.tsx`: application state, project lifecycle, media ingest, sorting, and replay
 - `src/Board.tsx`: shared board renderer
 - `src/types.ts`: cards, workflows, widgets, and recording data
-- `src/workflow.ts`: workflow creation and compatibility helpers
+- `src/workflow.ts`: workflow creation and editing helpers
 - `src/stageSurface.ts`: visible stage geometry, card layout, and drop targets
 - `src/widgetSort.ts`: assignment rules, capacities, and Q-Sort transitions
 - `src/persist.ts`: IndexedDB storage and ZIP import/export
@@ -36,7 +36,7 @@ IndexedDB stores projects, boards, media assets, sessions, metadata, and setup u
 
 Project ZIP exports contain the board state, sessions, asset metadata, and media blobs. Import assigns new local IDs so an archive can be restored without overwriting an existing project.
 
-The persistence layer still reads legacy Closed-sort fields and converts them to the current workflow model. Those compatibility fields should not be used for new UI behavior.
+SortBoard is pre-release software and does not migrate older persistence formats. A local schema change may reset browser data, and ZIP import accepts only the current archive format. Invalid or unsupported archives are rejected before a project is created.
 
 ## Recording and replay
 

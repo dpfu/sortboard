@@ -121,8 +121,8 @@ function openRecording(id: string, startX: number, finalX: number, label: string
     boardW: 1200,
     boardH: 800,
     sortConfig: { type: 'open' },
+    cardLayoutModeAtStart: 'fixed-16-9',
     workflowAtStart: createWorkflowForTemplate('open', 1200, 800, cardsAtStart.length),
-    closedContainersAtStart: [],
     cardsAtStart,
     segments: [
       {
@@ -182,9 +182,9 @@ function qRecording(id: string) {
     boardW: 1200,
     boardH: 800,
     sortConfig: { type: 'qsort' },
+    cardLayoutModeAtStart: 'fixed-16-9',
     workflowAtStart: workflow,
     activeStageIdAtStart: presortStage.id,
-    closedContainersAtStart: [],
     cardsAtStart,
     segments: [
       {
@@ -279,7 +279,7 @@ function displayedCardPosition(cardId: string) {
   };
 }
 
-function boardContent(board: PersistedBoardV1 | undefined) {
+function boardContent(board: Awaited<ReturnType<typeof persistGetBoard>>) {
   if (!board) return null;
   return {
     sortConfig: board.sortConfig,
@@ -290,7 +290,6 @@ function boardContent(board: PersistedBoardV1 | undefined) {
     workflow: board.workflow,
     activeStageId: board.activeStageId,
     activeSessionId: board.activeSessionId,
-    closedContainers: board.closedContainers,
     cards: board.cards,
   };
 }

@@ -1,9 +1,7 @@
 import { nanoid } from 'nanoid';
 import type {
   BoardWidgetData,
-  CardData,
   CategoryWidgetData,
-  ClosedContainerData,
   PreSortWidgetData,
   QSortBucketData,
   QSortWidgetData,
@@ -248,123 +246,6 @@ export function createWorkflowForTemplate(
     stages: [],
     widgets: [],
   } satisfies SortWorkflowData;
-}
-
-export function migrateLegacyClosedContainersToWorkflow(closedContainers: ClosedContainerData[]): SortWorkflowData {
-  const stage = createStage('closed-sort', 0);
-  const widgets: BoardWidgetData[] = closedContainers.map((container, index) => {
-    if (container.kind === 'source') {
-      return {
-        id: container.id,
-        kind: 'source' as const,
-        stageId: stage.id,
-        title: container.name,
-        createdAt: container.createdAt,
-        x: container.x,
-        y: container.y,
-        w: container.w,
-        h: container.h,
-        z: 10 + index,
-        layout: container.layout,
-      };
-    }
-    return {
-      id: container.id,
-      kind: 'category' as const,
-      stageId: stage.id,
-      title: container.name,
-      createdAt: container.createdAt,
-      x: container.x,
-      y: container.y,
-      w: container.w,
-      h: container.h,
-      z: 10 + index,
-      description: container.description,
-      capacityMode: container.capacityMode,
-      capacity: container.capacity,
-      allowedTags: [...container.allowedTags],
-      layout: container.layout,
-    };
-  });
-  return {
-    templateId: 'closed',
-    stages: [stage],
-    widgets,
-  };
-}
-
-export function migrateLegacyClosedCardAssignments(
-  cards: CardData[],
-  closedContainers: ClosedContainerData[],
-  stageId: string
-) {
-  const sourceId = closedContainers.find((container) => container.kind === 'source')?.id;
-  return cards.map((card) => {
-    const widgetId = card.closedContainerId || sourceId;
-    if (!widgetId) return card;
-    return {
-      ...card,
-      widgetAssignments: {
-        ...(card.widgetAssignments || {}),
-        [stageId]: {
-          widgetId,
-          zoneId: WIDGET_ZONE_CONTENT,
-          order: card.closedContainerOrder ?? 0,
-        },
-      },
-    };
-  });
-}
-
-export function toLegacyClosedContainers(workflow: SortWorkflowData | null | undefined, stageId: string | null | undefined) {
-  const widgets = getWidgetsForStage(workflow, stageId);
-  const targets = widgets.filter((widget): widget is CategoryWidgetData => widget.kind === 'category');
-  return widgets
-    .filter((widget): widget is SourceWidgetData | CategoryWidgetData => widget.kind === 'source' || widget.kind === 'category')
-    .map((widget) => {
-      if (widget.kind === 'source') {
-        return {
-          id: widget.id,
-          kind: 'source' as const,
-          name: widget.title,
-          createdAt: widget.createdAt,
-          x: widget.x,
-          y: widget.y,
-          w: widget.w,
-          h: widget.h,
-          layout: widget.layout,
-        };
-      }
-      const rowOrder = targets.findIndex((target) => target.id === widget.id);
-      return {
-        id: widget.id,
-        kind: 'target' as const,
-        name: widget.title,
-        createdAt: widget.createdAt,
-        x: widget.x,
-        y: widget.y,
-        w: widget.w,
-        h: widget.h,
-        rowOrder: Math.max(0, rowOrder),
-        description: widget.description,
-        visibleInSort: true,
-        capacityMode: widget.capacityMode,
-        capacity: widget.capacity,
-        allowedTags: [...widget.allowedTags],
-        layout: widget.layout,
-      };
-    });
-}
-
-export function projectClosedCardsForStage(cards: CardData[], stageId: string) {
-  return cards.map((card) => {
-    const assignment = card.widgetAssignments?.[stageId];
-    return {
-      ...card,
-      closedContainerId: assignment?.widgetId,
-      closedContainerOrder: assignment?.order,
-    };
-  });
 }
 
 export function getDefaultActiveStageId(workflow: SortWorkflowData | null | undefined) {

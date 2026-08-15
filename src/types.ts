@@ -15,12 +15,8 @@ export type CardKind = 'text' | 'image' | 'video';
 
 export type StackSortKey = 'name' | 'created';
 
-export type ClosedContainerKind = 'source' | 'target';
-
 export type WidgetLayoutMode = 'stack' | 'fan';
-export type ClosedContainerLayout = WidgetLayoutMode;
-
-export type ClosedContainerCapacityMode = 'unlimited' | 'limited';
+export type WidgetCapacityMode = 'unlimited' | 'limited';
 
 export interface CardMetadataV1 {
   name: string;
@@ -35,8 +31,6 @@ export interface CardMetadataV1 {
 
 export interface SortConfig {
   type: SortTemplateId;
-  // Legacy field kept for backward compatibility with persisted boards.
-  columns?: number;
 }
 
 export interface SortStageData {
@@ -67,7 +61,7 @@ export interface SourceWidgetData extends BoardWidgetBase {
 export interface CategoryWidgetData extends BoardWidgetBase {
   kind: 'category';
   description: string;
-  capacityMode: ClosedContainerCapacityMode;
+  capacityMode: WidgetCapacityMode;
   capacity?: number;
   allowedTags: string[];
   layout: WidgetLayoutMode;
@@ -122,35 +116,6 @@ export interface StackData {
   createdAt: number;
 }
 
-export interface ClosedContainerBase {
-  id: string;
-  kind: ClosedContainerKind;
-  name: string;
-  createdAt: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface ClosedSourcePileData extends ClosedContainerBase {
-  kind: 'source';
-  layout: ClosedContainerLayout;
-}
-
-export interface ClosedTargetData extends ClosedContainerBase {
-  kind: 'target';
-  rowOrder: number;
-  description: string;
-  visibleInSort: boolean;
-  capacityMode: ClosedContainerCapacityMode;
-  capacity?: number;
-  allowedTags: string[];
-  layout: ClosedContainerLayout;
-}
-
-export type ClosedContainerData = ClosedSourcePileData | ClosedTargetData;
-
 export interface CardData {
   id: string;
   kind: CardKind;
@@ -167,9 +132,6 @@ export interface CardData {
   stackId?: string;
   stackOrder?: number;
   widgetAssignments?: CardWidgetAssignmentsByStage;
-  // Legacy closed-sort membership fields kept for migration and old recordings.
-  closedContainerId?: string;
-  closedContainerOrder?: number;
   x: number;
   y: number;
   z: number;
@@ -222,26 +184,6 @@ export type DragSegment = {
   settleMs?: number;
 };
 
-export type SourcePromoteSegment = {
-  type: 'source-promote';
-  id: string;
-  cardId: string;
-  t0: number;
-  t1: number;
-  members: StaticMoveMember[];
-  settleMs?: number;
-};
-
-export type TargetCycleSegment = {
-  type: 'target-cycle';
-  id: string;
-  containerId: string;
-  t0: number;
-  t1: number;
-  members: StaticMoveMember[];
-  settleMs?: number;
-};
-
 export type StageTransitionSegment = {
   type: 'stage-transition';
   id: string;
@@ -254,20 +196,19 @@ export type StageTransitionSegment = {
   settleMs?: number;
 };
 
-export type RecordingSegment = DragSegment | SourcePromoteSegment | TargetCycleSegment | StageTransitionSegment;
+export type RecordingSegment = DragSegment | StageTransitionSegment;
 
 export interface RecordingSession {
-  version: 4 | 5;
+  version: 5;
   createdAt: string; // ISO
   cardW: number;
   cardH: number;
   boardW: number;
   boardH: number;
   sortConfig: SortConfig;
-  cardLayoutModeAtStart?: CardLayoutMode;
-  workflowAtStart?: SortWorkflowData;
+  cardLayoutModeAtStart: CardLayoutMode;
+  workflowAtStart: SortWorkflowData;
   activeStageIdAtStart?: string;
-  closedContainersAtStart: ClosedContainerData[];
   cardsAtStart: CardData[];
   segments: RecordingSegment[];
 }

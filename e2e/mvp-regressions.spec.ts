@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import {
   cardFromTop,
   cards,
+  dragMouseFromTo,
   exportProjectZip,
   gotoApp,
   handleDialog,
@@ -118,10 +119,7 @@ async function dragVisibleCardToTarget(page: Page, card: Locator, target: Locato
     y: targetTop <= targetBottom ? (targetTop + targetBottom) / 2 : visibleTarget.top + visibleTarget.height / 2,
   };
 
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(to.x, to.y, { steps: 24 });
-  await page.mouse.up();
+  await dragMouseFromTo(page, from, to);
 }
 
 async function allCardsAreInsideCanvas(page: Page) {
@@ -244,6 +242,7 @@ test('@smoke flushes a pending card edit into an immediate project export', asyn
 
 test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', async ({ page }) => {
   test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });
   await openFreshApp(page);
   const cardTestIds = await allCardTestIds(page);
@@ -278,6 +277,7 @@ test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', 
 
 test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the outer bucket', async ({ page }) => {
   test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });
   await openFreshApp(page);
   const cardTestIds = await allCardTestIds(page);

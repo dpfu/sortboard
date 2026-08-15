@@ -7,9 +7,6 @@ import {
   type CardLayoutMode,
   type CardMetadataV1,
   type CardWidgetAssignmentsByStage,
-  type ClosedContainerLayout,
-  type ClosedContainerData,
-  type ClosedTargetData,
   type RecordingSession,
   type SortStageData,
   type SortTemplateId,
@@ -17,15 +14,12 @@ import {
   type StackData,
   type SortConfig,
   type TextCardColorKey,
+  type WidgetLayoutMode,
 } from './types';
 import { normalizeCardLayoutMode, normalizeCardSizeScale, normalizeImageAspectRatio } from './cardLayout';
 import {
-  createWorkflowForTemplate,
   getDefaultActiveStageId,
   getSeedSourceWidget,
-  migrateLegacyClosedCardAssignments,
-  migrateLegacyClosedContainersToWorkflow,
-  toLegacyClosedContainers,
 } from './workflow';
 import { assignUnassignedCardsToWidgetZone } from './widgetSort';
 
@@ -33,40 +27,36 @@ export type BoardId = string;
 
 export type PersistedCardV1 = {
   id: string;
-  kind: CardData['kind'] | 'dummy';
-  createdAt?: number;
+  kind: CardData['kind'];
+  createdAt: number;
   sizeScale?: number;
   stackId?: string;
   stackOrder?: number;
   widgetAssignments?: CardWidgetAssignmentsByStage;
-  closedContainerId?: string;
-  closedContainerOrder?: number;
   x: number;
   y: number;
   z: number;
   // For media cards we persist only the asset ids (blobs live in the assets store).
   assetId?: string;
   posterAssetId?: string;
-  meta?: CardMetadataV1;
+  meta: CardMetadataV1;
 };
 
 export type PersistedStackV1 = StackData;
 
-export type PersistedClosedContainerV1 = ClosedContainerData;
 export type PersistedSortWorkflowV2 = SortWorkflowData;
 
 export type PersistedBoardV1 = {
-  version: number;
+  version: 2;
   id: BoardId;
   updatedAt: number;
   sortConfig: SortConfig;
   cardW: number;
   cardH: number;
-  cardLayoutMode?: CardLayoutMode;
-  stacks?: PersistedStackV1[];
-  workflow?: PersistedSortWorkflowV2;
+  cardLayoutMode: CardLayoutMode;
+  stacks: PersistedStackV1[];
+  workflow: PersistedSortWorkflowV2;
   activeStageId?: string;
-  closedContainers?: PersistedClosedContainerV1[];
   cards: PersistedCardV1[];
   activeSessionId?: string;
 };
@@ -102,12 +92,11 @@ export type PersistedMetaV1 = {
 };
 
 export type SetupSnapshotV1 = {
-  cardLayoutMode?: CardLayoutMode;
+  cardLayoutMode: CardLayoutMode;
   sortConfig: SortConfig;
-  stacks?: PersistedStackV1[];
-  workflow?: PersistedSortWorkflowV2;
+  stacks: PersistedStackV1[];
+  workflow: PersistedSortWorkflowV2;
   activeStageId?: string;
-  closedContainers?: PersistedClosedContainerV1[];
   cards: PersistedCardV1[];
 };
 
@@ -160,12 +149,10 @@ interface SortboardDB extends DBSchema {
 
 const DB_NAME = 'sortboard-mvp';
 const DB_VERSION = 7;
-const LEGACY_BOARD_ID = 'current';
 const DEFAULT_IMAGE_CARD_NAME = 'Image';
 const DEFAULT_VIDEO_CARD_NAME = 'Video';
 const DEFAULT_TEXT_CARD_NAME = 'Card';
 const DEFAULT_TEXT_CARD_COLOR: TextCardColorKey = 'slate';
-const MAX_CLOSED_TARGETS = 5;
 
 let dbPromise: Promise<IDBPDatabase<SortboardDB>> | null = null;
 let resolvedDb: IDBPDatabase<SortboardDB> | null = null;
@@ -208,6 +195,13 @@ function normalizeOptionalString(value: unknown) {
   return trimmed || undefined;
 }
 
+function normalizeCurrentCardLayoutMode(value: unknown): CardLayoutMode {
+  if (value !== 'as-is' && value !== 'fixed-16-9' && value !== 'fixed-9-16') {
+    throw new Error('Invalid current card layout mode');
+  }
+  return normalizeCardLayoutMode(value);
+}
+
 function normalizeCardCreatedAt(value: unknown, index: number) {
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
     return Math.round(value);
@@ -226,22 +220,6 @@ function normalizeStackOrder(value: unknown) {
   return Math.floor(value);
 }
 
-function normalizeClosedContainerOrder(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined;
-  return Math.floor(value);
-}
-
-function normalizeClosedTargetRowOrder(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined;
-  return Math.floor(value);
-}
-
-function normalizeClosedContainerId(value: unknown) {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
-}
-
 function normalizeStackCreatedAt(value: unknown, index: number) {
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
     return Math.round(value);
@@ -250,16 +228,12 @@ function normalizeStackCreatedAt(value: unknown, index: number) {
 }
 
 function normalizeSortTemplateId(value: unknown): SortTemplateId {
-  return value === 'closed' || value === 'qsort' ? value : 'open';
+  if (value === 'open' || value === 'closed' || value === 'qsort') return value;
+  throw new Error('Invalid current sort type');
 }
 
 function normalizePersistedSortConfig(value: SortConfig | undefined): SortConfig {
-  const templateId = normalizeSortTemplateId(value?.type);
-  const columns = typeof value?.columns === 'number' && Number.isFinite(value.columns) ? Math.max(1, Math.floor(value.columns)) : 3;
-  return {
-    type: templateId,
-    columns,
-  };
+  return { type: normalizeSortTemplateId(value?.type) };
 }
 
 function normalizeWidgetAssignments(value: unknown): CardWidgetAssignmentsByStage | undefined {
@@ -327,7 +301,7 @@ function normalizePreSortZones(value: unknown): [{ id: string; label: string }, 
 
 function normalizeQSortBuckets(value: unknown) {
   if (!Array.isArray(value) || value.length === 0) {
-    return createWorkflowForTemplate('qsort', 1200, 800, 15).widgets.find((widget) => widget.kind === 'qsort')?.buckets || [];
+    throw new Error('Invalid current Q-Sort buckets');
   }
   const next = value
     .map((bucket, index) => {
@@ -401,7 +375,7 @@ function normalizeWorkflowWidget(widget: unknown, index: number, validStageIds: 
     return {
       ...base,
       kind: 'source',
-      layout: normalizeClosedContainerLayout(raw.layout, 'stack'),
+      layout: normalizeWidgetLayout(raw.layout, 'stack'),
     };
   }
   if (kind === 'category') {
@@ -415,7 +389,7 @@ function normalizeWorkflowWidget(widget: unknown, index: number, validStageIds: 
           ? Math.max(1, Math.floor(raw.capacity))
           : undefined,
       allowedTags: normalizeTags(raw.allowedTags),
-      layout: normalizeClosedContainerLayout(raw.layout, 'fan'),
+      layout: normalizeWidgetLayout(raw.layout, 'fan'),
     };
   }
   if (kind === 'pre-sort') {
@@ -436,37 +410,36 @@ function normalizeWorkflowWidget(widget: unknown, index: number, validStageIds: 
 
 function normalizePersistedWorkflow(
   workflow: PersistedSortWorkflowV2 | undefined,
-  sortConfig: SortConfig,
-  closedContainers: PersistedClosedContainerV1[] | undefined,
-  boardW = 1200,
-  boardH = 800,
-  cardCount = 0
+  sortConfig: SortConfig
 ): SortWorkflowData {
   if (!workflow || typeof workflow !== 'object') {
-    if (sortConfig.type === 'closed' && Array.isArray(closedContainers) && closedContainers.length > 0) {
-      return migrateLegacyClosedContainersToWorkflow(closedContainers);
-    }
-    if (sortConfig.type === 'qsort') {
-      return createWorkflowForTemplate('qsort', boardW, boardH, cardCount);
-    }
-    if (sortConfig.type === 'closed') {
-      return createWorkflowForTemplate('closed', boardW, boardH, cardCount);
-    }
-    return createWorkflowForTemplate('open', boardW, boardH, cardCount);
+    throw new Error('Invalid current workflow');
   }
   const templateId = normalizeSortTemplateId((workflow as { templateId?: unknown }).templateId);
+  if (templateId !== sortConfig.type) {
+    throw new Error('Workflow template does not match sort type');
+  }
   const stagesRaw = Array.isArray((workflow as { stages?: unknown[] }).stages) ? (workflow as { stages: unknown[] }).stages : [];
   const stages = stagesRaw
     .map((stage, index) => normalizeWorkflowStage(stage, index))
     .filter((stage): stage is NonNullable<typeof stage> => !!stage)
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  if (stages.length !== stagesRaw.length || new Set(stages.map((stage) => stage.id)).size !== stages.length) {
+    throw new Error('Invalid current workflow stages');
+  }
   const validStageIds = new Set(stages.map((stage) => stage.id));
   const widgetsRaw = Array.isArray((workflow as { widgets?: unknown[] }).widgets) ? (workflow as { widgets: unknown[] }).widgets : [];
   const widgets = widgetsRaw
     .map((widget, index) => normalizeWorkflowWidget(widget, index, validStageIds))
     .filter((widget): widget is BoardWidgetData => !!widget);
-  if (stages.length === 0) {
-    return normalizePersistedWorkflow(undefined, { type: templateId }, closedContainers, boardW, boardH, cardCount);
+  if (widgets.length !== widgetsRaw.length || new Set(widgets.map((widget) => widget.id)).size !== widgets.length) {
+    throw new Error('Invalid current workflow widgets');
+  }
+  if (templateId !== 'open' && stages.length === 0) {
+    throw new Error('Invalid current workflow stages');
+  }
+  if (templateId === 'open' && (stages.length > 0 || widgets.length > 0)) {
+    throw new Error('Invalid current Open workflow');
   }
   return {
     templateId,
@@ -502,13 +475,8 @@ export function createCardMetadata(
   };
 }
 
-function normalizeCardKind(kind: CardData['kind'] | 'dummy'): CardData['kind'] {
-  if (kind === 'dummy') return 'text';
-  return kind;
-}
-
-function fallbackCardName(kind: CardData['kind'] | 'dummy', index: number) {
-  if (kind === 'text' || kind === 'dummy') return `${DEFAULT_TEXT_CARD_NAME} ${index + 1}`;
+function fallbackCardName(kind: CardData['kind'], index: number) {
+  if (kind === 'text') return `${DEFAULT_TEXT_CARD_NAME} ${index + 1}`;
   if (kind === 'video') return `${DEFAULT_VIDEO_CARD_NAME} ${index + 1}`;
   return `${DEFAULT_IMAGE_CARD_NAME} ${index + 1}`;
 }
@@ -516,16 +484,15 @@ function fallbackCardName(kind: CardData['kind'] | 'dummy', index: number) {
 export function normalizeCardMetadata(
   meta: CardMetadataV1 | undefined,
   fallbackName: string,
-  kind: CardData['kind'] | 'dummy'
+  kind: CardData['kind']
 ): CardMetadataV1 {
-  const normalizedKind = normalizeCardKind(kind);
   const nextName = meta?.name?.trim() || fallbackName;
   const base: CardMetadataV1 = {
     name: nextName,
     notes: meta?.notes?.trim() || '',
     tags: normalizeTags(meta?.tags),
   };
-  if (normalizedKind === 'text') {
+  if (kind === 'text') {
     const frontText = meta?.frontText?.trim() || nextName;
     return {
       ...base,
@@ -547,20 +514,24 @@ export function normalizeCardMetadata(
 }
 
 function normalizePersistedCard(card: PersistedCardV1, index: number): PersistedCardV1 {
-  const kind = normalizeCardKind(card.kind);
+  if (card.kind !== 'text' && card.kind !== 'image' && card.kind !== 'video') {
+    throw new Error('Unsupported card kind');
+  }
+  const kind = card.kind;
   return {
-    ...card,
+    id: card.id,
     kind,
     createdAt: normalizeCardCreatedAt(card.createdAt, index),
     sizeScale: normalizeCardSizeScale(card.sizeScale),
     stackId: normalizeStackId(card.stackId),
     stackOrder: normalizeStackOrder(card.stackOrder),
     widgetAssignments: normalizeWidgetAssignments(card.widgetAssignments),
-    closedContainerId: normalizeClosedContainerId(card.closedContainerId),
-    closedContainerOrder: normalizeClosedContainerOrder(card.closedContainerOrder),
-    assetId: normalizeOptionalString(card.assetId),
+    assetId: kind === 'image' || kind === 'video' ? normalizeOptionalString(card.assetId) : undefined,
     posterAssetId: kind === 'video' ? normalizeOptionalString(card.posterAssetId) : undefined,
     meta: normalizeCardMetadata(card.meta, fallbackCardName(kind, index), kind),
+    x: card.x,
+    y: card.y,
+    z: card.z,
   };
 }
 
@@ -572,99 +543,7 @@ function normalizePersistedStack(stack: PersistedStackV1, index: number): Persis
   };
 }
 
-function normalizeContainerRect(
-  value: Pick<PersistedClosedContainerV1, 'x' | 'y' | 'w' | 'h'>
-): Pick<PersistedClosedContainerV1, 'x' | 'y' | 'w' | 'h'> {
-  return {
-    x: typeof value.x === 'number' && Number.isFinite(value.x) ? Math.round(value.x) : 24,
-    y: typeof value.y === 'number' && Number.isFinite(value.y) ? Math.round(value.y) : 24,
-    w: typeof value.w === 'number' && Number.isFinite(value.w) && value.w > 0 ? Math.round(value.w) : 280,
-    h: typeof value.h === 'number' && Number.isFinite(value.h) && value.h > 0 ? Math.round(value.h) : 220,
-  };
-}
-
-function normalizePersistedClosedContainer(
-  container: PersistedClosedContainerV1,
-  index: number
-): PersistedClosedContainerV1 | null {
-  if (!container || typeof container.id !== 'string' || !container.id.trim()) return null;
-  const base = {
-    id: container.id,
-    name: container.name?.trim() || (container.kind === 'source' ? 'Source' : `Target ${index + 1}`),
-    createdAt: normalizeStackCreatedAt(container.createdAt, index),
-    ...normalizeContainerRect(container),
-  };
-  if (container.kind === 'source') {
-    return {
-      ...base,
-      kind: 'source',
-      layout: normalizeClosedContainerLayout(container.layout, 'stack'),
-    };
-  }
-  return {
-    ...base,
-    kind: 'target',
-    rowOrder: normalizeClosedTargetRowOrder((container as { rowOrder?: unknown }).rowOrder) ?? index,
-    description: typeof container.description === 'string' ? container.description : '',
-    visibleInSort: typeof container.visibleInSort === 'boolean' ? container.visibleInSort : true,
-    capacityMode: container.capacityMode === 'limited' ? 'limited' : 'unlimited',
-    capacity:
-      container.capacityMode === 'limited' && typeof container.capacity === 'number' && Number.isFinite(container.capacity)
-        ? Math.max(1, Math.floor(container.capacity))
-        : undefined,
-    allowedTags: normalizeTags((container as ClosedTargetData).allowedTags),
-    layout: normalizeClosedContainerLayout(container.layout, 'fan'),
-  };
-}
-
-function normalizePersistedClosedContainers(closedContainers: PersistedClosedContainerV1[] | undefined) {
-  if (!Array.isArray(closedContainers)) return [] as PersistedClosedContainerV1[];
-  const seen = new Set<string>();
-  let source: PersistedClosedContainerV1 | null = null;
-  const targets: Array<{ container: Extract<PersistedClosedContainerV1, { kind: 'target' }>; hasRowOrder: boolean }> = [];
-  for (let index = 0; index < closedContainers.length; index += 1) {
-    const raw = closedContainers[index];
-    const normalized = normalizePersistedClosedContainer(raw, index);
-    if (!normalized) continue;
-    if (seen.has(normalized.id)) continue;
-    if (normalized.kind === 'source') {
-      if (source) continue;
-      source = normalized;
-    } else {
-      targets.push({
-        container: normalized,
-        hasRowOrder: normalizeClosedTargetRowOrder((raw as { rowOrder?: unknown }).rowOrder) != null,
-      });
-    }
-    seen.add(normalized.id);
-  }
-  const orderedTargets = targets
-    .sort((a, b) => {
-      const aRow = a.hasRowOrder ? a.container.rowOrder : Number.MAX_SAFE_INTEGER;
-      const bRow = b.hasRowOrder ? b.container.rowOrder : Number.MAX_SAFE_INTEGER;
-      return (
-        aRow - bRow ||
-        a.container.x - b.container.x ||
-        a.container.createdAt - b.container.createdAt ||
-        a.container.id.localeCompare(b.container.id)
-      );
-    })
-    .slice(0, MAX_CLOSED_TARGETS);
-
-  if (targets.length > MAX_CLOSED_TARGETS) {
-    console.warn(`[persist] clamped closed targets from ${targets.length} to ${MAX_CLOSED_TARGETS}`);
-  }
-
-  return [
-    ...(source ? [source] : []),
-    ...orderedTargets.map(({ container }, index) => ({
-      ...container,
-      rowOrder: index,
-    })),
-  ];
-}
-
-function normalizeClosedContainerLayout(value: unknown, fallback: ClosedContainerLayout): ClosedContainerLayout {
+function normalizeWidgetLayout(value: unknown, fallback: WidgetLayoutMode): WidgetLayoutMode {
   return value === 'fan' || value === 'stack' ? value : fallback;
 }
 
@@ -738,98 +617,22 @@ function normalizeCardStackMembership(cards: PersistedCardV1[], stacks: Persiste
   };
 }
 
-function normalizeCardClosedMembership(cards: PersistedCardV1[], closedContainers: PersistedClosedContainerV1[]) {
-  if (closedContainers.length === 0) {
-    return {
-      cards: cards.map((card) => ({
-        ...card,
-        closedContainerId: undefined,
-        closedContainerOrder: undefined,
-      })),
-      closedContainers: [],
-    };
-  }
-
-  const source = closedContainers.find((container) => container.kind === 'source');
-  if (!source) {
-    return {
-      cards: cards.map((card) => ({
-        ...card,
-        closedContainerId: undefined,
-        closedContainerOrder: undefined,
-      })),
-      closedContainers: [],
-    };
-  }
-
-  const validIds = new Set(closedContainers.map((container) => container.id));
-  const grouped = new Map<string, PersistedCardV1[]>();
-  const normalizedCards = cards.map((card) => {
-    const closedContainerId =
-      card.closedContainerId && validIds.has(card.closedContainerId) ? card.closedContainerId : source.id;
-    const next = {
-      ...card,
-      closedContainerId,
-      closedContainerOrder: card.closedContainerOrder,
-    };
-    const list = grouped.get(closedContainerId) || [];
-    list.push(next);
-    grouped.set(closedContainerId, list);
-    return next;
-  });
-
-  for (const cardsInContainer of grouped.values()) {
-    cardsInContainer
-      .sort(
-        (a, b) =>
-          (a.closedContainerOrder ?? Number.MAX_SAFE_INTEGER) - (b.closedContainerOrder ?? Number.MAX_SAFE_INTEGER) ||
-          b.z - a.z ||
-          (a.createdAt ?? 0) - (b.createdAt ?? 0) ||
-          a.id.localeCompare(b.id)
-      )
-      .forEach((card, index) => {
-        card.closedContainerOrder = index;
-      });
-  }
-
-  return {
-    cards: normalizedCards,
-    closedContainers,
-  };
-}
-
 function normalizeBoardWorkflowState(
   sortConfig: SortConfig,
   cards: PersistedCardV1[],
   workflow: PersistedSortWorkflowV2 | undefined,
-  activeStageId: string | undefined,
-  closedContainers: PersistedClosedContainerV1[] | undefined,
-  boardW = 1200,
-  boardH = 800
+  activeStageId: string | undefined
 ) {
-  const normalizedWorkflow = normalizePersistedWorkflow(
-    workflow,
-    sortConfig,
-    closedContainers,
-    boardW,
-    boardH,
-    cards.length
-  );
-  const normalizedActiveStageId = normalizeOptionalString(activeStageId) || getDefaultActiveStageId(normalizedWorkflow) || undefined;
+  const normalizedWorkflow = normalizePersistedWorkflow(workflow, sortConfig);
+  const requestedStageId = normalizeOptionalString(activeStageId);
+  if (requestedStageId && !normalizedWorkflow.stages.some((stage) => stage.id === requestedStageId)) {
+    throw new Error('Invalid active workflow stage');
+  }
+  const normalizedActiveStageId = requestedStageId || getDefaultActiveStageId(normalizedWorkflow) || undefined;
   let nextCards = cards.map((card) => ({ ...card }));
 
   if (sortConfig.type !== 'open') {
     const stageId = normalizedActiveStageId || getDefaultActiveStageId(normalizedWorkflow);
-    const normalizedClosedContainers =
-      sortConfig.type === 'closed' && closedContainers && closedContainers.length > 0
-        ? normalizePersistedClosedContainers(closedContainers)
-        : sortConfig.type === 'closed'
-          ? toLegacyClosedContainers(normalizedWorkflow, stageId || undefined)
-          : [];
-    const hasAssignments = !!stageId && nextCards.some((card) => !!card.widgetAssignments?.[stageId]);
-    if (sortConfig.type === 'closed' && stageId && !hasAssignments && normalizedClosedContainers.length > 0) {
-      nextCards = migrateLegacyClosedCardAssignments(nextCards as CardData[], normalizedClosedContainers, stageId) as PersistedCardV1[];
-    }
     const seedSource = getSeedSourceWidget(normalizedWorkflow, normalizedActiveStageId || undefined);
     if (seedSource) {
       nextCards = assignUnassignedCardsToWidgetZone(
@@ -842,7 +645,6 @@ function normalizeBoardWorkflowState(
       cards: nextCards,
       workflow: normalizedWorkflow,
       activeStageId: stageId || undefined,
-      closedContainers: normalizedClosedContainers,
     };
   }
 
@@ -850,7 +652,65 @@ function normalizeBoardWorkflowState(
     cards: nextCards,
     workflow: normalizedWorkflow,
     activeStageId: normalizedActiveStageId,
-    closedContainers: normalizePersistedClosedContainers(closedContainers),
+  };
+}
+
+function normalizeBoard(board: PersistedBoardV1): PersistedBoardV1 {
+  if (!board || board.version !== 2) {
+    throw new Error('Unsupported board version');
+  }
+  if (!Array.isArray(board.cards) || !Array.isArray(board.stacks)) {
+    throw new Error('Invalid current board');
+  }
+  const sortConfig = normalizePersistedSortConfig(board.sortConfig);
+  const stackState = normalizeCardStackMembership(
+    normalizePersistedCards(board.cards),
+    normalizePersistedStacks(board.stacks)
+  );
+  const workflowState = normalizeBoardWorkflowState(
+    sortConfig,
+    stackState.cards,
+    board.workflow,
+    board.activeStageId
+  );
+  return {
+    version: 2,
+    id: board.id,
+    updatedAt: board.updatedAt,
+    sortConfig,
+    cardW: board.cardW,
+    cardH: board.cardH,
+    cardLayoutMode: normalizeCurrentCardLayoutMode(board.cardLayoutMode),
+    stacks: stackState.stacks,
+    workflow: workflowState.workflow,
+    activeStageId: workflowState.activeStageId,
+    cards: workflowState.cards,
+    activeSessionId: normalizeOptionalString(board.activeSessionId),
+  };
+}
+
+function normalizeSetupSnapshot(snapshot: SetupSnapshotV1): SetupSnapshotV1 {
+  if (!snapshot || !Array.isArray(snapshot.cards) || !Array.isArray(snapshot.stacks)) {
+    throw new Error('Invalid current setup snapshot');
+  }
+  const sortConfig = normalizePersistedSortConfig(snapshot.sortConfig);
+  const stackState = normalizeCardStackMembership(
+    normalizePersistedCards(snapshot.cards),
+    normalizePersistedStacks(snapshot.stacks)
+  );
+  const workflowState = normalizeBoardWorkflowState(
+    sortConfig,
+    stackState.cards,
+    snapshot.workflow,
+    snapshot.activeStageId
+  );
+  return {
+    cardLayoutMode: normalizeCurrentCardLayoutMode(snapshot.cardLayoutMode),
+    sortConfig,
+    stacks: stackState.stacks,
+    workflow: workflowState.workflow,
+    activeStageId: workflowState.activeStageId,
+    cards: workflowState.cards,
   };
 }
 
@@ -858,29 +718,41 @@ function normalizePersistedCards(cards: PersistedCardV1[]) {
   return cards.map((card, index) => normalizePersistedCard(card, index));
 }
 
-type RuntimeCardInput = Omit<CardData, 'kind'> & { kind: CardData['kind'] | 'dummy' };
-
-function normalizeRuntimeCard(card: RuntimeCardInput, index: number): CardData {
-  const kind = normalizeCardKind(card.kind);
+function normalizeRuntimeCard(card: CardData, index: number): CardData {
+  if (card.kind !== 'text' && card.kind !== 'image' && card.kind !== 'video') {
+    throw new Error('Unsupported card kind');
+  }
+  const kind = card.kind;
   return {
-    ...card,
+    id: card.id,
     kind,
     createdAt: normalizeCardCreatedAt(card.createdAt, index),
     sizeScale: normalizeCardSizeScale(card.sizeScale),
     stackId: normalizeStackId(card.stackId),
     stackOrder: normalizeStackOrder(card.stackOrder),
     widgetAssignments: normalizeWidgetAssignments(card.widgetAssignments),
-    closedContainerId: normalizeClosedContainerId(card.closedContainerId),
-    closedContainerOrder: normalizeClosedContainerOrder(card.closedContainerOrder),
     meta: normalizeCardMetadata(card.meta, fallbackCardName(kind, index), kind),
+    x: card.x,
+    y: card.y,
+    z: card.z,
+    assetId: kind === 'image' || kind === 'video' ? normalizeOptionalString(card.assetId) : undefined,
+    src: kind === 'image' || kind === 'video' ? card.src : undefined,
+    posterAssetId: kind === 'video' ? normalizeOptionalString(card.posterAssetId) : undefined,
+    posterSrc: kind === 'video' ? card.posterSrc : undefined,
   };
 }
 
-function normalizeRuntimeCards(cards: RuntimeCardInput[]) {
+function normalizeRuntimeCards(cards: CardData[]) {
   return cards.map((card, index) => normalizeRuntimeCard(card, index));
 }
 
 function normalizeRecording(recording: RecordingSession): RecordingSession {
+  if (!recording || recording.version !== 5) {
+    throw new Error('Unsupported recording version');
+  }
+  if (!Array.isArray(recording.cardsAtStart) || !Array.isArray(recording.segments)) {
+    throw new Error('Invalid current recording');
+  }
   const normalizeWidgetAssignmentChanges = (changes: unknown) =>
     Array.isArray(changes)
       ? changes
@@ -916,91 +788,83 @@ function normalizeRecording(recording: RecordingSession): RecordingSession {
           }))
       : [];
 
+  const sortConfig = normalizePersistedSortConfig(recording.sortConfig);
+  const workflowAtStart = normalizePersistedWorkflow(recording.workflowAtStart, sortConfig);
+  const requestedStageId = normalizeOptionalString(recording.activeStageIdAtStart);
+  if (requestedStageId && !workflowAtStart.stages.some((stage) => stage.id === requestedStageId)) {
+    throw new Error('Invalid recording start stage');
+  }
+  const validStageIds = new Set(workflowAtStart.stages.map((stage) => stage.id));
+  const segments = recording.segments.map((segment) => {
+    if (segment.type === 'stage-transition') {
+      const fromStageId = normalizeOptionalString(segment.fromStageId);
+      const toStageId = normalizeOptionalString(segment.toStageId);
+      if (!fromStageId || !toStageId || !validStageIds.has(fromStageId) || !validStageIds.has(toStageId)) {
+        throw new Error('Invalid recording stage transition');
+      }
+      const widgetAssignmentChanges = normalizeWidgetAssignmentChanges(segment.widgetAssignmentChanges);
+      if (widgetAssignmentChanges.some((change) => !validStageIds.has(change.stageId))) {
+        throw new Error('Invalid recording widget assignment stage');
+      }
+      return {
+        type: 'stage-transition' as const,
+        id: segment.id,
+        fromStageId,
+        toStageId,
+        t0: segment.t0,
+        t1: segment.t1,
+        members: normalizeStaticMoveMembers(segment.members),
+        widgetAssignmentChanges,
+        settleMs: segment.settleMs,
+      };
+    }
+    if (segment.type === 'drag') {
+      const widgetAssignmentChanges = normalizeWidgetAssignmentChanges(segment.widgetAssignmentChanges);
+      if (widgetAssignmentChanges.some((change) => !validStageIds.has(change.stageId))) {
+        throw new Error('Invalid recording widget assignment stage');
+      }
+      return {
+        type: 'drag' as const,
+        id: segment.id,
+        cardId: segment.cardId,
+        t0: segment.t0,
+        t1: segment.t1,
+        from: { x: segment.from.x, y: segment.from.y },
+        path: segment.path.map((sample) => [sample[0], sample[1], sample[2]] as const),
+        drop: { x: segment.drop.x, y: segment.drop.y },
+        final: { x: segment.final.x, y: segment.final.y },
+        groupMembers: Array.isArray(segment.groupMembers)
+          ? segment.groupMembers
+              .filter((member) => member && typeof member.cardId === 'string')
+              .map((member) => ({
+                cardId: member.cardId,
+                from: { x: member.from.x, y: member.from.y },
+                drop: { x: member.drop.x, y: member.drop.y },
+                final: { x: member.final.x, y: member.final.y },
+              }))
+          : undefined,
+        widgetAssignmentChanges,
+        settleMembers: normalizeStaticMoveMembers(segment.settleMembers),
+        settleMs: segment.settleMs,
+      };
+    }
+    throw new Error('Unsupported recording segment type');
+  });
+
   return {
-    ...recording,
     version: 5,
-    sortConfig: normalizePersistedSortConfig(recording.sortConfig),
-    workflowAtStart: normalizePersistedWorkflow(
-      recording.workflowAtStart,
-      normalizePersistedSortConfig(recording.sortConfig),
-      recording.closedContainersAtStart,
-      recording.boardW,
-      recording.boardH,
-      Array.isArray(recording.cardsAtStart) ? recording.cardsAtStart.length : 0
-    ),
-    activeStageIdAtStart:
-      normalizeOptionalString(recording.activeStageIdAtStart) ||
-      getDefaultActiveStageId(
-        normalizePersistedWorkflow(
-          recording.workflowAtStart,
-          normalizePersistedSortConfig(recording.sortConfig),
-          recording.closedContainersAtStart,
-          recording.boardW,
-          recording.boardH,
-          Array.isArray(recording.cardsAtStart) ? recording.cardsAtStart.length : 0
-        )
-      ) ||
-      undefined,
-    closedContainersAtStart: normalizePersistedClosedContainers(recording.closedContainersAtStart),
-    cardsAtStart: normalizeRuntimeCards(recording.cardsAtStart as RuntimeCardInput[]),
-    segments: Array.isArray(recording.segments)
-      ? recording.segments
-          .filter((segment) => segment && typeof segment === 'object' && typeof (segment as { type?: unknown }).type === 'string')
-          .map((segment) => {
-            if (segment.type === 'source-promote') {
-              return {
-                type: 'source-promote' as const,
-                id: segment.id,
-                cardId: segment.cardId,
-                t0: segment.t0,
-                t1: segment.t1,
-                members: normalizeStaticMoveMembers(segment.members),
-                settleMs: segment.settleMs,
-              };
-            }
-            if (segment.type === 'target-cycle') {
-              return {
-                type: 'target-cycle' as const,
-                id: segment.id,
-                containerId: segment.containerId,
-                t0: segment.t0,
-                t1: segment.t1,
-                members: normalizeStaticMoveMembers(segment.members),
-                settleMs: segment.settleMs,
-              };
-            }
-            if (segment.type === 'stage-transition') {
-              return {
-                type: 'stage-transition' as const,
-                id: segment.id,
-                fromStageId: normalizeOptionalString(segment.fromStageId) || '',
-                toStageId: normalizeOptionalString(segment.toStageId) || '',
-                t0: segment.t0,
-                t1: segment.t1,
-                members: normalizeStaticMoveMembers(segment.members),
-                widgetAssignmentChanges: normalizeWidgetAssignmentChanges(segment.widgetAssignmentChanges),
-                settleMs: segment.settleMs,
-              };
-            }
-            return {
-              ...segment,
-              type: 'drag' as const,
-              groupMembers: Array.isArray(segment.groupMembers)
-                ? segment.groupMembers
-                    .filter((member) => member && typeof member.cardId === 'string')
-                    .map((member) => ({
-                      cardId: member.cardId,
-                      from: { x: member.from.x, y: member.from.y },
-                      drop: { x: member.drop.x, y: member.drop.y },
-                      final: { x: member.final.x, y: member.final.y },
-                    }))
-                : undefined,
-              widgetAssignmentChanges: normalizeWidgetAssignmentChanges(segment.widgetAssignmentChanges),
-              settleMembers: normalizeStaticMoveMembers(segment.settleMembers),
-            };
-          })
-      : [],
-  };
+    createdAt: recording.createdAt,
+    cardW: recording.cardW,
+    cardH: recording.cardH,
+    boardW: recording.boardW,
+    boardH: recording.boardH,
+    sortConfig,
+    cardLayoutModeAtStart: normalizeCurrentCardLayoutMode(recording.cardLayoutModeAtStart),
+    workflowAtStart,
+    activeStageIdAtStart: requestedStageId || getDefaultActiveStageId(workflowAtStart) || undefined,
+    cardsAtStart: normalizeRuntimeCards(recording.cardsAtStart),
+    segments,
+  } as RecordingSession;
 }
 
 function getExtFromMime(mime: string) {
@@ -1060,6 +924,36 @@ function collectAssetIdsFromRecording(rec: RecordingSession, out: Set<string>) {
   }
 }
 
+function validateImportReferences(
+  board: PersistedBoardV1,
+  sessions: PersistedSessionV1[],
+  assets: ProjectExportAssetV1[]
+) {
+  const sessionIds = new Set<string>();
+  for (const session of sessions) {
+    if (sessionIds.has(session.id)) {
+      throw new Error(`Duplicate session ID in archive: ${session.id}`);
+    }
+    sessionIds.add(session.id);
+  }
+
+  if (board.activeSessionId && !sessionIds.has(board.activeSessionId)) {
+    throw new Error(`Active session is missing from archive: ${board.activeSessionId}`);
+  }
+
+  const declaredAssetIds = new Set(assets.map((asset) => asset.id));
+  const referencedAssetIds = new Set<string>();
+  collectAssetIdsFromBoard(board, referencedAssetIds);
+  for (const session of sessions) {
+    collectAssetIdsFromRecording(session.recording, referencedAssetIds);
+  }
+  for (const assetId of referencedAssetIds) {
+    if (!declaredAssetIds.has(assetId)) {
+      throw new Error(`Asset is referenced but not declared in assets.json: ${assetId}`);
+    }
+  }
+}
+
 async function collectReferencedAssetIds(
   boardsStore: { getAll: () => Promise<PersistedBoardV1[]> },
   sessionsStore: { getAll: () => Promise<PersistedSessionV1[]> },
@@ -1093,10 +987,33 @@ function sanitizeRecording(recording: RecordingSession): RecordingSession {
   };
 }
 
-function remapRecordingAssetIds(recording: RecordingSession, assetIdMap: Map<string, string>, createdAt: string): RecordingSession {
-  const normalized = normalizeRecording(recording);
+function normalizeSession(session: PersistedSessionV1): PersistedSessionV1 {
+  if (!session || session.version !== 1) {
+    throw new Error('Unsupported session version');
+  }
+  if (
+    typeof session.id !== 'string' ||
+    !session.id ||
+    typeof session.boardId !== 'string' ||
+    !session.boardId ||
+    typeof session.updatedAt !== 'number' ||
+    !Number.isFinite(session.updatedAt)
+  ) {
+    throw new Error('Invalid current session');
+  }
   return {
-    ...sanitizeRecording(normalized),
+    version: 1,
+    id: session.id,
+    boardId: session.boardId,
+    updatedAt: session.updatedAt,
+    recording: sanitizeRecording(session.recording),
+  };
+}
+
+function remapRecordingAssetIds(recording: RecordingSession, assetIdMap: Map<string, string>, createdAt: string): RecordingSession {
+  const normalized = sanitizeRecording(recording);
+  return {
+    ...normalized,
     createdAt,
     cardsAtStart: normalized.cardsAtStart.map((c) => {
       if (c.kind === 'text') return { ...c, src: undefined, posterSrc: undefined };
@@ -1118,6 +1035,50 @@ function parseJson<T>(raw: string, label: string): T {
 function validateManifest(value: any): asserts value is ProjectExportManifestV1 {
   if (!value || value.format !== 'sortboard-project-export' || value.version !== 1) {
     throw new Error('Unsupported export format');
+  }
+}
+
+function validateCurrentProject(value: unknown): asserts value is PersistedProjectV1 {
+  const project = value as Partial<PersistedProjectV1> | null;
+  if (
+    !project ||
+    project.version !== 1 ||
+    typeof project.id !== 'string' ||
+    typeof project.name !== 'string' ||
+    typeof project.createdAt !== 'number' ||
+    typeof project.updatedAt !== 'number'
+  ) {
+    throw new Error('Unsupported project version');
+  }
+}
+
+function normalizeProject(value: unknown): PersistedProjectV1 {
+  validateCurrentProject(value);
+  return {
+    version: 1,
+    id: value.id,
+    name: value.name,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+  };
+}
+
+function validateCurrentExportAssets(value: unknown): asserts value is ProjectExportAssetV1[] {
+  if (!Array.isArray(value)) throw new Error('Invalid assets.json');
+  const ids = new Set<string>();
+  for (const item of value) {
+    if (
+      !item ||
+      typeof item.id !== 'string' ||
+      !item.id ||
+      typeof item.mime !== 'string' ||
+      typeof item.file !== 'string' ||
+      !item.file ||
+      ids.has(item.id)
+    ) {
+      throw new Error('Invalid assets.json');
+    }
+    ids.add(item.id);
   }
 }
 
@@ -1155,80 +1116,11 @@ function createStores(db: IDBPDatabase<SortboardDB>) {
   }
 }
 
-async function migrateLegacyCurrentBoard(tx: any) {
-  const boards = tx.objectStore('boards');
-  const sessions = tx.objectStore('sessions');
-  const projects = tx.objectStore('projects');
-  const meta = tx.objectStore('meta');
-
-  const existingProjects = (await projects.getAll()) as PersistedProjectV1[];
-  const legacyBoard = (await boards.get(LEGACY_BOARD_ID)) as PersistedBoardV1 | undefined;
-
-  if (!legacyBoard) {
-    if (existingProjects.length > 0) {
-      const active = (await meta.get('activeProjectId')) as PersistedMetaV1 | undefined;
-      if (!active?.value) {
-        const sorted = [...existingProjects].sort((a, b) => b.updatedAt - a.updatedAt);
-        if (sorted[0]) {
-          await meta.put({ key: 'activeProjectId', value: sorted[0].id }, 'activeProjectId');
-        }
-      }
-    }
-    return;
-  }
-
-  const now = Date.now();
-  const projectId = nanoid();
-  const project: PersistedProjectV1 = {
-    version: 1,
-    id: projectId,
-    name: 'Demo Project',
-    createdAt: now,
-    updatedAt: legacyBoard.updatedAt || now,
-  };
-
-  await projects.put(project, project.id);
-  await boards.put({ ...legacyBoard, id: projectId, updatedAt: project.updatedAt }, projectId);
-  await boards.delete(LEGACY_BOARD_ID);
-
-  let cursor = await sessions.openCursor();
-  while (cursor) {
-    const value = cursor.value as PersistedSessionV1;
-    if (value.boardId === LEGACY_BOARD_ID) {
-      await cursor.update({ ...value, boardId: projectId });
-    }
-    cursor = await cursor.continue();
-  }
-
-  await meta.put({ key: 'activeProjectId', value: projectId }, 'activeProjectId');
-}
-
 function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<SortboardDB>(DB_NAME, DB_VERSION, {
-      async upgrade(db, oldVersion, _newVersion, tx) {
-        if (oldVersion < 1) {
-          createStores(db);
-        }
-        if (oldVersion < 2) {
-          createStores(db);
-          await migrateLegacyCurrentBoard(tx);
-        }
-        if (oldVersion < 3) {
-          createStores(db);
-        }
-        if (oldVersion < 4) {
-          createStores(db);
-        }
-        if (oldVersion < 5) {
-          createStores(db);
-        }
-        if (oldVersion < 6) {
-          createStores(db);
-        }
-        if (oldVersion < 7) {
-          createStores(db);
-        }
+      upgrade(db) {
+        createStores(db);
       },
     }).then((db) => {
       resolvedDb = db;
@@ -1254,6 +1146,7 @@ export async function persistGetAsset(assetId: string) {
   const db = await getDB();
   const asset = await db.get('assets', assetId);
   if (!asset) return undefined;
+  if (asset.version !== 1) throw new Error('Unsupported asset version');
   return {
     ...asset,
     blob: hydrateAssetBlob(asset.blob, asset.mime),
@@ -1266,35 +1159,7 @@ export async function persistDeleteAsset(assetId: string) {
 }
 
 export async function persistPutBoard(board: PersistedBoardV1) {
-  const sortConfig = normalizePersistedSortConfig(board.sortConfig);
-  const stackNormalized = normalizeCardStackMembership(
-    normalizePersistedCards(board.cards),
-    normalizePersistedStacks(board.stacks)
-  );
-  const workflowNormalized = normalizeBoardWorkflowState(
-    sortConfig,
-    stackNormalized.cards,
-    board.workflow,
-    board.activeStageId,
-    board.closedContainers,
-    board.cardW,
-    board.cardH
-  );
-  const closedNormalized = normalizeCardClosedMembership(
-    workflowNormalized.cards,
-    workflowNormalized.closedContainers
-  );
-  const value: PersistedBoardV1 = {
-    ...board,
-    version: 2,
-    sortConfig,
-    cardLayoutMode: normalizeCardLayoutMode(board.cardLayoutMode),
-    stacks: stackNormalized.stacks,
-    workflow: workflowNormalized.workflow,
-    activeStageId: workflowNormalized.activeStageId,
-    closedContainers: closedNormalized.closedContainers,
-    cards: closedNormalized.cards,
-  };
+  const value = normalizeBoard(board);
   const db = resolvedDb;
   if (db) {
     await db.put('boards', value, board.id);
@@ -1311,47 +1176,12 @@ export async function persistGetBoard(boardId: BoardId) {
   const db = await getDB();
   const board = await db.get('boards', boardId);
   if (!board) return undefined;
-  const sortConfig = normalizePersistedSortConfig(board.sortConfig);
-  const stackNormalized = normalizeCardStackMembership(
-    normalizePersistedCards(board.cards),
-    normalizePersistedStacks(board.stacks)
-  );
-  const workflowNormalized = normalizeBoardWorkflowState(
-    sortConfig,
-    stackNormalized.cards,
-    board.workflow,
-    board.activeStageId,
-    board.closedContainers,
-    board.cardW,
-    board.cardH
-  );
-  const closedNormalized = normalizeCardClosedMembership(
-    workflowNormalized.cards,
-    workflowNormalized.closedContainers
-  );
-  return {
-    ...board,
-    version: 2,
-    sortConfig,
-    cardLayoutMode: normalizeCardLayoutMode(board.cardLayoutMode),
-    stacks: stackNormalized.stacks,
-    workflow: workflowNormalized.workflow,
-    activeStageId: workflowNormalized.activeStageId,
-    closedContainers: closedNormalized.closedContainers,
-    cards: closedNormalized.cards,
-  };
+  return normalizeBoard(board);
 }
 
 export async function persistPutSession(session: PersistedSessionV1) {
   const db = await getDB();
-  await db.put(
-    'sessions',
-    {
-      ...session,
-      recording: sanitizeRecording(session.recording),
-    },
-    session.id
-  );
+  await db.put('sessions', normalizeSession(session), session.id);
 }
 
 export async function persistDeleteSession(sessionId: string) {
@@ -1362,33 +1192,31 @@ export async function persistDeleteSession(sessionId: string) {
 export async function persistListSessions(boardId: BoardId) {
   const db = await getDB();
   const sessions = await db.getAllFromIndex('sessions', 'byBoardId', boardId);
-  return sessions.map((session) => ({
-    ...session,
-    recording: normalizeRecording(session.recording),
-  }));
+  return sessions.map(normalizeSession);
 }
 
 export async function persistListProjects() {
   const db = await getDB();
   const projects = await db.getAll('projects');
-  return projects.sort((a, b) => b.updatedAt - a.updatedAt);
+  return projects.map(normalizeProject).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function persistGetProject(projectId: string) {
   const db = await getDB();
-  return db.get('projects', projectId);
+  const project = await db.get('projects', projectId);
+  return project ? normalizeProject(project) : undefined;
 }
 
 export async function persistPutProject(project: PersistedProjectV1) {
   const db = await getDB();
-  await db.put('projects', project, project.id);
+  await db.put('projects', normalizeProject(project), project.id);
 }
 
 export async function persistTouchProject(projectId: string, updatedAt = Date.now()) {
   const db = await getDB();
   const current = await db.get('projects', projectId);
   if (!current) return;
-  await db.put('projects', { ...current, updatedAt }, projectId);
+  await db.put('projects', { ...normalizeProject(current), updatedAt }, projectId);
 }
 
 export async function persistGetActiveProjectId() {
@@ -1406,36 +1234,14 @@ export async function persistGetSetupUndo(projectId: string) {
   const db = await getDB();
   const entry = await db.get('setupUndo', projectId);
   if (!entry) return undefined;
+  if (entry.version !== 1 || !Array.isArray(entry.past)) {
+    throw new Error('Unsupported setup undo version');
+  }
   return {
-    ...entry,
-    past: entry.past.map((snapshot) => ({
-      cardLayoutMode: normalizeCardLayoutMode(snapshot.cardLayoutMode),
-      sortConfig: normalizePersistedSortConfig(snapshot.sortConfig),
-      ...(() => {
-        const stackNormalized = normalizeCardStackMembership(
-          normalizePersistedCards(snapshot.cards),
-          normalizePersistedStacks(snapshot.stacks)
-        );
-        const workflowNormalized = normalizeBoardWorkflowState(
-          normalizePersistedSortConfig(snapshot.sortConfig),
-          stackNormalized.cards,
-          snapshot.workflow,
-          snapshot.activeStageId,
-          snapshot.closedContainers
-        );
-        const closedNormalized = normalizeCardClosedMembership(
-          workflowNormalized.cards,
-          workflowNormalized.closedContainers
-        );
-        return {
-          stacks: stackNormalized.stacks,
-          workflow: workflowNormalized.workflow,
-          activeStageId: workflowNormalized.activeStageId,
-          closedContainers: closedNormalized.closedContainers,
-          cards: closedNormalized.cards,
-        };
-      })(),
-    })),
+    version: 1 as const,
+    projectId: entry.projectId,
+    updatedAt: entry.updatedAt,
+    past: entry.past.map(normalizeSetupSnapshot),
   };
 }
 
@@ -1447,33 +1253,7 @@ export async function persistPutSetupUndo(projectId: string, past: SetupSnapshot
       version: 1,
       projectId,
       updatedAt: Date.now(),
-      past: past.map((snapshot) => {
-        const sortConfig = normalizePersistedSortConfig(snapshot.sortConfig);
-        const stackNormalized = normalizeCardStackMembership(
-          normalizePersistedCards(snapshot.cards),
-          normalizePersistedStacks(snapshot.stacks)
-        );
-        const workflowNormalized = normalizeBoardWorkflowState(
-          sortConfig,
-          stackNormalized.cards,
-          snapshot.workflow,
-          snapshot.activeStageId,
-          snapshot.closedContainers
-        );
-        const closedNormalized = normalizeCardClosedMembership(
-          workflowNormalized.cards,
-          workflowNormalized.closedContainers
-        );
-        return {
-          cardLayoutMode: normalizeCardLayoutMode(snapshot.cardLayoutMode),
-          sortConfig,
-          stacks: stackNormalized.stacks,
-          workflow: workflowNormalized.workflow,
-          activeStageId: workflowNormalized.activeStageId,
-          closedContainers: closedNormalized.closedContainers,
-          cards: closedNormalized.cards,
-        };
-      }),
+      past: past.map(normalizeSetupSnapshot),
     },
     projectId
   );
@@ -1564,48 +1344,14 @@ export async function persistGarbageCollectUnreferencedAssets() {
 export async function persistExportProjectZip(projectId: string): Promise<Blob> {
   const JSZip = await loadJSZip();
   const db = await getDB();
-  const project = await db.get('projects', projectId);
+  const rawProject = await db.get('projects', projectId);
   const rawBoard = await db.get('boards', projectId);
-  if (!project || !rawBoard) {
+  if (!rawProject || !rawBoard) {
     throw new Error('Project not found');
   }
-  const sortConfig = normalizePersistedSortConfig(rawBoard.sortConfig);
-  const board: PersistedBoardV1 = {
-    ...rawBoard,
-    version: 2,
-    sortConfig,
-    cardLayoutMode: normalizeCardLayoutMode(rawBoard.cardLayoutMode),
-    ...(() => {
-      const stackNormalized = normalizeCardStackMembership(
-        normalizePersistedCards(rawBoard.cards),
-        normalizePersistedStacks(rawBoard.stacks)
-      );
-      const workflowNormalized = normalizeBoardWorkflowState(
-        sortConfig,
-        stackNormalized.cards,
-        rawBoard.workflow,
-        rawBoard.activeStageId,
-        rawBoard.closedContainers,
-        rawBoard.cardW,
-        rawBoard.cardH
-      );
-      const closedNormalized = normalizeCardClosedMembership(
-        workflowNormalized.cards,
-        workflowNormalized.closedContainers
-      );
-      return {
-        stacks: stackNormalized.stacks,
-        workflow: workflowNormalized.workflow,
-        activeStageId: workflowNormalized.activeStageId,
-        closedContainers: closedNormalized.closedContainers,
-        cards: closedNormalized.cards,
-      };
-    })(),
-  };
-  const sessions = ((await db.getAllFromIndex('sessions', 'byBoardId', projectId)) as PersistedSessionV1[]).map((session) => ({
-    ...session,
-    recording: normalizeRecording(session.recording),
-  }));
+  const project = normalizeProject(rawProject);
+  const board = normalizeBoard(rawBoard);
+  const sessions = ((await db.getAllFromIndex('sessions', 'byBoardId', projectId)) as PersistedSessionV1[]).map(normalizeSession);
 
   const assetIds = new Set<string>();
   collectAssetIdsFromBoard(board, assetIds);
@@ -1622,7 +1368,9 @@ export async function persistExportProjectZip(projectId: string): Promise<Blob> 
 
   for (const assetId of assetIds) {
     const asset = await db.get('assets', assetId);
-    if (!asset) continue;
+    if (!asset) {
+      throw new Error(`Cannot export project: referenced asset is missing: ${assetId}`);
+    }
     const blob = hydrateAssetBlob(asset.blob, asset.mime);
     const ext = getExtFromMime(asset.mime);
     const file = `assets/${asset.id}.${ext}`;
@@ -1639,7 +1387,7 @@ export async function persistExportProjectZip(projectId: string): Promise<Blob> 
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
   zip.file('project.json', JSON.stringify(project, null, 2));
   zip.file('board.json', JSON.stringify(board, null, 2));
-  zip.file('sessions.json', JSON.stringify(sessions.map((s) => ({ ...s, recording: sanitizeRecording(s.recording) })), null, 2));
+  zip.file('sessions.json', JSON.stringify(sessions, null, 2));
   zip.file('assets.json', JSON.stringify(assets, null, 2));
 
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
@@ -1669,42 +1417,17 @@ export async function persistImportProjectZip(file: Blob): Promise<{ projectId: 
   if (!importedProject || !importedBoardRaw || !Array.isArray(importedSessionsRaw) || !Array.isArray(importedAssets)) {
     throw new Error('Invalid archive payload');
   }
-  const importedBoard: PersistedBoardV1 = {
-    ...importedBoardRaw,
-    version: 2,
-    sortConfig: normalizePersistedSortConfig(importedBoardRaw.sortConfig),
-    cardLayoutMode: normalizeCardLayoutMode(importedBoardRaw.cardLayoutMode),
-    ...(() => {
-      const stackNormalized = normalizeCardStackMembership(
-        normalizePersistedCards(importedBoardRaw.cards || []),
-        normalizePersistedStacks(importedBoardRaw.stacks)
-      );
-      const workflowNormalized = normalizeBoardWorkflowState(
-        normalizePersistedSortConfig(importedBoardRaw.sortConfig),
-        stackNormalized.cards,
-        importedBoardRaw.workflow,
-        importedBoardRaw.activeStageId,
-        importedBoardRaw.closedContainers,
-        importedBoardRaw.cardW,
-        importedBoardRaw.cardH
-      );
-      const closedNormalized = normalizeCardClosedMembership(
-        workflowNormalized.cards,
-        workflowNormalized.closedContainers
-      );
-      return {
-        stacks: stackNormalized.stacks,
-        workflow: workflowNormalized.workflow,
-        activeStageId: workflowNormalized.activeStageId,
-        closedContainers: closedNormalized.closedContainers,
-        cards: closedNormalized.cards,
-      };
-    })(),
-  };
-  const importedSessions: PersistedSessionV1[] = importedSessionsRaw.map((session) => ({
-    ...session,
-    recording: normalizeRecording(session.recording),
-  }));
+  validateCurrentProject(importedProject);
+  validateCurrentExportAssets(importedAssets);
+  const importedBoard = normalizeBoard(importedBoardRaw);
+  const importedSessions = importedSessionsRaw.map(normalizeSession);
+  if (
+    importedBoard.id !== importedProject.id ||
+    importedSessions.some((session) => session.boardId !== importedProject.id)
+  ) {
+    throw new Error('Archive project references do not match');
+  }
+  validateImportReferences(importedBoard, importedSessions, importedAssets);
 
   const importedAssetBlobs = new Map<string, Blob>();
   for (const item of importedAssets) {
@@ -1759,9 +1482,8 @@ export async function persistImportProjectZip(file: Blob): Promise<{ projectId: 
     version: 2,
     id: projectId,
     updatedAt: now,
-    cardLayoutMode: normalizeCardLayoutMode(importedBoard.cardLayoutMode),
+    cardLayoutMode: normalizeCurrentCardLayoutMode(importedBoard.cardLayoutMode),
     stacks: importedBoard.stacks,
-    closedContainers: importedBoard.closedContainers,
     cards: importedBoard.cards.map((c) => {
       if (c.kind === 'text') return { ...c, assetId: undefined, posterAssetId: undefined };
       return {

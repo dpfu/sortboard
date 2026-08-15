@@ -168,11 +168,13 @@ describe('App sorting workflow', () => {
 
     await persist.persistPutBoard({
       ...board!,
+      version: 2,
       cardLayoutMode: 'as-is',
       cards: [
         {
           id: imageA.id,
           kind: 'image',
+          createdAt: 1,
           assetId: 'asset-a',
           x: 20,
           y: 20,
@@ -182,6 +184,7 @@ describe('App sorting workflow', () => {
         {
           id: imageB.id,
           kind: 'image',
+          createdAt: 2,
           assetId: 'asset-b',
           x: 320,
           y: 20,
@@ -223,11 +226,13 @@ describe('App sorting workflow', () => {
 
     await persist.persistPutBoard({
       ...board!,
+      version: 2,
       cardLayoutMode: 'fixed-9-16',
       cards: [
         {
           id: 'img-portrait-1',
           kind: 'image',
+          createdAt: 1,
           assetId: undefined,
           x: 20,
           y: 20,
@@ -237,6 +242,7 @@ describe('App sorting workflow', () => {
         {
           id: 'txt-portrait-1',
           kind: 'text',
+          createdAt: 2,
           x: 320,
           y: 20,
           z: 2,

@@ -174,6 +174,7 @@ describe('App closed sort widgets', () => {
 
     await persist.persistPutBoard({
       ...board!,
+      version: 2,
       cards: board!.cards.map((card, index) =>
         card.id !== firstCard.id
           ? card
@@ -261,6 +262,7 @@ describe('App closed sort widgets', () => {
 
     await persist.persistPutBoard({
       ...board!,
+      version: 2,
       activeStageId: stage!.id,
       cards: board!.cards.map((card, index) => ({
         ...card,

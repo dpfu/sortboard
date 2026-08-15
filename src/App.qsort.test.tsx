@@ -120,6 +120,7 @@ describe('App qsort workflow', () => {
 
     await persist.persistPutBoard({
       ...qsortBoard,
+      version: 2,
       activeStageId: presortStage.id,
       cards: qsortBoard.cards.map((card, index) => ({
         ...card,

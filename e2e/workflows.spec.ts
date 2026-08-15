@@ -1,5 +1,13 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { cardFromTop, cards, dragLocatorBy, handleDialog, openFreshApp, waitForAppReady } from './helpers/app';
+import {
+  cardFromTop,
+  cards,
+  dragLocatorBy,
+  dragMouseFromTo,
+  handleDialog,
+  openFreshApp,
+  waitForAppReady,
+} from './helpers/app';
 
 async function createEmptyProjectWithTextCards(page: Page, count: number) {
   await openFreshApp(page);
@@ -51,10 +59,11 @@ async function dragCardTo(page: Page, cardTestId: string, targetTestId: string) 
     throw new Error(`Could not resolve drag bounds for ${cardTestId} -> ${targetTestId}`);
   }
 
-  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 20 });
-  await page.mouse.up();
+  await dragMouseFromTo(
+    page,
+    { x: cardBox.x + cardBox.width / 2, y: cardBox.y + cardBox.height / 2 },
+    { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 }
+  );
 }
 
 async function testIdOf(locator: Locator) {
@@ -418,7 +427,14 @@ async function seedOpenReplaySessions(page: Page) {
             id: string;
             cardW: number;
             cardH: number;
-            sortConfig: { type: 'open' | 'closed' | 'qsort'; columns?: number };
+            cardLayoutMode: 'as-is' | 'fixed-16-9' | 'fixed-9-16';
+            sortConfig: { type: 'open' | 'closed' | 'qsort' };
+            workflow: {
+              templateId: 'open' | 'closed' | 'qsort';
+              stages: Array<{ id: string; kind: string; name: string; order: number }>;
+              widgets: Array<Record<string, unknown>>;
+            };
+            activeStageId?: string;
             cards: Array<{
               id: string;
               x: number;
@@ -454,7 +470,9 @@ async function seedOpenReplaySessions(page: Page) {
               boardW: 1200,
               boardH: 800,
               sortConfig: board.sortConfig,
-              closedContainersAtStart: [],
+              cardLayoutModeAtStart: board.cardLayoutMode,
+              workflowAtStart: board.workflow,
+              activeStageIdAtStart: board.activeStageId,
               cardsAtStart: baseCards,
               segments: [
                 {
@@ -489,7 +507,9 @@ async function seedOpenReplaySessions(page: Page) {
               boardW: 1200,
               boardH: 800,
               sortConfig: board.sortConfig,
-              closedContainersAtStart: [],
+              cardLayoutModeAtStart: board.cardLayoutMode,
+              workflowAtStart: board.workflow,
+              activeStageIdAtStart: board.activeStageId,
               cardsAtStart: baseCards,
               segments: [
                 {

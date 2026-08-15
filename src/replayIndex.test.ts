@@ -31,9 +31,9 @@ function recording(): RecordingSession {
     boardW: 1000,
     boardH: 700,
     sortConfig: { type: 'qsort' },
+    cardLayoutModeAtStart: 'fixed-16-9',
     workflowAtStart: workflow,
     activeStageIdAtStart: 'pre',
-    closedContainersAtStart: [],
     cardsAtStart: [startCard],
     // Intentionally out of input order and with non-monotone t1 values. The
     // index owns chronological ordering for both poses and discrete state.

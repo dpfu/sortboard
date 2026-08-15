@@ -3,6 +3,8 @@
 SortBoard is an experimental, local-first board for sorting text, images, and short videos.
 It runs entirely in a desktop browser and does not require a backend or account.
 
+**Live demo:** [dpfu.github.io/sortboard](https://dpfu.github.io/sortboard/)
+
 ## Status
 
 SortBoard is pre-release research software. The current goal is a small, testable v0.1 rather than a general-purpose collaboration platform.
@@ -40,7 +42,7 @@ A project export is a ZIP archive containing:
 - `assets.json`
 - the referenced media files in `assets/`
 
-The archive is intended for backup and transfer between SortBoard installations. Its JSON is inspectable, but the export is not yet a stable analysis API.
+The archive is intended for backup and transfer between SortBoard installations using the current export format. Pre-release updates may reset local browser data or reject exports created by older versions. The JSON is inspectable, but the export is not a stable analysis API.
 
 ## Run locally
 
@@ -92,7 +94,7 @@ npm run test:e2e:full
 - no URL or social-platform import
 - no Q-method statistics or analysis report
 - video support depends on browser and operating-system codecs
-- persistence and export schemas may change before v0.1
+- persistence and export schemas may change before v0.1, without migration support
 
 See [docs/architecture.md](docs/architecture.md) for the implementation overview.
 

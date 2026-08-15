@@ -68,7 +68,7 @@ async function persistedBoardCardCount(page: Page) {
 export async function waitForAppReady(page: Page) {
   const startButton = page.getByRole('button', { name: 'Start sorting →' });
   await expect(startButton).toBeVisible();
-  await expect(startButton).toBeEnabled();
+  await expect(startButton).toBeEnabled({ timeout: 10_000 });
   await expect.poll(() => selectedProjectName(page)).not.toBe('');
   await expect.poll(() => persistedBoardCardCount(page)).not.toBeNull();
   const expectedCardCount = await persistedBoardCardCount(page);
@@ -110,11 +110,15 @@ export async function uploadMedia(page: Page, files: UploadFiles) {
   await uploadMediaWithChooser(page, files);
 }
 
-async function dragFromTo(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+export async function dragMouseFromTo(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
-  await page.mouse.move(to.x, to.y, { steps: 20 });
-  await page.mouse.up();
+  try {
+    await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
+    await page.mouse.move(to.x, to.y);
+  } finally {
+    await page.mouse.up();
+  }
 }
 
 async function dragFromToWithPointerEvents(
@@ -198,7 +202,7 @@ export async function dragLocatorBy(page: Page, locator: Locator, delta: { x: nu
     await dragFromToWithPointerEvents(locator, from, to);
     return;
   }
-  await dragFromTo(page, from, to);
+  await dragMouseFromTo(page, from, to);
 }
 
 export async function resizeCardFromEast(page: Page, locator: Locator, deltaX: number) {
@@ -217,7 +221,7 @@ export async function resizeCardFromEast(page: Page, locator: Locator, deltaX: n
     x: from.x + deltaX,
     y: from.y,
   };
-  await dragFromTo(page, from, to);
+  await dragMouseFromTo(page, from, to);
 }
 
 type DialogOptions = {

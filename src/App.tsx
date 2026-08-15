@@ -9,7 +9,6 @@ import type {
   CardData,
   CardLayoutMode,
   CardMetadataV1,
-  ClosedContainerData,
   DragSegment,
   Mode,
   RecordingSession,
@@ -21,7 +20,7 @@ import type {
   TraceSample,
 } from './types';
 import { SUPPORTED_MEDIA_ACCEPT, clamp, detectMediaKind, isSupportedMediaFile } from './utils';
-import { clampToBoard as clampToBoardPure, snapClosed as snapClosedPure } from './positioning';
+import { clampToBoard as clampToBoardPure } from './positioning';
 import { useElementSize } from './useElementSize';
 import {
   CARD_SIZE_SCALE_MAX,
@@ -58,7 +57,6 @@ import {
   persistTouchProject,
   type BoardId,
   type PersistedBoardV1,
-  type PersistedClosedContainerV1,
   type PersistedSessionV1,
   type PersistedStackV1,
   type PersistedProjectV1,
@@ -79,12 +77,8 @@ import {
   getSourceWidget,
   getTemplateLabel,
   isWorkflowConfiguredForSorting,
-  migrateLegacyClosedCardAssignments,
-  migrateLegacyClosedContainersToWorkflow,
-  projectClosedCardsForStage,
   patchWorkflowWidget,
   removeWidgetFromWorkflow,
-  toLegacyClosedContainers,
   WIDGET_ZONE_CONTENT,
 } from './workflow';
 import {
@@ -128,7 +122,7 @@ const DEFAULT_CARD_W = 240;
 const CARD_W_MIN = 160;
 const CARD_W_MAX = 360;
 const CARD_W_STEP = 8;
-const DEFAULT_SORT_CONFIG: SortConfig = { type: 'open', columns: 3 };
+const DEFAULT_SORT_CONFIG: SortConfig = { type: 'open' };
 const DEFAULT_PROJECT_NAME = 'Demo Project';
 const DEMO_CARD_COUNT = 24;
 const DEFAULT_CARD_LAYOUT_MODE: CardLayoutMode = 'as-is';
@@ -304,8 +298,8 @@ function defaultVideoMeta(
   });
 }
 
-function fallbackCardNameForKind(kind: CardData['kind'] | 'dummy', index: number) {
-  if (kind === 'text' || kind === 'dummy') return `Card ${index + 1}`;
+function fallbackCardNameForKind(kind: CardData['kind'], index: number) {
+  if (kind === 'text') return `Card ${index + 1}`;
   if (kind === 'video') return `Video ${index + 1}`;
   return `Image ${index + 1}`;
 }
@@ -322,32 +316,6 @@ function sortTypeDescription(type: SortType) {
 
 function nextCreatedAt(index = 0) {
   return Date.now() + index;
-}
-
-type LegacyCardData = Omit<CardData, 'kind'> & { kind: CardData['kind'] | 'dummy' };
-
-function normalizeCard(card: LegacyCardData, index: number): CardData {
-  const kind = card.kind === 'dummy' ? 'text' : card.kind;
-  return {
-    ...card,
-    kind,
-    createdAt: typeof card.createdAt === 'number' ? card.createdAt : index + 1,
-    sizeScale: normalizeCardSizeScale(card.sizeScale),
-    stackId: typeof card.stackId === 'string' ? card.stackId : undefined,
-    stackOrder: typeof card.stackOrder === 'number' ? card.stackOrder : undefined,
-    widgetAssignments: card.widgetAssignments,
-    closedContainerId: typeof card.closedContainerId === 'string' ? card.closedContainerId : undefined,
-    closedContainerOrder: typeof card.closedContainerOrder === 'number' ? card.closedContainerOrder : undefined,
-    assetId: kind === 'text' ? undefined : card.assetId,
-    src: kind === 'text' ? undefined : card.src,
-    posterAssetId: kind === 'video' ? card.posterAssetId : undefined,
-    posterSrc: kind === 'video' ? card.posterSrc : undefined,
-    meta: normalizeCardMetadata(card.meta, fallbackCardNameForKind(kind, index), kind),
-  };
-}
-
-function normalizeCards(cards: LegacyCardData[]) {
-  return cards.map((card, index) => normalizeCard(card, index));
 }
 
 function createTextCard(index: number, z: number): CardData {
@@ -375,8 +343,6 @@ function toPersistedCards(cards: CardData[]) {
     stackId: c.stackId,
     stackOrder: c.stackOrder,
     widgetAssignments: c.widgetAssignments,
-    closedContainerId: c.closedContainerId,
-    closedContainerOrder: c.closedContainerOrder,
     meta: normalizeCardMetadata(c.meta, fallbackCardNameForKind(c.kind, index), c.kind),
     x: c.x,
     y: c.y,
@@ -394,10 +360,6 @@ function toPersistedStacks(stacks: StackData[]): PersistedStackV1[] {
   }));
 }
 
-function toPersistedClosedContainers(closedContainers: ClosedContainerData[]): PersistedClosedContainerV1[] {
-  return closedContainers.map((container) => ({ ...container }));
-}
-
 function toPersistedWorkflow(workflow: SortWorkflowData): SortWorkflowData {
   return {
     templateId: workflow.templateId,
@@ -407,84 +369,35 @@ function toPersistedWorkflow(workflow: SortWorkflowData): SortWorkflowData {
 }
 
 function sanitizeRecording(recording: RecordingSession): RecordingSession {
-  const closedStageId =
-    recording.sortConfig.type === 'closed'
-      ? recording.activeStageIdAtStart || getDefaultActiveStageId(recording.workflowAtStart)
-      : null;
-  const closedContainersAtStart =
-    recording.sortConfig.type === 'closed' && recording.workflowAtStart
-      ? toLegacyClosedContainers(recording.workflowAtStart, closedStageId || undefined)
-      : [];
-  const cardsAtStart =
-    recording.sortConfig.type === 'closed' && recording.workflowAtStart && closedStageId
-      ? projectClosedCardsForStage(recording.cardsAtStart, closedStageId)
-      : recording.cardsAtStart;
   return {
     ...recording,
     version: 5,
-    workflowAtStart: recording.workflowAtStart
-      ? {
-          templateId: recording.workflowAtStart.templateId,
-          stages: recording.workflowAtStart.stages.map((stage) => ({ ...stage })),
-          widgets: recording.workflowAtStart.widgets.map((widget) => ({ ...widget })) as BoardWidgetData[],
-        }
-      : undefined,
-    closedContainersAtStart: toPersistedClosedContainers(closedContainersAtStart),
-    cardsAtStart: normalizeCards(cardsAtStart).map((c) => ({ ...c, src: undefined, posterSrc: undefined })),
+    workflowAtStart: toPersistedWorkflow(recording.workflowAtStart),
+    cardsAtStart: toPersistedCards(recording.cardsAtStart).map((card) => ({
+      ...card,
+      src: undefined,
+      posterSrc: undefined,
+    })),
   };
-}
-
-function deriveClosedContainersForPersistence(
-  sortConfig: SortConfig,
-  workflow: SortWorkflowData,
-  activeStageId: string | null | undefined
-) {
-  if (sortConfig.type !== 'closed') return [] as PersistedClosedContainerV1[];
-  return toPersistedClosedContainers(toLegacyClosedContainers(workflow, activeStageId || undefined));
-}
-
-function projectCardsForPersistence(
-  cards: CardData[],
-  sortConfig: SortConfig,
-  _workflow: SortWorkflowData,
-  activeStageId: string | null | undefined
-) {
-  if (sortConfig.type !== 'closed' || !activeStageId) return toPersistedCards(cards);
-  return toPersistedCards(projectClosedCardsForStage(cards, activeStageId));
 }
 
 function resolveRuntimeWorkflowState(
   sortConfig: SortConfig,
-  workflow: SortWorkflowData | null | undefined,
+  workflow: SortWorkflowData,
   activeStageId: string | null | undefined,
-  legacyClosedContainers: ClosedContainerData[] | undefined,
-  cards: CardData[],
-  boardW = 1200,
-  boardH = 800
+  cards: CardData[]
 ) {
+  const nextWorkflow = toPersistedWorkflow(workflow);
   if (sortConfig.type === 'open') {
     return {
-      workflow: createWorkflowForTemplate('open', boardW, boardH, cards.length),
+      workflow: nextWorkflow,
       activeStageId: null,
       cards,
     };
   }
 
-  const nextWorkflow =
-    workflow?.templateId === sortConfig.type
-      ? toPersistedWorkflow(workflow)
-      : sortConfig.type === 'closed' && legacyClosedContainers && legacyClosedContainers.length > 0
-        ? migrateLegacyClosedContainersToWorkflow(legacyClosedContainers)
-        : createWorkflowForTemplate(sortConfig.type, boardW, boardH, cards.length);
   const nextStageId = activeStageId || getDefaultActiveStageId(nextWorkflow);
   let nextCards = cards;
-
-  if (sortConfig.type === 'closed' && nextStageId && legacyClosedContainers && legacyClosedContainers.length > 0) {
-    const hasAssignments = nextCards.some((card) => !!card.widgetAssignments?.[nextStageId]);
-    if (!hasAssignments) {
-      nextCards = migrateLegacyClosedCardAssignments(nextCards, legacyClosedContainers, nextStageId);
-    }
-  }
 
   const seedSource = getSeedSourceWidget(nextWorkflow, nextStageId);
   if (seedSource) {
@@ -495,50 +408,6 @@ function resolveRuntimeWorkflowState(
     workflow: nextWorkflow,
     activeStageId: nextStageId,
     cards: nextCards,
-  };
-}
-
-function migrateRecording(recAny: any): RecordingSession {
-  if (recAny && Array.isArray(recAny.segments)) {
-    return {
-      ...recAny,
-      version: 5,
-      closedContainersAtStart: Array.isArray(recAny.closedContainersAtStart) ? recAny.closedContainersAtStart : [],
-      cardsAtStart: normalizeCards(Array.isArray(recAny.cardsAtStart) ? recAny.cardsAtStart : []),
-    };
-  }
-  return {
-    version: 5,
-    createdAt: recAny.createdAt,
-    cardW: recAny.cardW,
-    cardH: recAny.cardH,
-    boardW: recAny.boardW,
-    boardH: recAny.boardH,
-    sortConfig: recAny.sortConfig,
-    closedContainersAtStart: [],
-    cardsAtStart: normalizeCards(Array.isArray(recAny.cardsAtStart) ? recAny.cardsAtStart : []),
-    segments: Array.isArray(recAny?.traces)
-      ? recAny.traces.map((tr: any) => {
-          const first = tr.samples?.[0] as TraceSample | undefined;
-          const last = tr.samples?.[tr.samples.length - 1] as TraceSample | undefined;
-          const fromX = first ? first[1] : 0;
-          const fromY = first ? first[2] : 0;
-          const dropX = last ? last[1] : fromX;
-          const dropY = last ? last[2] : fromY;
-          return {
-            type: 'drag',
-            id: nanoid(),
-            cardId: tr.cardId,
-            t0: tr.startMs ?? (first ? first[0] : 0),
-            t1: tr.endMs ?? (last ? last[0] : tr.startMs ?? 0),
-            from: { x: fromX, y: fromY },
-            path: Array.isArray(tr.samples) ? tr.samples : ([] as TraceSample[]),
-            drop: { x: dropX, y: dropY },
-            final: { x: dropX, y: dropY },
-            settleMs: 0,
-          };
-        })
-      : [],
   };
 }
 
@@ -624,7 +493,6 @@ function bootstrapProjectsOnce(createDemoProjectCards: (count?: number) => Promi
           stacks: [],
           workflow: createWorkflowForTemplate('open', 1200, 800, starter.length),
           activeStageId: undefined,
-          closedContainers: [],
           cards: toPersistedCards(starter),
         });
         await persistSetActiveProjectId(projectId);
@@ -1050,8 +918,7 @@ export default function App() {
       stacks: toPersistedStacks(stacks),
       workflow: toPersistedWorkflow(workflow),
       activeStageId: activeStageId || undefined,
-      closedContainers: deriveClosedContainersForPersistence(sortConfig, workflow, activeStageId),
-      cards: projectCardsForPersistence(cards, sortConfig, workflow, activeStageId),
+      cards: toPersistedCards(cards),
     };
   }, [
     activeStageId,
@@ -1121,17 +988,7 @@ export default function App() {
       stacks: toPersistedStacks(latest.stacks),
       workflow: toPersistedWorkflow(latest.workflow),
       activeStageId: latest.activeStageId || undefined,
-      closedContainers: deriveClosedContainersForPersistence(
-        latest.sortConfig,
-        latest.workflow,
-        latest.activeStageId
-      ),
-      cards: projectCardsForPersistence(
-        latest.cards,
-        latest.sortConfig,
-        latest.workflow,
-        latest.activeStageId
-      ),
+      cards: toPersistedCards(latest.cards),
     };
   }, [boardId, isProjectHydrated]);
 
@@ -1273,13 +1130,7 @@ export default function App() {
   // Track a monotonically increasing z for predictable stacking.
   const zTop = React.useRef<number>(Math.max(...cards.map((c) => c.z), 0));
 
-  type HydratableCard = Omit<CardData, 'kind' | 'src' | 'posterSrc' | 'meta' | 'createdAt'> & {
-    kind: CardData['kind'] | 'dummy';
-    createdAt?: number;
-    assetId?: string;
-    posterAssetId?: string;
-    meta?: CardMetadataV1;
-  };
+  type HydratableCard = Omit<CardData, 'src' | 'posterSrc'>;
 
   const hydrateCardsFromPersisted = React.useCallback(
     async (persistedCards: HydratableCard[]) => {
@@ -1295,7 +1146,7 @@ export default function App() {
       await Promise.all(Array.from(assetIds, (assetId) => getOrCreateObjectUrlForAsset(assetId)));
 
       return persistedCards.map((pc, i): CardData => {
-        const kind = pc.kind === 'dummy' ? 'text' : pc.kind;
+        const kind = pc.kind;
         const meta = normalizeCardMetadata(pc.meta, fallbackCardNameForKind(kind, i), kind);
         const src =
           (kind === 'image' || kind === 'video') && pc.assetId
@@ -1308,7 +1159,6 @@ export default function App() {
         return {
           ...pc,
           kind,
-          createdAt: typeof pc.createdAt === 'number' ? pc.createdAt : i + 1,
           sizeScale: normalizeCardSizeScale(pc.sizeScale),
           meta,
           assetId: kind === 'image' || kind === 'video' ? pc.assetId : undefined,
@@ -1410,8 +1260,7 @@ export default function App() {
       stacks: toPersistedStacks(stacks),
       workflow: toPersistedWorkflow(workflow),
       activeStageId: activeStageId || undefined,
-      closedContainers: deriveClosedContainersForPersistence(sortConfig, workflow, activeStageId),
-      cards: projectCardsForPersistence(cards, sortConfig, workflow, activeStageId),
+      cards: toPersistedCards(cards),
     }),
     [activeStageId, cardLayoutMode, cards, sortConfig, stacks, workflow]
   );
@@ -1465,16 +1314,13 @@ export default function App() {
       if (activeProjectIdRef.current !== projectId) return;
       const runtimeState = resolveRuntimeWorkflowState(
         snapshot.sortConfig,
-        snapshot.workflow || null,
+        snapshot.workflow,
         snapshot.activeStageId || null,
-        snapshot.closedContainers,
-        hydratedCards,
-        1200,
-        800
+        hydratedCards
       );
       setCardLayoutMode(normalizeCardLayoutMode(snapshot.cardLayoutMode));
       setSortConfig({ ...snapshot.sortConfig });
-      setStacks(snapshot.stacks || []);
+      setStacks(snapshot.stacks);
       setWorkflow(runtimeState.workflow);
       setActiveStageId(runtimeState.activeStageId);
       setCards(runtimeState.cards);
@@ -1627,7 +1473,6 @@ export default function App() {
           stacks: [],
           workflow: createWorkflowForTemplate('open', 1200, 800, starter.length),
           activeStageId: undefined,
-          closedContainers: [],
           cards: toPersistedCards(starter),
         });
         if (cancelled) return;
@@ -1661,18 +1506,15 @@ export default function App() {
       if (cancelled) return;
       const runtimeState = resolveRuntimeWorkflowState(
         persisted.sortConfig,
-        persisted.workflow || null,
+        persisted.workflow,
         persisted.activeStageId || null,
-        persisted.closedContainers || [],
-        hydratedCards,
-        1200,
-        800
+        hydratedCards
       );
 
       setSortConfig(persisted.sortConfig);
       setCardWidth(clampCardWidth(persisted.cardW || DEFAULT_CARD_W));
       setCardLayoutMode(normalizeCardLayoutMode(persisted.cardLayoutMode));
-      setStacks(persisted.stacks || []);
+      setStacks(persisted.stacks);
       setWorkflow(runtimeState.workflow);
       setActiveStageId(runtimeState.activeStageId);
       setCards(runtimeState.cards);
@@ -1681,12 +1523,11 @@ export default function App() {
       void probeMissingImageAspectRatios(boardId, runtimeState.cards);
 
       if (activeSession?.recording) {
-        const migrated = migrateRecording(activeSession.recording);
         const cardsAtStart = await hydrateCardsFromPersisted(
-          migrated.cardsAtStart.map((c) => ({ ...c, src: undefined }))
+          activeSession.recording.cardsAtStart.map((card) => ({ ...card, src: undefined, posterSrc: undefined }))
         );
         if (cancelled) return;
-        setRecordingSession({ ...migrated, cardsAtStart });
+        setRecordingSession({ ...activeSession.recording, cardsAtStart });
       } else {
         setRecordingSession(null);
       }
@@ -1878,11 +1719,6 @@ export default function App() {
   const createFreshSortingSession = React.useCallback(
     (startCards: CardData[], startWorkflow: SortWorkflowData, startStageId: string | null) => {
       const createdAt = new Date().toISOString();
-      const closedContainersAtStart = deriveClosedContainersForPersistence(
-        sortConfig,
-        startWorkflow,
-        startStageId
-      );
       const session: RecordingSession = {
         version: 5,
         createdAt,
@@ -1894,11 +1730,7 @@ export default function App() {
         cardLayoutModeAtStart: cardLayoutMode,
         workflowAtStart: toPersistedWorkflow(startWorkflow),
         activeStageIdAtStart: startStageId || undefined,
-        closedContainersAtStart,
-        cardsAtStart:
-          sortConfig.type === 'closed' && startStageId
-            ? projectClosedCardsForStage(startCards, startStageId).map((card) => ({ ...card }))
-            : startCards.map((card) => ({ ...card })),
+        cardsAtStart: startCards.map((card) => ({ ...card })),
         segments: [],
       };
       const sessionItem: SessionItem = {
@@ -1906,7 +1738,6 @@ export default function App() {
         updatedAt: Date.now(),
         recording: {
           ...session,
-          closedContainersAtStart: closedContainersAtStart.map((container) => ({ ...container })),
           cardsAtStart: session.cardsAtStart.map((card) => ({ ...card, src: undefined, posterSrc: undefined })),
         },
       };
@@ -2448,7 +2279,6 @@ export default function App() {
         name,
         cards: nextCards.length,
         sortType: nextSortConfig.type,
-        columns: nextSortConfig.columns,
       });
       await persistPutProject(project);
       await persistPutBoard({
@@ -2462,7 +2292,6 @@ export default function App() {
         stacks: [],
         workflow: createWorkflowForTemplate('open', 1200, 800, nextCards.length),
         activeStageId: undefined,
-        closedContainers: [],
         cards: toPersistedCards(nextCards),
       });
       await persistSetActiveProjectId(projectId);
@@ -2747,25 +2576,6 @@ export default function App() {
     [boardSize.height, boardSize.width, selectedWidgetId, sortConfig.type]
   );
 
-  const snapClosedWithDims = React.useCallback(
-    (x: number, y: number, w: number, h: number) => {
-      const viewport = {
-        width: boardSize.width || 1200,
-        height: boardSize.height || 800,
-      };
-      return (
-      snapClosedPure(x, y, {
-        boardW: viewport.width,
-        boardH: viewport.height,
-        cardW: w,
-        cardH: h,
-        columns: sortConfig.columns ?? 3,
-      })
-      );
-    },
-    [boardSize.height, boardSize.width, sortConfig.columns]
-  );
-
   const resolveCardPlacement = React.useCallback(
     (
       card: CardData,
@@ -2779,15 +2589,11 @@ export default function App() {
     ) => {
       const baseWidth = options?.baseWidth ?? cardWidth;
       const layoutMode = options?.layoutMode ?? cardLayoutMode;
-      const shouldSnap = options?.snap ?? false;
       const dims = getCardDimensions(card, layoutMode, baseWidth);
       const clamped = clampToBoardWithDims(x, y, dims.w, dims.h);
-      const snapped = shouldSnap
-        ? snapClosedWithDims(clamped.x, clamped.y, dims.w, dims.h)
-        : clamped;
-      return { x: snapped.x, y: snapped.y, w: dims.w, h: dims.h };
+      return { x: clamped.x, y: clamped.y, w: dims.w, h: dims.h };
     },
-    [cardLayoutMode, cardWidth, clampToBoardWithDims, snapClosedWithDims]
+    [cardLayoutMode, cardWidth, clampToBoardWithDims]
   );
 
   const getBoardFitScaleMax = React.useCallback(
@@ -3909,7 +3715,7 @@ export default function App() {
     (type: SortType) => {
       if (type === sortConfig.type) return;
       if (mode !== 'setup') {
-        setSortConfig((prev) => ({ ...prev, type }));
+        setSortConfig({ type });
         return;
       }
 
@@ -3979,7 +3785,7 @@ export default function App() {
         setSelectedWidgetId(null);
       }
 
-      setSortConfig((prev) => ({ ...prev, type }));
+      setSortConfig({ type });
     },
     [
       activeProjectId,
@@ -4172,16 +3978,8 @@ export default function App() {
   const replayIndex = replayView?.index || null;
   const replayWorkflow = React.useMemo(() => {
     if (!replayRecording) return null;
-    if (replayRecording.workflowAtStart) {
-      return toPersistedWorkflow(replayRecording.workflowAtStart);
-    }
-    return createWorkflowForTemplate(
-      replayRecording.sortConfig.type,
-      replayRecording.boardW || boardViewport.width,
-      replayRecording.boardH || boardViewport.height,
-      replayRecording.cardsAtStart.length
-    );
-  }, [boardViewport.height, boardViewport.width, replayRecording]);
+    return toPersistedWorkflow(replayRecording.workflowAtStart);
+  }, [replayRecording]);
   const replayActiveStageId = React.useMemo(
     () => (replayRecording && replayIndex ? replayStageIdAt(replayRecording, replayIndex, replayTimeMs) : null),
     [replayIndex, replayRecording, replayTimeMs]
