@@ -78,6 +78,7 @@ describe('Board keyboard target navigation', () => {
         {
           kind: 'qsort-stage',
           surfaceId: 'q-stage',
+          stageId: 'qsort-stage',
           widgetId: 'qsort',
           title: 'Distribution',
           count: 1,

@@ -120,10 +120,13 @@ test('@smoke completes a closed sort through the UI and replays it', async ({ pa
     }
   }
 
-  await expect(page.getByText('All cards placed')).toBeVisible();
+  await expect(page.getByText('All cards placed', { exact: true })).toBeVisible();
   await expect(page.getByText('Recording · 4 actions')).toBeVisible();
   await expect(endButton).toBeEnabled();
-  await endButton.click();
+  const closedCompletion = page.getByTestId('sort-completion');
+  await expect(closedCompletion).toContainText('Done!');
+  await expect(closedCompletion).toContainText('All cards placed.');
+  await closedCompletion.getByRole('button', { name: 'View replay →' }).click();
 
   await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(1);
@@ -170,7 +173,10 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   }
 
   await expect(nextStageButton).toBeEnabled();
-  await nextStageButton.click();
+  const preSortCompletion = page.getByTestId('sort-completion');
+  await expect(preSortCompletion).toContainText('Done!');
+  await expect(preSortCompletion).toContainText('First impressions sorted.');
+  await preSortCompletion.getByRole('button', { name: 'Continue to Q-Sort →' }).click();
 
   const qSortSurface = page.locator('[data-testid^="surface-qsort-"]');
   const qSortLanes = page.locator('[data-testid^="qsort-lane-"]');
@@ -178,6 +184,8 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   const endButton = page.getByRole('button', { name: 'End sorting →' });
   await expect(qSortSurface).toHaveCount(1);
   await expect(qSortLanes).toHaveCount(2);
+  await expect(qSortSurface.locator(':scope > .boardSurface__header')).toHaveCount(0);
+  await expect.poll(() => page.getByTestId('board-root').evaluate((element) => element.scrollLeft)).toBe(0);
   await expect(qSortLanes.nth(0).locator('.boardSurface__count')).toHaveText('2');
   await expect(qSortLanes.nth(1).locator('.boardSurface__count')).toHaveText('2');
   await expect(endButton).toBeDisabled();
@@ -224,7 +232,10 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
 
   await expect(endButton).toBeEnabled();
   await expect(page.getByText('Recording · 9 actions')).toBeVisible();
-  await endButton.click();
+  const qSortCompletion = page.getByTestId('sort-completion');
+  await expect(qSortCompletion).toContainText('Done!');
+  await expect(qSortCompletion).toContainText('Distribution complete.');
+  await qSortCompletion.getByRole('button', { name: 'View replay →' }).click();
 
   await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(1);

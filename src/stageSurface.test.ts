@@ -8,7 +8,12 @@ import {
   getQSortWidget,
   getSourceWidget,
 } from './workflow';
-import { buildStageSurfaceScene, findStageSurfaceDropTarget, reflowCardsForStage } from './stageSurface';
+import {
+  buildStageSurfaceScene,
+  findStageSurfaceDropTarget,
+  getQSortCardDisplayDimensions,
+  reflowCardsForStage,
+} from './stageSurface';
 
 function makeCard(id: string): CardData {
   return {
@@ -275,7 +280,7 @@ describe('stageSurface layout', () => {
     expect(smallOrdered[1]!.x - smallOrdered[0]!.x).toBe(28);
   });
 
-  it('builds a wider q-sort canvas and keeps lane cards below the lane header', () => {
+  it('fits q-sort into the viewport and keeps tray cards below the tray header', () => {
     const workflow = createWorkflowForTemplate('qsort', 1600, 900, 12);
     const presortStageId = workflow.stages.find((stage) => stage.kind === 'presort')!.id;
     const qsortStageId = workflow.stages.find((stage) => stage.kind === 'qsort')!.id;
@@ -293,10 +298,10 @@ describe('stageSurface layout', () => {
 
     const scene = buildStageSurfaceScene(workflow, qsortStageId, cards, null, 'sort', { width: 1600, height: 900 });
     const qsortSurface = scene.surfaces.find((surface) => surface.kind === 'qsort-stage');
-    expect(scene.canvasW).toBeGreaterThan(1600);
-    expect(scene.viewportX).toBeGreaterThan(0);
+    expect(scene.canvasW).toBe(1600);
+    expect(scene.viewportX).toBe(0);
     expect(qsortSurface).toBeTruthy();
-    expect(qsortSurface?.distributionRect.w || 0).toBeGreaterThan(1200);
+    expect(qsortSurface?.distributionRect.w || 0).toBeGreaterThan(1500);
 
     const reflowed = reflowCardsForStage(cards, workflow, qsortStageId, getCardBounds, { width: 1600, height: 900 }, 'sort');
     const laneTop = qsortSurface?.lanes[0]?.y || 0;
@@ -304,7 +309,7 @@ describe('stageSurface layout', () => {
     expect(presortStageId).toBeTruthy();
   });
 
-  it('builds the active q-sort surface with side-by-side lanes and bottom-aligned slot columns', () => {
+  it('builds top trays and equal-height columns with top-aligned slots', () => {
     const workflow = createWorkflowForTemplate('qsort', 1200, 800, 15);
     const qsortStageId = workflow.stages.find((stage) => stage.kind === 'qsort')!.id;
     const scene = buildStageSurfaceScene(workflow, qsortStageId, [], null, 'sort', { width: 1200, height: 800 });
@@ -314,11 +319,45 @@ describe('stageSurface layout', () => {
 
     const centerBucket = surface.buckets[Math.floor(surface.buckets.length / 2)]!;
     const edgeBucket = surface.buckets[0]!;
-    expect(surface.leftColumnRect.x + surface.leftColumnRect.w).toBeLessThan(surface.distributionRect.x);
+    expect(surface.leftColumnRect.y + surface.leftColumnRect.h).toBeLessThan(surface.distributionRect.y);
+    expect(surface.lanes[0]!.x + surface.lanes[0]!.w).toBeLessThan(surface.lanes[1]!.x);
     expect(surface.baselineY).toBeGreaterThan(surface.distributionRect.y);
-    expect(centerBucket.columnHeight).toBeGreaterThan(edgeBucket.columnHeight);
+    expect(centerBucket.columnHeight).toBe(edgeBucket.columnHeight);
     expect(centerBucket.slots).toHaveLength(centerBucket.capacity);
-    expect(centerBucket.slots[0]!.y).toBeGreaterThan(centerBucket.slots[1]!.y);
+    expect(centerBucket.slots[0]!.y).toBeLessThan(centerBucket.slots[1]!.y);
+  });
+
+  it('keeps the original aspect ratio while fitting q-sort cards into trays and slots', () => {
+    const workflow = createWorkflowForTemplate('qsort', 1200, 800, 15);
+    const qsortStageId = workflow.stages.find((stage) => stage.kind === 'qsort')!.id;
+    const qsortWidget = getQSortWidget(workflow, qsortStageId)!;
+    const imageCard: CardData = {
+      ...makeCard('wide-image'),
+      kind: 'image',
+      meta: { ...makeCard('wide-image').meta, aspectRatio: 2 },
+      widgetAssignments: {
+        [qsortStageId]: { widgetId: qsortWidget.id, zoneId: qsortWidget.lanes[0]!.id, order: 0 },
+      },
+    };
+    const scene = buildStageSurfaceScene(workflow, qsortStageId, [imageCard], null, 'sort', { width: 1200, height: 800 });
+    const surface = scene.surfaces.find((entry) => entry.kind === 'qsort-stage');
+    expect(surface?.kind).toBe('qsort-stage');
+    if (!surface || surface.kind !== 'qsort-stage') return;
+
+    const trayDims = getQSortCardDisplayDimensions(imageCard, surface, () => ({ x: 0, y: 0, w: 240, h: 120 }));
+    expect(trayDims.w / trayDims.h).toBe(2);
+    expect(trayDims.w).toBeLessThan(240);
+
+    const slottedCard = {
+      ...imageCard,
+      widgetAssignments: {
+        [qsortStageId]: { widgetId: qsortWidget.id, zoneId: qsortWidget.buckets[0]!.id, order: 0 },
+      },
+    };
+    const slotDims = getQSortCardDisplayDimensions(slottedCard, surface, () => ({ x: 0, y: 0, w: 240, h: 120 }));
+    expect(slotDims.w / slotDims.h).toBe(2);
+    expect(slotDims.w).toBeLessThanOrEqual(surface.buckets[0]!.slots[0]!.w - 12);
+    expect(slotDims.h).toBeLessThanOrEqual(surface.buckets[0]!.slots[0]!.h - 10);
   });
 
   it('renders zero-capacity q-sort buckets as empty stubs without slots', () => {
@@ -381,8 +420,8 @@ describe('stageSurface layout', () => {
     const cardB = reflowed.find((card) => card.id === 'card-b')!;
     const cardC = reflowed.find((card) => card.id === 'card-c')!;
 
-    expect(cardA.y).toBeGreaterThan(cardB.y);
-    expect(cardC.y).toBeLessThan(cardB.y);
+    expect(cardA.y).toBeLessThan(cardB.y);
+    expect(cardC.y).toBeGreaterThan(cardB.y);
 
     cards = reflowed.filter((card) => card.id !== 'card-a');
     reflowed = reflowCardsForStage(

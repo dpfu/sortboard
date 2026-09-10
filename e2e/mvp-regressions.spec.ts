@@ -2,7 +2,6 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import {
   cardFromTop,
   cards,
-  dragMouseFromTo,
   exportProjectZip,
   gotoApp,
   handleDialog,
@@ -70,7 +69,12 @@ async function scrollCardIntoView(page: Page, card: Locator) {
     .toBe(true);
 }
 
-async function dragVisibleCardToTarget(page: Page, card: Locator, target: Locator) {
+async function dragVisibleCardToTarget(
+  page: Page,
+  card: Locator,
+  target: Locator,
+  onLift?: () => Promise<void>
+) {
   const board = page.getByTestId('board-root');
   await waitForStableBox(card, (await card.getAttribute('data-testid')) || 'card');
 
@@ -119,7 +123,15 @@ async function dragVisibleCardToTarget(page: Page, card: Locator, target: Locato
     y: targetTop <= targetBottom ? (targetTop + targetBottom) / 2 : visibleTarget.top + visibleTarget.height / 2,
   };
 
-  await dragMouseFromTo(page, from, to);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
+    await onLift?.();
+    await page.mouse.move(to.x, to.y);
+  } finally {
+    await page.mouse.up();
+  }
 }
 
 async function allCardsAreInsideCanvas(page: Page) {
@@ -207,6 +219,29 @@ test('@smoke flushes a pending card edit before reload', async ({ page }) => {
   await expect(page.getByLabel('Notes', { exact: true })).toHaveValue('Saved before reload');
 });
 
+test('@smoke recovers a pending card edit after an interrupted IndexedDB write', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: VIEWPORT_HEIGHT });
+  await openFreshApp(page);
+
+  await page.evaluate(() => {
+    const originalPut = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      if (this.name === 'boards') {
+        throw new DOMException('Simulated interrupted board save', 'AbortError');
+      }
+      return originalPut.apply(this, args);
+    } as typeof IDBObjectStore.prototype.put;
+  });
+
+  const cardTestId = await editTopCard(page, 'Notes', 'Recovered after reload');
+  await expect(page.getByTestId('project-status')).toContainText("Couldn’t save your latest changes");
+  await page.reload();
+  await waitForAppReady(page);
+
+  await page.getByTestId(cardTestId).click();
+  await expect(page.getByLabel('Notes', { exact: true })).toHaveValue('Recovered after reload');
+});
+
 test('@smoke flushes a pending card edit before sorting starts', async ({ page }) => {
   await page.setViewportSize({ width: 981, height: VIEWPORT_HEIGHT });
   await openFreshApp(page);
@@ -266,7 +301,7 @@ test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', 
     await expect(source.locator('.boardSurface__count')).toHaveText(String(cardTestIds.length - index - 1));
   }
 
-  await expect(page.getByText('All cards placed')).toBeVisible();
+  await expect(page.getByText('All cards placed', { exact: true })).toBeVisible();
   await expect(page.getByText('Recording · 24 actions')).toBeVisible();
   await expect(page.getByRole('button', { name: 'End sorting →' })).toBeEnabled();
   await expect.poll(() => allCardsAreInsideCanvas(page)).toBe(true);
@@ -318,11 +353,14 @@ test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the out
   await expect.poll(() => allCardsAreInsideCanvas(page)).toBe(true);
   await expect
     .poll(() => board.evaluate((element) => element.scrollWidth - element.clientWidth))
-    .toBeGreaterThan(0);
+    .toBe(0);
+  await expect
+    .poll(() => board.evaluate((element) => element.scrollHeight - element.clientHeight))
+    .toBe(0);
 
   const outerBucket = qSortBuckets.last();
   await outerBucket.scrollIntoViewIfNeeded();
-  await expect.poll(() => board.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect.poll(() => board.evaluate((element) => element.scrollLeft)).toBe(0);
   const outerCapacityText = (await outerBucket.locator('.widgetBucket__meta').textContent())?.trim() || '';
   const outerCapacityMatch = outerCapacityText.match(/^0\s*\/\s*(\d+)$/);
   if (!outerCapacityMatch || Number(outerCapacityMatch[1]) < 1) {
@@ -333,10 +371,32 @@ test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the out
   const laneWithCards = laneCardIds.findIndex((ids) => ids.length > 0);
   expect(laneWithCards).toBeGreaterThanOrEqual(0);
   const exposedCard = page.getByTestId(laneCardIds[laneWithCards].at(-1)!);
-  await dragVisibleCardToTarget(page, exposedCard, outerBucket);
+  const compactCardBox = await exposedCard.boundingBox();
+  expect(compactCardBox).toBeTruthy();
+  await dragVisibleCardToTarget(page, exposedCard, outerBucket, async () => {
+    await expect
+      .poll(async () => (await exposedCard.boundingBox())?.width || 0)
+      .toBeGreaterThan((compactCardBox?.width || 0) * 1.5);
+  });
   await expect(outerBucket.locator('.widgetBucket__meta')).toHaveText(`1 / ${outerCapacity}`);
+  const snappedCardBox = await exposedCard.boundingBox();
+  const outerBucketBox = await outerBucket.boundingBox();
+  const occupiedSlotBox = await outerBucket.locator('[data-testid^="qsort-slot-"]').first().boundingBox();
+  expect(snappedCardBox).toBeTruthy();
+  expect(outerBucketBox).toBeTruthy();
+  expect(occupiedSlotBox).toBeTruthy();
+  expect((snappedCardBox?.width || Infinity)).toBeLessThan(outerBucketBox?.width || 0);
+  const snappedCenterX = (snappedCardBox?.x || 0) + (snappedCardBox?.width || 0) / 2;
+  const slotCenterX = (occupiedSlotBox?.x || 0) + (occupiedSlotBox?.width || 0) / 2;
+  expect(Math.abs(snappedCenterX - slotCenterX)).toBeLessThan(2);
   await expect(page.locator('[data-testid^="qsort-lane-"]').nth(laneWithCards).locator('.boardSurface__count')).toHaveText(
     String(laneCounts[laneWithCards] - 1)
   );
   await expect(page.getByText('Recording · 26 actions')).toBeVisible();
+
+  const returnTray = page.locator('[data-testid^="qsort-lane-"]').nth(laneWithCards);
+  await dragVisibleCardToTarget(page, exposedCard, returnTray);
+  await expect(outerBucket.locator('.widgetBucket__meta')).toHaveText(`0 / ${outerCapacity}`);
+  await expect(returnTray.locator('.boardSurface__count')).toHaveText(String(laneCounts[laneWithCards]));
+  await expect(page.getByText('Recording · 27 actions')).toBeVisible();
 });

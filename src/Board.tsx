@@ -3,7 +3,7 @@ import type { CardData, CardLayoutMode, Mode, SortConfig } from './types';
 import { DraggableCard, type ResizeEdge, type ResizeStartPayload } from './DraggableCard';
 import { isSupportedMediaFile } from './utils';
 import { getCardDimensions } from './cardLayout';
-import type { StageSurfaceScene } from './stageSurface';
+import { getQSortCardDisplayDimensions, type QSortCanvasSurfaceView, type StageSurfaceScene } from './stageSurface';
 
 export interface StackBadgeView {
   stackId: string;
@@ -51,10 +51,11 @@ export interface BoardProps {
   baseCardWidth: number;
   cardLayoutMode: CardLayoutMode;
   selectedCardIds?: string[];
+  liftedCardIds?: string[];
   boardRef: React.RefObject<HTMLDivElement>;
   dragEnabled: boolean;
   onBringToFront: (id: string) => void;
-  onMoveEnd: (id: string, newX: number, newY: number) => boolean | void;
+  onMoveEnd: (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => boolean | void;
   onResizeStart?: (id: string, pointer: ResizeStartPayload) => void;
   onSelectCard?: (id: string, options?: { toggle?: boolean }) => void;
   onSelectStack?: (stackId: string) => void;
@@ -68,7 +69,7 @@ export interface BoardProps {
   onLassoSelect?: (ids: string[], append: boolean) => void;
   onFilesAdded: (files: File[]) => void;
   onDragTraceStart?: (id: string, x: number, y: number) => void;
-  onDragTraceSample?: (id: string, x: number, y: number) => void;
+  onDragTraceSample?: (id: string, x: number, y: number, dragPoint?: { x: number; y: number }) => void;
   onOpenPreview?: (id: string) => void;
 }
 
@@ -201,6 +202,7 @@ export function Board({
   baseCardWidth,
   cardLayoutMode,
   selectedCardIds,
+  liftedCardIds,
   boardRef,
   dragEnabled,
   onBringToFront,
@@ -228,13 +230,29 @@ export function Board({
   const badgeDragRef = React.useRef<{ pointerId: number; stackId: string } | null>(null);
   const canvasRef = React.useRef<HTMLDivElement>(null);
   const hasSetupSelection = mode === 'setup' && !!selectedCardIds && selectedCardIds.length > 0;
+  const qSortSurface = React.useMemo(
+    () => surfaceScene?.surfaces.find((surface): surface is QSortCanvasSurfaceView => surface.kind === 'qsort-stage') || null,
+    [surfaceScene]
+  );
+  const liftedCardIdSet = React.useMemo(() => new Set(liftedCardIds || []), [liftedCardIds]);
+  const liftedCardDimsById = React.useMemo(() => {
+    const next = new Map<string, { w: number; h: number }>();
+    for (const card of cards) {
+      next.set(card.id, getCardDimensions(card, qSortSurface ? 'as-is' : cardLayoutMode, baseCardWidth));
+    }
+    return next;
+  }, [baseCardWidth, cardLayoutMode, cards, qSortSurface]);
   const cardDimsById = React.useMemo(() => {
     const next = new Map<string, { w: number; h: number }>();
     for (const card of cards) {
-      next.set(card.id, getCardDimensions(card, cardLayoutMode, baseCardWidth));
+      const lifted = liftedCardDimsById.get(card.id) || getCardDimensions(card, cardLayoutMode, baseCardWidth);
+      const dims = qSortSurface && !liftedCardIdSet.has(card.id)
+        ? getQSortCardDisplayDimensions(card, qSortSurface, () => ({ x: card.x, y: card.y, ...lifted }))
+        : lifted;
+      next.set(card.id, dims);
     }
     return next;
-  }, [baseCardWidth, cardLayoutMode, cards]);
+  }, [baseCardWidth, cardLayoutMode, cards, liftedCardDimsById, liftedCardIdSet, qSortSurface]);
   const keyboardTargets = React.useMemo(() => keyboardDropTargets(surfaceScene), [surfaceScene]);
   const cardsRef = React.useRef(cards);
   const cardDimsByIdRef = React.useRef(cardDimsById);
@@ -284,7 +302,12 @@ export function Board({
       }
 
       onDragTraceStart?.(id, card.x, card.y);
-      const moved = onMoveEnd(id, target.x + (target.w - dims.w) / 2, target.y + (target.h - dims.h) / 2);
+      const moved = onMoveEnd(
+        id,
+        target.x + (target.w - dims.w) / 2,
+        target.y + (target.h - dims.h) / 2,
+        { x: target.x + target.w / 2, y: target.y + target.h / 2 }
+      );
       setKeyboardAnnouncement(
         moved ? `Moved ${card.meta.name} to ${target.label}.` : `${card.meta.name} cannot move to ${target.label}.`
       );
@@ -704,14 +727,7 @@ export function Board({
                   </span>
                   <span className="boardSurface__count">{surface.count}</span>
                 </button>
-              ) : (
-                <div className="boardSurface__header">
-                  <span className="boardSurface__headerMeta">
-                    <span className="boardSurface__title">{surface.title}</span>
-                  </span>
-                  <span className="boardSurface__count">{surface.count}</span>
-                </div>
-              )}
+              ) : null}
 
               <div
                 className="boardQSort__leftColumn"
@@ -753,6 +769,14 @@ export function Board({
                   height: surface.distributionRect.h,
                 }}
               >
+                <div className="boardQSort__distributionHeader">
+                  <div>
+                    <div className="boardQSort__distributionTitle">Sort the cards into a forced distribution</div>
+                    <div className="boardQSort__distributionHelp">
+                      Pick up a card from either tray, then drop it into an available slot.
+                    </div>
+                  </div>
+                </div>
                 <div
                   className="boardQSort__baseline"
                   aria-hidden
@@ -772,11 +796,17 @@ export function Board({
                       height: bucket.h,
                     }}
                   >
+                    <div className="widgetBucket__footer">
+                      <div className="widgetBucket__label">
+                        {/^[1-9]\d*$/.test(bucket.label) ? `+${bucket.label}` : bucket.label}
+                      </div>
+                      <div className="widgetBucket__meta">{bucket.capacityLabel}</div>
+                    </div>
                     <div
                       className="widgetBucket__column"
                       data-testid={`qsort-column-${surface.widgetId}-${bucket.zoneId}`}
                       style={{
-                        top: bucket.baselineY - bucket.y - bucket.columnHeight,
+                        top: 0,
                         height: bucket.columnHeight,
                       }}
                     />
@@ -793,10 +823,6 @@ export function Board({
                         }}
                       />
                     ))}
-                    <div className="widgetBucket__footer">
-                      <div className="widgetBucket__label">{bucket.label}</div>
-                      <div className="widgetBucket__meta">{bucket.capacityLabel}</div>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -865,12 +891,15 @@ export function Board({
 
         {cards.map((card) => {
           const dims = cardDimsById.get(card.id) || getCardDimensions(card, cardLayoutMode, baseCardWidth);
+          const liftedDims = liftedCardDimsById.get(card.id) || dims;
           return (
             <DraggableCard
               key={card.id}
               card={card}
               cardW={dims.w}
               cardH={dims.h}
+              liftedCardW={qSortSurface ? liftedDims.w : undefined}
+              liftedCardH={qSortSurface ? liftedDims.h : undefined}
               mode={mode}
               isSelected={mode === 'setup' && !!selectedCardIds?.includes(card.id)}
               dragEnabled={dragEnabled}

@@ -157,14 +157,15 @@ describe('App qsort workflow', () => {
     await waitFor(() => {
       const boardElement = secondView.container.querySelector('.board') as HTMLDivElement | null;
       expect(boardElement).toBeTruthy();
-      expect((boardElement?.scrollLeft || 0)).toBeGreaterThan(0);
+      expect(boardElement?.scrollLeft || 0).toBe(0);
     });
+    expect(secondView.container.querySelector('[data-testid^="surface-qsort-"] > .boardSurface__header')).toBeNull();
 
     const centerBucket = qsortWidget.buckets[Math.floor(qsortWidget.buckets.length / 2)]!;
     const edgeBucket = qsortWidget.buckets[0]!;
     const centerColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${centerBucket.id}`);
     const edgeColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${edgeBucket.id}`);
-    expect(parseFloat(centerColumn.style.height)).toBeGreaterThan(parseFloat(edgeColumn.style.height));
+    expect(parseFloat(centerColumn.style.height)).toBe(parseFloat(edgeColumn.style.height));
     expect(screen.getByRole('button', { name: 'End sorting →' })).toBeTruthy();
 
     expect(activeProjectId).toBeTruthy();

@@ -133,11 +133,12 @@ export function layoutCardsInQSortBucketSlots(
   if (overflowCards.length > 0) {
     const { maxW, maxH } = maxCardSize(overflowCards, getBounds);
     const startX = bucket.x + Math.max(0, Math.round((bucket.w - maxW) / 2));
-    const startY = Math.round(bucket.baselineY - bucket.columnHeight - Math.min(18, Math.round(maxH * 0.2)));
+    const finalSlot = bucket.slots.at(-1);
+    const startY = Math.round((finalSlot?.y ?? bucket.baselineY) + Math.min(18, Math.round(maxH * 0.2)));
     overflowCards.forEach((card, index) => {
       next.set(card.id, {
         x: Math.round(startX + index * STACK_STEP_X),
-        y: Math.round(startY + index * STACK_STEP_Y - maxH),
+        y: Math.round(startY + index * STACK_STEP_Y),
       });
     });
   }

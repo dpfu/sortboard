@@ -104,6 +104,7 @@ export type QSortBucketSurfaceView = {
 
 export type QSortCanvasSurfaceView = BaseSurfaceView & {
   kind: 'qsort-stage';
+  stageId: string;
   widgetId: string;
   title: string;
   count: number;
@@ -138,9 +139,10 @@ const SINK_HEADER_PAD = 74;
 const QSORT_LANE_HEADER_PAD = 52;
 const QSORT_BUCKET_GAP = 12;
 const QSORT_SLOT_GAP = 10;
-const QSORT_BOTTOM_PAD = 34;
 const QSORT_LANE_GAP = 18;
-const QSORT_LEFT_RATIO = 0.32;
+const QSORT_SECTION_GAP = 24;
+const QSORT_DISTRIBUTION_HEADER_H = 84;
+const QSORT_BUCKET_HEADER_H = 58;
 
 function rectContains(rect: Rect, pointX: number, pointY: number) {
   return pointX >= rect.x && pointX <= rect.x + rect.w && pointY >= rect.y && pointY <= rect.y + rect.h;
@@ -340,35 +342,37 @@ function buildQSortScene(
 
   const topPad = getTopPad(mode);
   const contentH = Math.max(360, viewport.height - topPad - OUTER_PAD_Y);
-  const leftColumnW = clamp(Math.round(viewport.width * QSORT_LEFT_RATIO), 280, 420);
-  const visibleDistributionW = Math.max(
-    760,
-    viewport.width - OUTER_PAD_X * 2 - leftColumnW - COLUMN_GAP
+  const setupHeaderH = mode === 'setup' ? 52 : 0;
+  const contentW = Math.max(656, viewport.width - OUTER_PAD_X * 2);
+  const trayH = clamp(Math.round(contentH * 0.22), 156, 190);
+  const distributionH = Math.max(416, contentH - trayH - QSORT_SECTION_GAP);
+  const canvasW = Math.max(viewport.width, contentW + OUTER_PAD_X * 2);
+  const canvasH = Math.max(
+    viewport.height,
+    topPad + setupHeaderH + trayH + QSORT_SECTION_GAP + distributionH + OUTER_PAD_Y
   );
-  const distributionW = Math.max(920, Math.round(visibleDistributionW + viewport.width * 0.18));
-  const canvasW = Math.max(viewport.width, OUTER_PAD_X * 2 + leftColumnW + COLUMN_GAP + distributionW);
-  const viewportX = clamp(Math.round(leftColumnW * 0.18), 0, Math.max(0, canvasW - viewport.width));
+  const viewportX = 0;
   const leftColumnRect: Rect = {
     x: OUTER_PAD_X,
-    y: topPad,
-    w: leftColumnW,
-    h: contentH,
+    y: topPad + setupHeaderH,
+    w: contentW,
+    h: trayH,
   };
   const distributionRect: Rect = {
-    x: leftColumnRect.x + leftColumnRect.w + COLUMN_GAP,
-    y: topPad,
-    w: distributionW,
-    h: contentH,
+    x: OUTER_PAD_X,
+    y: topPad + trayH + QSORT_SECTION_GAP,
+    w: contentW,
+    h: distributionH,
   };
   const laneGap = QSORT_LANE_GAP;
-  const laneH = Math.max(150, Math.floor((leftColumnRect.h - laneGap) / 2));
+  const laneW = Math.floor((leftColumnRect.w - laneGap) / Math.max(1, qsortWidget.lanes.length));
   const lanes = qsortWidget.lanes.map((lane, index) => ({
     zoneId: lane.id,
     label: lane.label,
-    x: leftColumnRect.x,
-    y: leftColumnRect.y + index * (laneH + laneGap),
-    w: leftColumnRect.w,
-    h: laneH,
+    x: leftColumnRect.x + index * (laneW + laneGap),
+    y: leftColumnRect.y,
+    w: laneW,
+    h: leftColumnRect.h,
     count: countCardsInWidgetZone(cards, stageId, qsortWidget.id, lane.id),
     state: activeDropState(activeDrop, qsortWidget.id, lane.id),
   }));
@@ -379,18 +383,23 @@ function buildQSortScene(
   );
   const totalBucketW = bucketW * qsortWidget.buckets.length + QSORT_BUCKET_GAP * Math.max(0, qsortWidget.buckets.length - 1);
   const bucketStartX = distributionRect.x + Math.max(0, Math.round((distributionRect.w - totalBucketW) / 2));
-  const baselineY = distributionRect.y + distributionRect.h - QSORT_BOTTOM_PAD;
-  const slotHeight = Math.max(
-    22,
-    Math.floor((Math.max(180, baselineY - distributionRect.y) - QSORT_SLOT_GAP * Math.max(0, maxCapacity - 1)) / maxCapacity)
+  const bucketTop = distributionRect.y + QSORT_DISTRIBUTION_HEADER_H;
+  const bucketH = Math.max(300, distributionRect.h - QSORT_DISTRIBUTION_HEADER_H - 18);
+  const slotAreaTop = bucketTop + QSORT_BUCKET_HEADER_H;
+  const slotAreaH = Math.max(240, bucketH - QSORT_BUCKET_HEADER_H - 16);
+  const slotHeight = clamp(
+    Math.floor((slotAreaH - QSORT_SLOT_GAP * Math.max(0, maxCapacity - 1)) / maxCapacity),
+    30,
+    112
   );
+  const baselineY = slotAreaTop;
   const center = (qsortWidget.buckets.length - 1) / 2;
   const buckets = qsortWidget.buckets.map((bucket, index) => {
     const count = countCardsInWidgetZone(cards, stageId, qsortWidget.id, bucket.id);
     const slots = Array.from({ length: Math.max(0, bucket.capacity) }, (_, slotIndex) => ({
       slotIndex,
       x: bucketStartX + index * (bucketW + QSORT_BUCKET_GAP),
-      y: baselineY - slotHeight - slotIndex * (slotHeight + QSORT_SLOT_GAP),
+      y: slotAreaTop + slotIndex * (slotHeight + QSORT_SLOT_GAP),
       w: bucketW,
       h: slotHeight,
       occupied: slotIndex < Math.min(count, bucket.capacity),
@@ -399,17 +408,14 @@ function buildQSortScene(
       zoneId: bucket.id,
       label: bucket.label,
       x: bucketStartX + index * (bucketW + QSORT_BUCKET_GAP),
-      y: distributionRect.y,
+      y: bucketTop,
       w: bucketW,
-      h: distributionRect.h,
+      h: bucketH,
       count,
       capacity: bucket.capacity,
       capacityLabel: `${count} / ${bucket.capacity}`,
       slots,
-      columnHeight:
-        bucket.capacity > 0
-          ? bucket.capacity * slotHeight + Math.max(0, bucket.capacity - 1) * QSORT_SLOT_GAP
-          : 32,
+      columnHeight: bucketH,
       baselineY,
       isCenter: Math.abs(index - center) <= 0.5,
       isExtreme: index === 0 || index === qsortWidget.buckets.length - 1,
@@ -420,17 +426,18 @@ function buildQSortScene(
   return {
     stageKind,
     canvasW,
-    canvasH: viewport.height,
+    canvasH,
     viewportX,
     surfaces: [
       {
         kind: 'qsort-stage',
         surfaceId: `qsort-stage-${qsortWidget.id}`,
+        stageId,
         widgetId: qsortWidget.id,
         x: leftColumnRect.x,
         y: topPad,
-        w: distributionRect.x + distributionRect.w - leftColumnRect.x,
-        h: contentH,
+        w: contentW,
+        h: distributionRect.y + distributionRect.h - topPad,
         title: qsortWidget.title,
         count: lanes.reduce((sum, lane) => sum + lane.count, 0) + buckets.reduce((sum, bucket) => sum + bucket.count, 0),
         leftColumnRect,
@@ -473,6 +480,59 @@ function maxCardSize(cards: CardData[], getBounds: (card: CardData) => CardBound
     maxH = Math.max(maxH, bounds.h);
   }
   return { maxW, maxH };
+}
+
+function fitCardDimensions(bounds: CardBounds, maxW: number, maxH: number) {
+  const scale = Math.min(1, maxW / Math.max(1, bounds.w), maxH / Math.max(1, bounds.h));
+  return {
+    w: Math.max(1, Math.round(bounds.w * scale)),
+    h: Math.max(1, Math.round(bounds.h * scale)),
+  };
+}
+
+export function getQSortCardDisplayDimensions(
+  card: CardData,
+  surface: QSortCanvasSurfaceView,
+  getBounds: (card: CardData) => CardBounds
+) {
+  const full = getBounds(card);
+  const assignment = card.widgetAssignments?.[surface.stageId];
+  if (!assignment || assignment.widgetId !== surface.widgetId) {
+    return { w: full.w, h: full.h };
+  }
+
+  const lane = surface.lanes.find((entry) => entry.zoneId === assignment.zoneId);
+  if (lane) {
+    const maxW = clamp(Math.round(lane.w * 0.2), 96, 132);
+    const maxH = Math.max(54, lane.h - QSORT_LANE_HEADER_PAD - 18);
+    return fitCardDimensions(full, maxW, maxH);
+  }
+
+  const bucket = surface.buckets.find((entry) => entry.zoneId === assignment.zoneId);
+  const slot = bucket?.slots[0];
+  if (slot) {
+    return fitCardDimensions(full, Math.max(24, slot.w - 12), Math.max(16, slot.h - 10));
+  }
+  return fitCardDimensions(full, 72, 48);
+}
+
+function layoutCardsAsShelf(cards: CardData[], rect: Rect, getBounds: (card: CardData) => CardBounds) {
+  if (cards.length === 0) return new Map<string, { x: number; y: number }>();
+  const dimensions = cards.map((card) => getBounds(card));
+  const maxW = Math.max(...dimensions.map((entry) => entry.w));
+  const availableSpreadX = Math.max(0, rect.w - maxW);
+  const stepX = cards.length > 1 ? Math.min(maxW + 10, availableSpreadX / (cards.length - 1)) : 0;
+  const spreadX = Math.max(0, (cards.length - 1) * stepX);
+  const startX = rect.x + Math.max(0, Math.round((rect.w - maxW - spreadX) / 2));
+  const next = new Map<string, { x: number; y: number }>();
+  cards.forEach((card, index) => {
+    const dims = dimensions[index]!;
+    next.set(card.id, {
+      x: Math.round(startX + index * stepX),
+      y: Math.round(rect.y + Math.max(0, (rect.h - dims.h) / 2)),
+    });
+  });
+  return next;
 }
 
 export function layoutCardsInWorkArea(cards: CardData[], rect: Rect, getBounds: (card: CardData) => CardBounds) {
@@ -603,12 +663,16 @@ export function reflowCardsForStage(
   const qsortSurface = scene.surfaces.find((surface): surface is QSortCanvasSurfaceView => surface.kind === 'qsort-stage');
   const qsortWidget = getQSortWidget(workflow, stageId);
   if (qsortSurface && qsortWidget) {
+    const getCompactBounds = (card: CardData): CardBounds => {
+      const compact = getQSortCardDisplayDimensions(card, qsortSurface, getBounds);
+      return { x: card.x, y: card.y, w: compact.w, h: compact.h };
+    };
     for (const lane of qsortSurface.lanes) {
       const zoneCards = getCardsInWidgetZone(cards, stageId, qsortWidget.id, lane.zoneId);
-      const layout = layoutCardsAsStack(
+      const layout = layoutCardsAsShelf(
         zoneCards,
         insetRect(lane, { top: QSORT_LANE_HEADER_PAD, right: 14, bottom: 14, left: 14 }),
-        getBounds
+        getCompactBounds
       );
       for (const card of zoneCards) {
         setPosition(card, layout.get(card.id));
@@ -616,7 +680,7 @@ export function reflowCardsForStage(
     }
     for (const bucket of qsortSurface.buckets) {
       const zoneCards = getCardsInWidgetZone(cards, stageId, qsortWidget.id, bucket.zoneId);
-      const layout = layoutCardsInQSortBucketSlots(zoneCards, bucket, getBounds);
+      const layout = layoutCardsInQSortBucketSlots(zoneCards, bucket, getCompactBounds);
       for (const card of zoneCards) {
         setPosition(card, layout.get(card.id));
       }

@@ -43,19 +43,21 @@ export interface DraggableCardProps {
   card: CardData;
   cardW: number;
   cardH: number;
+  liftedCardW?: number;
+  liftedCardH?: number;
   mode: Mode;
   isSelected?: boolean;
   dragEnabled: boolean;
   dragConstraintsRef: React.RefObject<HTMLElement>;
   onBringToFront: (id: string) => void;
-  onMoveEnd: (id: string, newX: number, newY: number) => void;
+  onMoveEnd: (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => void;
   onResizeStart?: (id: string, pointer: ResizeStartPayload) => void;
   onSelectCard?: (id: string, options?: { toggle?: boolean }) => void;
   onKeyboardMove?: (id: string, direction: 'left' | 'right' | 'up' | 'down') => void;
   keyboardDescriptionId?: string;
   locationLabel?: string;
   onDragTraceStart?: (id: string, x: number, y: number) => void;
-  onDragTraceSample?: (id: string, x: number, y: number) => void;
+  onDragTraceSample?: (id: string, x: number, y: number, dragPoint?: { x: number; y: number }) => void;
   onOpenPreview?: (id: string) => void;
   showChrome?: boolean;
 }
@@ -64,6 +66,8 @@ function DraggableCardComponent({
   card,
   cardW,
   cardH,
+  liftedCardW,
+  liftedCardH,
   mode,
   isSelected,
   dragEnabled,
@@ -86,6 +90,13 @@ function DraggableCardComponent({
   const rotate = prefersReducedMotion ? rawRotate : springRotate;
   const dragControls = useDragControls();
   const canResize = mode === 'setup' && !!isSelected && !!onResizeStart;
+  const liftScale = Math.max(
+    1,
+    Math.min(
+      (liftedCardW || cardW) / Math.max(1, cardW),
+      (liftedCardH || cardH) / Math.max(1, cardH)
+    )
+  );
   const [resizeHotEdge, setResizeHotEdge] = React.useState<ResizeEdge | null>(null);
   const isKeyboardInteractive = mode === 'setup' ? !!onSelectCard : mode === 'sort' && !!onKeyboardMove;
   const cardLabel = card.meta.name || card.meta.frontText || `${card.kind} card`;
@@ -214,7 +225,7 @@ function DraggableCardComponent({
       // State-driven position. While dragging, Framer temporarily takes over.
       animate={{ x: card.x, y: card.y }}
       transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.7 }}
-      whileDrag={{ scale: 1.03, boxShadow: 'var(--shadow-lift)' }}
+      whileDrag={{ scale: liftScale * 1.03, boxShadow: 'var(--shadow-lift)' }}
       onPointerDown={handlePointerDown}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
@@ -228,7 +239,12 @@ function DraggableCardComponent({
         const next = prefersReducedMotion ? 0 : clamp(info.delta.x * 0.35, -ROTATION_MAX, ROTATION_MAX);
         rawRotate.set(next);
 
-        onDragTraceSample?.(card.id, card.x + info.offset.x, card.y + info.offset.y);
+        const nextX = card.x + info.offset.x;
+        const nextY = card.y + info.offset.y;
+        onDragTraceSample?.(card.id, nextX, nextY, {
+          x: nextX + cardW / 2,
+          y: nextY + cardH / 2,
+        });
       }}
       onDragStart={() => {
         rawRotate.set(0);
@@ -239,7 +255,10 @@ function DraggableCardComponent({
         rawRotate.set(0);
         const nextX = card.x + info.offset.x;
         const nextY = card.y + info.offset.y;
-        onMoveEnd(card.id, nextX, nextY);
+        onMoveEnd(card.id, nextX, nextY, {
+          x: nextX + cardW / 2,
+          y: nextY + cardH / 2,
+        });
       }}
       onDoubleClick={() => {
         if (card.kind === 'video') {

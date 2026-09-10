@@ -129,6 +129,60 @@ const DEFAULT_CARD_LAYOUT_MODE: CardLayoutMode = 'as-is';
 const DEFAULT_STACK_SORT_KEY: StackSortKey = 'name';
 const STACK_SPLIT_OFFSET_PX = 32;
 const SETUP_DETAILS_DRAWER_MEDIA_QUERY = '(max-width: 1120px)';
+// A same-tab reload can interrupt an in-flight IndexedDB write. Journal only
+// the active metadata edit synchronously; media blobs remain in IndexedDB.
+const PENDING_CARD_META_EDIT_KEY = 'sortboard.pending-card-meta-edit.v1';
+
+type PendingCardMetaEditV1 = {
+  version: 1;
+  boardId: string;
+  cardId: string;
+  updatedAt: number;
+  meta: CardMetadataV1;
+};
+
+function stagePendingCardMetaEdit(edit: Omit<PendingCardMetaEditV1, 'version'>) {
+  try {
+    const serialized = JSON.stringify({ version: 1, ...edit } satisfies PendingCardMetaEditV1);
+    window.sessionStorage.setItem(PENDING_CARD_META_EDIT_KEY, serialized);
+    return serialized;
+  } catch {
+    return null;
+  }
+}
+
+function readPendingCardMetaEdit(boardId: string) {
+  try {
+    const serialized = window.sessionStorage.getItem(PENDING_CARD_META_EDIT_KEY);
+    if (!serialized) return null;
+    const pending = JSON.parse(serialized) as Partial<PendingCardMetaEditV1>;
+    if (
+      pending.version !== 1 ||
+      pending.boardId !== boardId ||
+      typeof pending.cardId !== 'string' ||
+      typeof pending.updatedAt !== 'number' ||
+      !pending.meta ||
+      typeof pending.meta.name !== 'string' ||
+      typeof pending.meta.notes !== 'string' ||
+      !Array.isArray(pending.meta.tags)
+    ) {
+      return null;
+    }
+    return { serialized, edit: pending as PendingCardMetaEditV1 };
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingCardMetaEdit(serialized: string) {
+  try {
+    if (window.sessionStorage.getItem(PENDING_CARD_META_EDIT_KEY) === serialized) {
+      window.sessionStorage.removeItem(PENDING_CARD_META_EDIT_KEY);
+    }
+  } catch {
+    // IndexedDB remains the primary store when session storage is unavailable.
+  }
+}
 
 type ProjectBootstrapResult = {
   projects: PersistedProjectV1[];
@@ -1228,6 +1282,13 @@ export default function App() {
   );
 
   const getClosedCardBounds = getCardBounds;
+  const getQSortCardBounds = React.useCallback(
+    (card: CardData): WidgetCardBounds => {
+      const dims = getCardDims(card, cardWidth, 'as-is');
+      return { x: card.x, y: card.y, w: dims.w, h: dims.h };
+    },
+    [cardWidth, getCardDims]
+  );
 
   const boardViewport = React.useMemo(
     () => ({
@@ -1238,9 +1299,18 @@ export default function App() {
   );
 
   const reflowCardsForStage = React.useCallback(
-    (nextCards: CardData[], nextWorkflow: SortWorkflowData, stageId: string, nextMode = modeRef.current) =>
-      reflowStageSurfaceCards(nextCards, nextWorkflow, stageId, getClosedCardBounds, boardViewport, nextMode),
-    [boardViewport, getClosedCardBounds]
+    (nextCards: CardData[], nextWorkflow: SortWorkflowData, stageId: string, nextMode = modeRef.current) => {
+      const isQSortStage = nextWorkflow.stages.find((stage) => stage.id === stageId)?.kind === 'qsort';
+      return reflowStageSurfaceCards(
+        nextCards,
+        nextWorkflow,
+        stageId,
+        isQSortStage ? getQSortCardBounds : getClosedCardBounds,
+        boardViewport,
+        nextMode
+      );
+    },
+    [boardViewport, getClosedCardBounds, getQSortCardBounds]
   );
 
   const commitBoardState = React.useCallback((nextCards: CardData[], nextStacks: StackData[]) => {
@@ -1454,11 +1524,33 @@ export default function App() {
     discardedSessionIdsRef.current.clear();
 
     (async () => {
-      const [persisted, persistedSessions] = await Promise.all([
+      let [persisted, persistedSessions] = await Promise.all([
         persistGetBoard(boardId),
         persistListSessions(boardId),
       ]);
       if (cancelled) return;
+
+      const pendingEdit = readPendingCardMetaEdit(boardId);
+      const pendingCardIndex = pendingEdit && persisted
+        ? persisted.cards.findIndex((card) => card.id === pendingEdit.edit.cardId)
+        : -1;
+      if (pendingEdit && persisted && pendingCardIndex >= 0 && pendingEdit.edit.updatedAt >= persisted.updatedAt) {
+        persisted = {
+          ...persisted,
+          updatedAt: pendingEdit.edit.updatedAt,
+          cards: persisted.cards.map((card, index) =>
+            index === pendingCardIndex ? { ...card, meta: pendingEdit.edit.meta } : card
+          ),
+        };
+        const recovered = await runSafePersistence('pending card edit recovery', async () => {
+          await persistPutBoard(persisted!);
+          await persistTouchProject(boardId, pendingEdit.edit.updatedAt);
+        });
+        if (recovered) clearPendingCardMetaEdit(pendingEdit.serialized);
+        if (cancelled) return;
+      } else if (pendingEdit) {
+        clearPendingCardMetaEdit(pendingEdit.serialized);
+      }
 
       if (!persisted) {
         const starter = createInitialCards();
@@ -1542,7 +1634,14 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [boardId, hydrateCardsFromPersisted, probeMissingImageAspectRatios, stopReplayImmediate, stopSampler]);
+  }, [
+    boardId,
+    hydrateCardsFromPersisted,
+    probeMissingImageAspectRatios,
+    runSafePersistence,
+    stopReplayImmediate,
+    stopSampler,
+  ]);
 
   // Revoke object URLs on unmount.
   React.useEffect(() => {
@@ -1709,9 +1808,17 @@ export default function App() {
       cardsRef.current = nextCards;
       latestBoardStateRef.current.cards = nextCards;
       setCards(nextCards);
+      const pendingEdit = stagePendingCardMetaEdit({
+        boardId: projectId,
+        cardId: selectedId,
+        updatedAt: Date.now(),
+        meta: nextMeta,
+      });
       const promise = persistCurrentBoardSnapshotImmediately('board save after card metadata edit');
       immediateCardSaveRef.current = { cards: nextCards, promise };
-      void promise;
+      void promise.then((saved) => {
+        if (saved && pendingEdit) clearPendingCardMetaEdit(pendingEdit);
+      });
     },
     [persistCurrentBoardSnapshotImmediately, pushSetupUndoSnapshotIfNeeded, selectedCards]
   );
@@ -3457,7 +3564,7 @@ export default function App() {
   );
 
   const handleDragTraceSample = React.useCallback(
-    (id: string, x: number, y: number) => {
+    (id: string, x: number, y: number, dragPoint?: { x: number; y: number }) => {
       if (modeRef.current === 'setup') {
         const setupDrag = setupGroupDragRef.current;
         if (setupDrag && setupDrag.leaderId === id) {
@@ -3485,9 +3592,13 @@ export default function App() {
         const stageId = activeStageIdRef.current;
         const card = cardsRef.current.find((entry) => entry.id === id);
         if (card && stageId) {
-          const dims = getCardDims(card);
           const scene = dragSurfaceSceneRef.current || buildSurfaceScene(stageId, cardsRef.current, workflowRef.current, 'sort', null);
-          const target = findStageSurfaceDropTarget(scene, { x, y, w: dims.w, h: dims.h });
+          const target = dragPoint
+            ? findStageSurfaceDropTarget(scene, { x: dragPoint.x, y: dragPoint.y, w: 0, h: 0 })
+            : (() => {
+                const dims = getCardDims(card);
+                return findStageSurfaceDropTarget(scene, { x, y, w: dims.w, h: dims.h });
+              })();
           if (target) {
             const validation = validateWidgetDrop(workflowRef.current, stageId, target, card, cardsRef.current);
             setActiveWidgetDropIndicator((previous) =>
@@ -3518,7 +3629,7 @@ export default function App() {
   );
 
   const handleMoveEnd = React.useCallback(
-    (id: string, newX: number, newY: number) => {
+    (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => {
       if (isResizingCardRef.current) {
         return;
       }
@@ -3551,7 +3662,9 @@ export default function App() {
         let accepted = false;
         if (stageId) {
           const scene = buildSurfaceScene(stageId, sourceCards, workflowRef.current, mode === 'setup' ? 'setup' : 'sort', null);
-          const target = findStageSurfaceDropTarget(scene, { x: dropPos.x, y: dropPos.y, w: finalPos.w, h: finalPos.h });
+          const target = dropPoint
+            ? findStageSurfaceDropTarget(scene, { x: dropPoint.x, y: dropPoint.y, w: 0, h: 0 })
+            : findStageSurfaceDropTarget(scene, { x: dropPos.x, y: dropPos.y, w: finalPos.w, h: finalPos.h });
           if (target) {
             const validation = validateWidgetDrop(workflowRef.current, stageId, target, card, sourceCards);
             if (validation.accepted) {
@@ -4023,6 +4136,16 @@ export default function App() {
     () => replayClusterMarkers.filter((marker) => marker.score >= 6),
     [replayClusterMarkers]
   );
+  const replayLiftedCardIds = React.useMemo(() => {
+    if (!replayIndex) return [];
+    const lifted = new Set<string>();
+    for (const segment of replayIndex.segments) {
+      if (segment.type !== 'drag' || replayTimeMs < segment.t0 || replayTimeMs >= segment.t1) continue;
+      lifted.add(segment.cardId);
+      for (const member of segment.groupMembers || []) lifted.add(member.cardId);
+    }
+    return [...lifted];
+  }, [replayIndex, replayTimeMs]);
   const ignoreReplayInteraction = React.useCallback(() => undefined, []);
   const canUndoSetup = mode === 'setup' && !projectInteractionDisabled && !!activeProjectId && setupUndoPast.length > 0;
   const canAdjustCardSize =
@@ -4386,6 +4509,15 @@ export default function App() {
       ? workflow.stages.find((stage) => stage.id === activeWorkflowStageId)?.name || null
       : null;
   const showSortStagePill = !!activeSortStageLabel && activeSortStageLabel !== getTemplateLabel(sortConfig.type);
+  const showSortCompletion = mode === 'sort' && hasWidgetWorkflow && isCurrentWorkflowStageComplete;
+  const sortCompletionMessage =
+    sortConfig.type === 'qsort' && hasNextWorkflowStage
+      ? 'First impressions sorted.'
+      : sortConfig.type === 'qsort'
+        ? 'Distribution complete.'
+        : 'All cards placed.';
+  const sortCompletionActionLabel =
+    sortConfig.type === 'qsort' && hasNextWorkflowStage ? 'Continue to Q-Sort →' : 'View replay →';
 
   React.useEffect(() => {
     if (mode !== 'setup') return;
@@ -4817,6 +4949,28 @@ export default function App() {
               onOpenPreview={openVideoPreview}
               onFilesAdded={addLocalMedia}
             />
+            {showSortCompletion ? (
+              <section className="sortCompletion" data-testid="sort-completion" role="status" aria-live="polite">
+                <div className="sortCompletion__confetti" aria-hidden="true">
+                  {Array.from({ length: 10 }, (_, index) => (
+                    <span key={index} />
+                  ))}
+                </div>
+                <div className="sortCompletion__panel">
+                  <div>
+                    <div className="sortCompletion__title">Done!</div>
+                    <div className="sortCompletion__message">{sortCompletionMessage}</div>
+                  </div>
+                  <button
+                    className="btn sortCompletion__action"
+                    type="button"
+                    onClick={sortConfig.type === 'qsort' && hasNextWorkflowStage ? handleAdvanceSortStage : endSorting}
+                  >
+                    {sortCompletionActionLabel}
+                  </button>
+                </div>
+              </section>
+            ) : null}
           </main>
         </div>
       ) : (
@@ -4912,6 +5066,7 @@ export default function App() {
                   sortConfig={replayRecording?.sortConfig || sortConfig}
                   cards={replayVisibleCards}
                   surfaceScene={replaySurfaceScene}
+                  liftedCardIds={replayLiftedCardIds}
                   baseCardWidth={replayRecording?.cardW || cardWidth}
                   cardLayoutMode={replayRecording?.cardLayoutModeAtStart || cardLayoutMode}
                   boardRef={boardRef}
