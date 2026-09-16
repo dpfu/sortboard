@@ -1,3 +1,4 @@
+import { openProjectMenu } from './helpers/app';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { cardFromTop, cards, dragLocatorBy, dragMouseFromTo, openFreshApp, waitForAppReady } from './helpers/app';
 
@@ -5,9 +6,10 @@ type Point = { x: number; y: number };
 
 async function createSingleCardProject(page: Page) {
   await openFreshApp(page);
+  await openProjectMenu(page);
   await page.getByRole('button', { name: 'New' }).click();
   await expect(cards(page)).toHaveCount(0);
-  await page.getByRole('button', { name: '+ Text card' }).click();
+  await page.getByRole('button', { name: 'Text card' }).click();
   await expect(cards(page)).toHaveCount(1);
 
   const card = await cardFromTop(page);
@@ -130,8 +132,8 @@ async function waitForStableBox(locator: Locator, label: string) {
 
 async function completeOpenSession(page: Page, delta: Point) {
   const card = await createSingleCardProject(page);
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
-  await expect(page.getByRole('button', { name: 'End sorting →' })).toBeVisible();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeVisible();
 
   const start = await settledCardPoint(card);
   await dragLocatorBy(page, card, delta);
@@ -139,8 +141,8 @@ async function completeOpenSession(page: Page, delta: Point) {
   const final = await settledCardPoint(card);
   expect(pointDistance(start, final)).toBeGreaterThan(100);
 
-  await page.getByRole('button', { name: 'End sorting →' }).click();
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await page.getByRole('button', { name: 'Finish sorting' }).click();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(1);
 
   return { card, start, final };
@@ -165,11 +167,11 @@ async function dragCardTo(page: Page, card: Locator, target: Locator) {
 test.describe('replay state isolation', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Replay persistence regressions run in Chromium.');
 
-  test('@smoke keeps the final Open board after reloading from an intermediate replay pose', async ({ page }) => {
+  test('@smoke keeps the prepared Open board after reloading from an intermediate replay pose', async ({ page }) => {
     const { card, start, final } = await completeOpenSession(page, { x: 260, y: 140 });
     const dragMidpointFraction = await recordedDragMidpointFraction(page);
 
-    await page.getByRole('button', { name: 'Play' }).click();
+    await page.getByRole('button', { name: 'Play recording' }).click();
     await seekReplay(page, dragMidpointFraction);
     const intermediate = await settledCardPoint(card);
     expect(pointDistance(intermediate, start)).toBeGreaterThan(30);
@@ -177,22 +179,24 @@ test.describe('replay state isolation', () => {
 
     await page.reload();
     await waitForAppReady(page);
+    await expectCardNear(card, start);
+    await page.getByRole('button', { name: 'Recordings (1)' }).click();
     await expectCardNear(card, final);
   });
 
   test('Stop resets replay time and the Open board to the selected session start', async ({ page }) => {
     const { card, start, final } = await completeOpenSession(page, { x: 240, y: 120 });
 
-    await page.getByRole('button', { name: 'Play' }).click();
+    await page.getByRole('button', { name: 'Play recording' }).click();
     await seekReplay(page, 0.6);
     await expect
       .poll(async () => pointDistance(await cardPoint(card), final))
       .toBeGreaterThan(20);
     await expect(page.locator('.replayTimeLabel')).not.toHaveText('00:00.000');
 
-    await page.getByRole('button', { name: 'Play' }).click();
+    await page.getByRole('button', { name: 'Play recording' }).click();
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
-    await page.getByRole('button', { name: 'Reset to start' }).click();
+    await page.getByRole('button', { name: 'Go to start' }).click();
     await page.evaluate(
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     );
@@ -200,15 +204,15 @@ test.describe('replay state isolation', () => {
     await expectCardNear(card, start);
   });
 
-  test('selecting the older of two Open sessions immediately shows that session start', async ({ page }) => {
+  test('starts a fresh Open session and shows each selected recording at its result', async ({ page }) => {
     const card = await createSingleCardProject(page);
-    await page.getByRole('button', { name: 'Start sorting →' }).click();
+    await page.getByRole('button', { name: 'Start sorting' }).click();
     const firstSessionStart = await settledCardPoint(card);
 
     await dragLocatorBy(page, card, { x: 220, y: 80 });
     await expect(page.getByText('Recording · 1 action')).toBeVisible();
     const firstSessionFinal = await settledCardPoint(card);
-    await page.getByRole('button', { name: 'End sorting →' }).click();
+    await page.getByRole('button', { name: 'Finish sorting' }).click();
 
     const sessionButtons = page.getByTestId('replay-sessions').getByRole('button');
     await expect(sessionButtons).toHaveCount(1);
@@ -218,26 +222,26 @@ test.describe('replay state isolation', () => {
     }
 
     await page.waitForTimeout(10);
-    await page.getByRole('button', { name: '← Start another sort' }).click();
-    await expect(page.getByRole('button', { name: 'End sorting →' })).toBeVisible();
-    await expectCardNear(card, firstSessionFinal);
+    await page.getByRole('button', { name: 'New sorting session' }).click();
+    await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeVisible();
+    await expectCardNear(card, firstSessionStart);
 
     await dragLocatorBy(page, card, { x: 140, y: 120 });
     await expect(page.getByText('Recording · 1 action')).toBeVisible();
     const secondSessionFinal = await settledCardPoint(card);
     expect(pointDistance(firstSessionStart, secondSessionFinal)).toBeGreaterThan(100);
-    await page.getByRole('button', { name: 'End sorting →' }).click();
+    await page.getByRole('button', { name: 'Finish sorting' }).click();
     await expect(sessionButtons).toHaveCount(2);
 
     const olderSession = page.getByTestId('replay-sessions').getByTitle(firstSessionId);
-    await page.getByRole('button', { name: 'Play' }).click();
+    await page.getByRole('button', { name: 'Play recording' }).click();
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await olderSession.click();
     await page.evaluate(
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     );
     await expect(olderSession).toHaveClass(/isActive/);
-    await expectCardNear(card, firstSessionStart);
+    await expectCardNear(card, firstSessionFinal);
   });
 
   test('Q-Sort records and replays Pre-Sort first even when setup was showing Q-Sort', async ({ page }) => {
@@ -251,8 +255,8 @@ test.describe('replay state isolation', () => {
     await expect(stageControl.getByRole('button', { name: 'Q-Sort', exact: true })).toHaveClass(/isActive/);
     await expect(page.locator('[data-testid^="surface-qsort-"]')).toHaveCount(1);
 
-    await page.getByRole('button', { name: 'Start sorting →' }).click();
-    await expect(page.locator('.sortBar .pill').filter({ hasText: /^Pre-Sort$/ })).toHaveCount(1);
+    await page.getByRole('button', { name: 'Start sorting' }).click();
+    await expect(page.locator('.sortBar__stage')).toHaveText('Pre-Sort');
 
     const source = page.locator('[data-testid^="surface-work-area-"]');
     const preSortTargets = page.locator('[data-testid^="surface-sink-"]');
@@ -263,7 +267,7 @@ test.describe('replay state isolation', () => {
     await expect(source.locator('.boardSurface__count')).toHaveText('0');
     await expect(preSortTargets.first().locator('.boardSurface__count')).toHaveText('1');
 
-    const nextStage = page.getByRole('button', { name: 'Next stage →' });
+    const nextStage = page.getByRole('button', { name: 'Continue to Q-Sort' });
     await expect(nextStage).toBeEnabled();
     await nextStage.click();
 
@@ -288,18 +292,20 @@ test.describe('replay state isolation', () => {
     await waitForStableBox(availableSlot, 'Q-Sort bucket slot');
     await dragCardTo(page, liveLaneCard, availableSlot);
     await expect(availableBucket.locator('.widgetBucket__meta')).toHaveText('1 / 1');
-    const endSorting = page.getByRole('button', { name: 'End sorting →' });
+    const endSorting = page.getByRole('button', { name: 'Finish sorting' });
     await expect(endSorting).toBeEnabled();
     await endSorting.click();
 
     const session = page.getByTestId('replay-sessions').getByRole('button').first();
     await session.click();
     await expect(session).toHaveClass(/isActive/);
+    await expect(page.locator('[data-testid^="surface-qsort-"]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Go to start' }).click();
     await expect(page.locator('[data-testid^="surface-qsort-"]')).toHaveCount(0);
     await expect(page.locator('[data-testid^="surface-sink-"]')).toHaveCount(2);
     await expect(page.locator('[data-testid^="surface-work-area-"] .boardSurface__count')).toHaveText('1');
 
-    await page.getByRole('button', { name: 'Play' }).click();
+    await page.getByRole('button', { name: 'Play recording' }).click();
     const pause = page.getByRole('button', { name: 'Pause' });
     await expect(pause).toBeVisible();
     await pause.click();

@@ -70,25 +70,24 @@ describe('App project creation', () => {
     const { default: App } = await import('./App');
     render(<App />);
 
-    const select = (await screen.findByLabelText('Select project')) as HTMLSelectElement;
+    await userEvent.click(await screen.findByRole('button', { name: 'Open starter board' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Project menu' }));
+    const select = screen.getByLabelText('Select project') as HTMLSelectElement;
     await waitFor(() => {
       expect(Array.from(select.options).map((o) => o.textContent)).toContain('Demo Project');
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'New' }));
 
-    await waitFor(() => {
-      const optionNames = Array.from(select.options).map((o) => o.textContent);
-      expect(optionNames).toContain('Project 2');
-      expect(select.selectedOptions[0]?.textContent).toBe('Project 2');
-    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project menu' }).getAttribute('title')).toBe('Project 2'));
 
-    expect((screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText('Add at least one card to begin.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(await screen.findByText('Add at least one card to begin.')).toBeTruthy();
     expect(screen.getByText('Your board is empty')).toBeTruthy();
     expect(screen.getByText('Add a text card, image, or video to get started.')).toBeTruthy();
 
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // The image library is optional; its failure does not block the local starter.
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(console.info).toHaveBeenCalledWith('[projects] create start', expect.any(Object));
     await waitFor(() => {
       expect(console.info).toHaveBeenCalledWith('[projects] create success', expect.any(Object));

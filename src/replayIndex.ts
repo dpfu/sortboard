@@ -1,4 +1,5 @@
-import type { CardData, DragSegment, RecordingSession, RecordingSegment, StaticMoveMember } from './types';
+import { applyStackFrame, stackFrameAt } from './stackRecording';
+import type { CameraKeyframe, CardData, DragSegment, RecordingSession, RecordingSegment, StaticMoveMember } from './types';
 import { getDefaultActiveStageId } from './workflow';
 
 export type Keyframe = {
@@ -27,6 +28,7 @@ export type ReplayIndex = {
     t: number;
     changes: NonNullable<DragSegment['widgetAssignmentChanges']>;
   }>;
+  cameraTrack: CameraKeyframe[];
   tracks: Map<string, Track>;
   markers: TimelineMarker[];
 };
@@ -104,6 +106,7 @@ export function buildReplayIndex(rec: RecordingSession): ReplayIndex {
 
   let durationMs = 0;
   const segs = [...rec.segments].sort((a, b) => a.t0 - b.t0);
+  const cameraTrack = [...(rec.cameraTrack || [])].sort((a, b) => a.tMs - b.tMs);
   const stageTransitions = segs
     .filter((segment) => segment.type === 'stage-transition')
     .map((segment) => ({ t: segment.t0, toStageId: segment.toStageId }));
@@ -158,6 +161,10 @@ export function buildReplayIndex(rec: RecordingSession): ReplayIndex {
     const segEnd = seg.t1 + (seg.settleMs ?? 0);
     if (segEnd > durationMs) durationMs = segEnd;
   }
+  const lastCameraFrame = cameraTrack.at(-1);
+  if (lastCameraFrame && lastCameraFrame.tMs > durationMs) durationMs = lastCameraFrame.tMs;
+
+  durationMs = Math.max(durationMs, rec.stackTrack?.at(-1)?.tMs || 0);
 
   // Ensure monotonic by sorting frames for each track.
   for (const tr of tracks.values()) {
@@ -208,6 +215,7 @@ export function buildReplayIndex(rec: RecordingSession): ReplayIndex {
     segments: segs,
     stageTransitions,
     assignmentFrames,
+    cameraTrack,
     tracks,
     markers: [],
   };
@@ -227,7 +235,7 @@ export function buildReplayIndex(rec: RecordingSession): ReplayIndex {
     prevEdges = edges;
   }
 
-  return { durationMs, segments: segs, stageTransitions, assignmentFrames, tracks, markers };
+  return { durationMs, segments: segs, stageTransitions, assignmentFrames, cameraTrack, tracks, markers };
 }
 
 export function poseAt(index: ReplayIndex, tMs: number) {
@@ -303,7 +311,7 @@ export function replayStageIdAt(recording: RecordingSession, index: ReplayIndex,
 }
 
 export function replayCardsAt(recording: RecordingSession, index: ReplayIndex, tMs: number) {
-  if (tMs <= 0) return recording.cardsAtStart;
+  if (tMs <= 0) return applyStackFrame(recording.cardsAtStart, stackFrameAt(recording.stackTrack, 0));
   const latestChanges = new Map<string, NonNullable<DragSegment['widgetAssignmentChanges']>[number]>();
   for (const frame of index.assignmentFrames) {
     if (frame.t > tMs) break;
@@ -315,5 +323,5 @@ export function replayCardsAt(recording: RecordingSession, index: ReplayIndex, t
     recording.cardsAtStart,
     Array.from(latestChanges.values())
   );
-  return applyPoseToCards(cardsWithAssignments, poseAt(index, tMs));
+  return applyStackFrame(applyPoseToCards(cardsWithAssignments, poseAt(index, tMs)), stackFrameAt(recording.stackTrack, tMs));
 }

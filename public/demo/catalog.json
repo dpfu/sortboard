@@ -1,0 +1,1461 @@
+{
+  "version": 1,
+  "images": [
+    {
+      "id": "01-diffusiondb",
+      "pairId": "01",
+      "title": "Oregon coast",
+      "source": "DiffusionDB / 2022",
+      "file": "images/01-diffusiondb.webp",
+      "bytes": 44320,
+      "sha256": "5fa6dcfd5b18aa278063ff670d9f2d6f5a089f446596fa9a223ec7b4edc2dc21",
+      "meta": {
+        "name": "Image 049",
+        "notes": "Original prompt:\nfrom the coast of north oregon, usa ( oc ) [ r / earthporn ] \n\nPair ID: 01\nImage ID: 01-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 3279492441\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 18340455-f428-43c5-b6f8-a7f793553de5.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 4af0954ae524dc9f0de4018571d4ee7daa1fe1aeafe2cefe8cba950f38da0d01\nPrompt SHA-256: 86aca85b0b5ef437abd5a377dfca957909985de14ee0bd8bd315a4e9ed274b27\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 5fa6dcfd5b18aa278063ff670d9f2d6f5a089f446596fa9a223ec7b4edc2dc21",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-01"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-049.webp"
+      }
+    },
+    {
+      "id": "01-imagegen",
+      "pairId": "01",
+      "title": "Oregon coast",
+      "source": "Imagegen / 2026",
+      "file": "images/01-imagegen.webp",
+      "bytes": 159148,
+      "sha256": "a371dba1c231b82857dcd2b599dfc27dd97e568d749b8c6ebe140a6e085fa815",
+      "meta": {
+        "name": "Image 002",
+        "notes": "Original prompt:\nfrom the coast of north oregon, usa ( oc ) [ r / earthporn ] \n\nPair ID: 01\nImage ID: 01-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:23:18.294Z\nGeneration completed (UTC): 2026-09-10T09:24:27.891Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: c68d17ce245e31ca1abb1d544bdef8264df2c42f5319b13dbaf8360560edba9d\nPrompt SHA-256: 86aca85b0b5ef437abd5a377dfca957909985de14ee0bd8bd315a4e9ed274b27\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: a371dba1c231b82857dcd2b599dfc27dd97e568d749b8c6ebe140a6e085fa815",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-01"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-002.webp"
+      }
+    },
+    {
+      "id": "02-diffusiondb",
+      "pairId": "02",
+      "title": "Older couple",
+      "source": "DiffusionDB / 2022",
+      "file": "images/02-diffusiondb.webp",
+      "bytes": 46342,
+      "sha256": "7d359ba3b88d37316e1b1d5b2b1311597af30c6f0d35682aab54899821c1bf6e",
+      "meta": {
+        "name": "Image 008",
+        "notes": "Original prompt:\npoignant portrait black and white photo of an old couple smiling at each other, nostalgia, love \n\nPair ID: 02\nImage ID: 02-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1596176968\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 74abafca-0adb-408b-bf82-29f0215f6eec.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 511a52c8fe93ebcb8d3b58d74c8ea1c25fb04646fa2e67eb90054e9c1b0af724\nPrompt SHA-256: 501569c389d2f1db822f911b8b4d7b708d53f94f79a780d98dc8c5172343dbb6\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 7d359ba3b88d37316e1b1d5b2b1311597af30c6f0d35682aab54899821c1bf6e",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-02"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-008.webp"
+      }
+    },
+    {
+      "id": "02-imagegen",
+      "pairId": "02",
+      "title": "Older couple",
+      "source": "Imagegen / 2026",
+      "file": "images/02-imagegen.webp",
+      "bytes": 108918,
+      "sha256": "6698e0518d1c3f973d814bd221b0e362936876302e80fa6b6c2619cfa6b7ca51",
+      "meta": {
+        "name": "Image 009",
+        "notes": "Original prompt:\npoignant portrait black and white photo of an old couple smiling at each other, nostalgia, love \n\nPair ID: 02\nImage ID: 02-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:23:18.296Z\nGeneration completed (UTC): 2026-09-10T09:25:36.759Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1370 x 1148\nSource PNG SHA-256: 24559a203f959fb86c8944ed679633a778537ffd573248c2eadadbe8107756b0\nPrompt SHA-256: 501569c389d2f1db822f911b8b4d7b708d53f94f79a780d98dc8c5172343dbb6\nDemo copy: WebP, 1024 x 858, resized without cropping\nDemo copy SHA-256: 6698e0518d1c3f973d814bd221b0e362936876302e80fa6b6c2619cfa6b7ca51",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-02"
+        ],
+        "aspectRatio": 1.1934731934731935,
+        "originalFileName": "image-009.webp"
+      }
+    },
+    {
+      "id": "03-diffusiondb",
+      "pairId": "03",
+      "title": "Voxel bison",
+      "source": "DiffusionDB / 2022",
+      "file": "images/03-diffusiondb.webp",
+      "bytes": 42836,
+      "sha256": "e7fe0f3c8f5c57f50d94e3c338613bbe1e4cd0445b0f3f1583ba1a34de519d92",
+      "meta": {
+        "name": "Image 057",
+        "notes": "Original prompt:\nvoxel art bison \n\nPair ID: 03\nImage ID: 03-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 3294029794\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 60a6a8fc-2b5c-4257-bdf5-0681dbf53049.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: c0ec5ba5e069cdc035a5e2db82674f680d329d4d4e5e9ebe680417ee1e09e1a9\nPrompt SHA-256: db10c87d94cc7f6cadfa1d5408b0fbceb084db87d67f374cfe49f9eee58d80f8\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: e7fe0f3c8f5c57f50d94e3c338613bbe1e4cd0445b0f3f1583ba1a34de519d92",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-03"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-057.webp"
+      }
+    },
+    {
+      "id": "03-imagegen",
+      "pairId": "03",
+      "title": "Voxel bison",
+      "source": "Imagegen / 2026",
+      "file": "images/03-imagegen.webp",
+      "bytes": 74884,
+      "sha256": "d5a736f6a84c6da993241aff11c2fd9cb6f05ec45044dade91e4c28b650c8182",
+      "meta": {
+        "name": "Image 048",
+        "notes": "Original prompt:\nvoxel art bison \n\nPair ID: 03\nImage ID: 03-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:23:18.296Z\nGeneration completed (UTC): 2026-09-10T09:23:51.189Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1374 x 1145\nSource PNG SHA-256: a5edffd1ee8eddd919287a59499bed40e433ca79f8beead21992be5a25d482d7\nPrompt SHA-256: db10c87d94cc7f6cadfa1d5408b0fbceb084db87d67f374cfe49f9eee58d80f8\nDemo copy: WebP, 1024 x 853, resized without cropping\nDemo copy SHA-256: d5a736f6a84c6da993241aff11c2fd9cb6f05ec45044dade91e4c28b650c8182",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-03"
+        ],
+        "aspectRatio": 1.2004689331770222,
+        "originalFileName": "image-048.webp"
+      }
+    },
+    {
+      "id": "04-diffusiondb",
+      "pairId": "04",
+      "title": "Fractal marble sculpture",
+      "source": "DiffusionDB / 2022",
+      "file": "images/04-diffusiondb.webp",
+      "bytes": 34118,
+      "sha256": "2ddd1e842b6c92e4c6c6cb2312256e03886902f5a37cfe4afaab592368d5f0ef",
+      "meta": {
+        "name": "Image 030",
+        "notes": "Original prompt:\nmarble sculpture of a fractal being, highly realistic, 4 k, studio lighting \n\nPair ID: 04\nImage ID: 04-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 3027255769\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: be2bcbf2-85ac-4f3c-8172-fb7a60db6238.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 95207bdf277010c1bb3c9251778a16514c3842000bcb5e51060566c37017c3b3\nPrompt SHA-256: dfb4cc2da1e51deaef61718ffcfadc00f49a51588c20572a7302d5bdc8965dc3\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 2ddd1e842b6c92e4c6c6cb2312256e03886902f5a37cfe4afaab592368d5f0ef",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-04"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-030.webp"
+      }
+    },
+    {
+      "id": "04-imagegen",
+      "pairId": "04",
+      "title": "Fractal marble sculpture",
+      "source": "Imagegen / 2026",
+      "file": "images/04-imagegen.webp",
+      "bytes": 73154,
+      "sha256": "de6e6a9ee1f404778c12202640cc14450f4b1665ef50c9bff971923a59572df3",
+      "meta": {
+        "name": "Image 059",
+        "notes": "Original prompt:\nmarble sculpture of a fractal being, highly realistic, 4 k, studio lighting \n\nPair ID: 04\nImage ID: 04-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:26:05.290Z\nGeneration completed (UTC): 2026-09-10T09:26:36.546Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1024 x 1536\nSource PNG SHA-256: b4f1042bf0bae15b8c6a4aa2e08608e71b971080ed82751ea9f29a3b383965aa\nPrompt SHA-256: dfb4cc2da1e51deaef61718ffcfadc00f49a51588c20572a7302d5bdc8965dc3\nDemo copy: WebP, 683 x 1024, resized without cropping\nDemo copy SHA-256: de6e6a9ee1f404778c12202640cc14450f4b1665ef50c9bff971923a59572df3",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-04"
+        ],
+        "aspectRatio": 0.6669921875,
+        "originalFileName": "image-059.webp"
+      }
+    },
+    {
+      "id": "05-diffusiondb",
+      "pairId": "05",
+      "title": "Cheeseburger head",
+      "source": "DiffusionDB / 2022",
+      "file": "images/05-diffusiondb.webp",
+      "bytes": 35284,
+      "sha256": "f32351060fb93c8e231f5fc847a98f7784da692eab7146e55f4fb7ce12355021",
+      "meta": {
+        "name": "Image 045",
+        "notes": "Original prompt:\nman in tux with a giant cheeseburger head \n\nPair ID: 05\nImage ID: 05-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 59284052\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 27630277-f4db-46b5-851b-b8bdfe197f1a.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 1d0dcbb18870f954528badd015d9323480894d92c9e14782e5372ddfebd5f65b\nPrompt SHA-256: 01444fbee2aeed61ca4ba7e325853856a93e4831b329aab28accb23b982b0096\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: f32351060fb93c8e231f5fc847a98f7784da692eab7146e55f4fb7ce12355021",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-05"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-045.webp"
+      }
+    },
+    {
+      "id": "05-imagegen",
+      "pairId": "05",
+      "title": "Cheeseburger head",
+      "source": "Imagegen / 2026",
+      "file": "images/05-imagegen.webp",
+      "bytes": 66312,
+      "sha256": "b49db59e57d6c5b050674b4def2bc266207879d59b59db0dbc4c58a82792bc26",
+      "meta": {
+        "name": "Image 036",
+        "notes": "Original prompt:\nman in tux with a giant cheeseburger head \n\nPair ID: 05\nImage ID: 05-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:26:05.290Z\nGeneration completed (UTC): 2026-09-10T09:27:18.737Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1024 x 1536\nSource PNG SHA-256: 550c65916e9291b85f664aaab89e96a8427b3932cd302ffc8e35e16594a7d958\nPrompt SHA-256: 01444fbee2aeed61ca4ba7e325853856a93e4831b329aab28accb23b982b0096\nDemo copy: WebP, 683 x 1024, resized without cropping\nDemo copy SHA-256: b49db59e57d6c5b050674b4def2bc266207879d59b59db0dbc4c58a82792bc26",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-05"
+        ],
+        "aspectRatio": 0.6669921875,
+        "originalFileName": "image-036.webp"
+      }
+    },
+    {
+      "id": "06-diffusiondb",
+      "pairId": "06",
+      "title": "Pastel city buildings",
+      "source": "DiffusionDB / 2022",
+      "file": "images/06-diffusiondb.webp",
+      "bytes": 68614,
+      "sha256": "edb3e8238baaaf15481596d0b52d13db94b59918ef25c3dc0b43f8969f5356dc",
+      "meta": {
+        "name": "Image 056",
+        "notes": "Original prompt:\nnew york city building abstract geometric colorful render 🛰 \n\nPair ID: 06\nImage ID: 06-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1008036271\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: b0a566fa-504a-4f67-a2d1-d54169ce19f7.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 92915b23d3ef158a000c8a7ef3c11cffc0765495288fd9c274d50e84d51e85d9\nPrompt SHA-256: ba6746ce0c97094d3f2ecabdbbe561af550c6a4e26990cf90f0bd6819ee87928\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: edb3e8238baaaf15481596d0b52d13db94b59918ef25c3dc0b43f8969f5356dc",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-06"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-056.webp"
+      }
+    },
+    {
+      "id": "06-imagegen",
+      "pairId": "06",
+      "title": "Pastel city buildings",
+      "source": "Imagegen / 2026",
+      "file": "images/06-imagegen.webp",
+      "bytes": 122108,
+      "sha256": "812f56a87ff41543fb9985fe6ce54db3384572534ffd0fad0ff6f1b7e530facf",
+      "meta": {
+        "name": "Image 047",
+        "notes": "Original prompt:\nnew york city building abstract geometric colorful render 🛰 \n\nPair ID: 06\nImage ID: 06-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:26:05.290Z\nGeneration completed (UTC): 2026-09-10T09:28:28.434Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1024 x 1536\nSource PNG SHA-256: 89fda2a8bb2d4f05290429595d78f1c4dde42bd4507e839d6765e024c13399d7\nPrompt SHA-256: ba6746ce0c97094d3f2ecabdbbe561af550c6a4e26990cf90f0bd6819ee87928\nDemo copy: WebP, 683 x 1024, resized without cropping\nDemo copy SHA-256: 812f56a87ff41543fb9985fe6ce54db3384572534ffd0fad0ff6f1b7e530facf",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-06"
+        ],
+        "aspectRatio": 0.6669921875,
+        "originalFileName": "image-047.webp"
+      }
+    },
+    {
+      "id": "07-diffusiondb",
+      "pairId": "07",
+      "title": "Burnt-out house",
+      "source": "DiffusionDB / 2022",
+      "file": "images/07-diffusiondb.webp",
+      "bytes": 76340,
+      "sha256": "7d4fb02c0a5a99f5107c854022ee70aeabd187c377d632bd5a106be88d2e7a03",
+      "meta": {
+        "name": "Image 005",
+        "notes": "Original prompt:\na derelict burnt out 1 9 6 0 s house, with dark burnt rooms, and no stairs. realistic. seen from outside. 3 5 mm \n\nPair ID: 07\nImage ID: 07-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2065126325\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 200720f8-1bd4-4b0a-812a-6f54ac282386.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: dbfd74c42451ca06886b2c70bbb55446570aa5db010e632cf85c8771c1120e69\nPrompt SHA-256: 9792bad9c59de4b1ec22f255e39ddf15f0a6022c6d5fa0400d4dbf4b1044ad94\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 7d4fb02c0a5a99f5107c854022ee70aeabd187c377d632bd5a106be88d2e7a03",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-07"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-005.webp"
+      }
+    },
+    {
+      "id": "07-imagegen",
+      "pairId": "07",
+      "title": "Burnt-out house",
+      "source": "Imagegen / 2026",
+      "file": "images/07-imagegen.webp",
+      "bytes": 168616,
+      "sha256": "6923fec7b5972b5078cdc93121fce42789a22b14db9cda6dcba7d9e38717f654",
+      "meta": {
+        "name": "Image 031",
+        "notes": "Original prompt:\na derelict burnt out 1 9 6 0 s house, with dark burnt rooms, and no stairs. realistic. seen from outside. 3 5 mm \n\nPair ID: 07\nImage ID: 07-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:26:05.290Z\nGeneration completed (UTC): 2026-09-10T09:27:50.916Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: 002118775f3ff08903666b404af435b1daf7686c36b54f47a3467421c82d1ffa\nPrompt SHA-256: 9792bad9c59de4b1ec22f255e39ddf15f0a6022c6d5fa0400d4dbf4b1044ad94\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 6923fec7b5972b5078cdc93121fce42789a22b14db9cda6dcba7d9e38717f654",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-07"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-031.webp"
+      }
+    },
+    {
+      "id": "08-diffusiondb",
+      "pairId": "08",
+      "title": "Portrait of a young woman",
+      "source": "DiffusionDB / 2022",
+      "file": "images/08-diffusiondb.webp",
+      "bytes": 44874,
+      "sha256": "e97cd6ac27c59c0006dabe2ca0a2ed27e928f059d101613c09ac7ec091bb64c7",
+      "meta": {
+        "name": "Image 033",
+        "notes": "Original prompt:\nportrait of a beautiful young woman, with blue eyes and long blond hair falling on her chest. she has a small face just like her nose, with thin pink lips and thin dark eyebrows \n\nPair ID: 08\nImage ID: 08-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2489690502\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: ad2e8c85-413b-4c5a-812d-c91d98bd175b.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: b08b9e2f14f24a6d5b0b2ff475485c87f3a054e713d52bef3c913e4e6f8c61a5\nPrompt SHA-256: 9fdbdb9dde748d0d77830db278140f01310565fce21b2c8c2d6c5695262ec078\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: e97cd6ac27c59c0006dabe2ca0a2ed27e928f059d101613c09ac7ec091bb64c7",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-08"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-033.webp"
+      }
+    },
+    {
+      "id": "08-imagegen",
+      "pairId": "08",
+      "title": "Portrait of a young woman",
+      "source": "Imagegen / 2026",
+      "file": "images/08-imagegen.webp",
+      "bytes": 94036,
+      "sha256": "2dbc75c5a97cefbf96b04487a02c16af21ccdd5b4a9f9b691752de3c01f82a49",
+      "meta": {
+        "name": "Image 028",
+        "notes": "Original prompt:\nportrait of a beautiful young woman, with blue eyes and long blond hair falling on her chest. she has a small face just like her nose, with thin pink lips and thin dark eyebrows \n\nPair ID: 08\nImage ID: 08-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:26:05.290Z\nGeneration completed (UTC): 2026-09-10T09:29:40.735Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1145 x 1374\nSource PNG SHA-256: b22e5492caaff83dfa344144a39f1b694f2e24fb963867e640b49fa3e4697b14\nPrompt SHA-256: 9fdbdb9dde748d0d77830db278140f01310565fce21b2c8c2d6c5695262ec078\nDemo copy: WebP, 853 x 1024, resized without cropping\nDemo copy SHA-256: 2dbc75c5a97cefbf96b04487a02c16af21ccdd5b4a9f9b691752de3c01f82a49",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-08"
+        ],
+        "aspectRatio": 0.8330078125,
+        "originalFileName": "image-028.webp"
+      }
+    },
+    {
+      "id": "09-diffusiondb",
+      "pairId": "09",
+      "title": "Watercolor terrier",
+      "source": "DiffusionDB / 2022",
+      "file": "images/09-diffusiondb.webp",
+      "bytes": 49970,
+      "sha256": "4a10cb4a1df6c1f742df19e103c8437dce56a52df3cf46dd499567293248bfde",
+      "meta": {
+        "name": "Image 058",
+        "notes": "Original prompt:\nwest hightland white terrier, sweet, affectionate, tender, cute, watercolor painting \n\nPair ID: 09\nImage ID: 09-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 4041886957\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: a640eb50-d38f-4f9b-9b8c-b0bb128ee53f.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 85f2046dd6eff21e255641f58d968a6d5f2de0678ec74ddb73c5fc8cd82f759f\nPrompt SHA-256: 2cc3bd7fab53afb74727b7fc331fba6c5aa9f8a1f0b0f0972a5478272e2865cb\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 4a10cb4a1df6c1f742df19e103c8437dce56a52df3cf46dd499567293248bfde",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-09"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-058.webp"
+      }
+    },
+    {
+      "id": "09-imagegen",
+      "pairId": "09",
+      "title": "Watercolor terrier",
+      "source": "Imagegen / 2026",
+      "file": "images/09-imagegen.webp",
+      "bytes": 226540,
+      "sha256": "d1020b12cc0885c9e7df0dc759bb075f4c2c94850e9a79222fb4d18bb3f73eeb",
+      "meta": {
+        "name": "Image 035",
+        "notes": "Original prompt:\nwest hightland white terrier, sweet, affectionate, tender, cute, watercolor painting \n\nPair ID: 09\nImage ID: 09-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:26:05.290Z\nGeneration completed (UTC): 2026-09-10T09:29:03.832Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1254 x 1254\nSource PNG SHA-256: ed2a79ff52e0d265990fc9804cc0fae71a1df8926d6b809a2c9dad65e89315b3\nPrompt SHA-256: 2cc3bd7fab53afb74727b7fc331fba6c5aa9f8a1f0b0f0972a5478272e2865cb\nDemo copy: WebP, 1024 x 1024, resized without cropping\nDemo copy SHA-256: d1020b12cc0885c9e7df0dc759bb075f4c2c94850e9a79222fb4d18bb3f73eeb",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-09"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-035.webp"
+      }
+    },
+    {
+      "id": "10-diffusiondb",
+      "pairId": "10",
+      "title": "Bubble in a cage",
+      "source": "DiffusionDB / 2022",
+      "file": "images/10-diffusiondb.webp",
+      "bytes": 60796,
+      "sha256": "03af0d79cad606857e15f4d0f56d1b752f36aa68d648a7c03cb45713949a87b0",
+      "meta": {
+        "name": "Image 022",
+        "notes": "Original prompt:\na bubble suspended within a cubical cage realitistic detailed 3 5 mm light and shadow \n\nPair ID: 10\nImage ID: 10-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 4240900671\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: fa9fcb68-dca5-4866-a67a-9a61ebe91216.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 37ec938c27516fae304fe1771a31e5e2bebd29eafd4bef4f7c386e294f293a6e\nPrompt SHA-256: da5601e50a25c36631908fed5a45dca1fd322ffba1b86e23f2fea75098c767e9\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 03af0d79cad606857e15f4d0f56d1b752f36aa68d648a7c03cb45713949a87b0",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-10"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-022.webp"
+      }
+    },
+    {
+      "id": "10-imagegen",
+      "pairId": "10",
+      "title": "Bubble in a cage",
+      "source": "Imagegen / 2026",
+      "file": "images/10-imagegen.webp",
+      "bytes": 94888,
+      "sha256": "a7cd66e58fc7e0ee7ff382771729319c1a0fe5c04ae89928d8a59c20f1da0af6",
+      "meta": {
+        "name": "Image 024",
+        "notes": "Original prompt:\na bubble suspended within a cubical cage realitistic detailed 3 5 mm light and shadow \n\nPair ID: 10\nImage ID: 10-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:29:55.089Z\nGeneration completed (UTC): 2026-09-10T09:30:26.510Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1299 x 1211\nSource PNG SHA-256: 64f82ab396ced8f7561f96d80fb3603fa3bead6c7db480ff8e57220a54bd7aea\nPrompt SHA-256: da5601e50a25c36631908fed5a45dca1fd322ffba1b86e23f2fea75098c767e9\nDemo copy: WebP, 1024 x 955, resized without cropping\nDemo copy SHA-256: a7cd66e58fc7e0ee7ff382771729319c1a0fe5c04ae89928d8a59c20f1da0af6",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-10"
+        ],
+        "aspectRatio": 1.0722513089005237,
+        "originalFileName": "image-024.webp"
+      }
+    },
+    {
+      "id": "11-diffusiondb",
+      "pairId": "11",
+      "title": "Robot on the high street",
+      "source": "DiffusionDB / 2022",
+      "file": "images/11-diffusiondb.webp",
+      "bytes": 71192,
+      "sha256": "c9e763c402507650290250c0e1a51c4ea258df23f8c9aa61f497a76eed4559bd",
+      "meta": {
+        "name": "Image 021",
+        "notes": "Original prompt:\n1 9 9 0 s photograph. a giant robot standing in the high street of a run down seaside town \n\nPair ID: 11\nImage ID: 11-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1861388096\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: e033c5e7-d231-4db9-b390-0cdec84f993c.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 22a374c4659e1cba0c06eae01d114d75fa41611223346617d297eaf8129113a8\nPrompt SHA-256: 3bc7378bcf526049b3d5b3c4261832e85dc8d13b9336c788e4612d1b819d1949\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: c9e763c402507650290250c0e1a51c4ea258df23f8c9aa61f497a76eed4559bd",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-11"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-021.webp"
+      }
+    },
+    {
+      "id": "11-imagegen",
+      "pairId": "11",
+      "title": "Robot on the high street",
+      "source": "Imagegen / 2026",
+      "file": "images/11-imagegen.webp",
+      "bytes": 93512,
+      "sha256": "7fedb3cfaf9d3cb5a4fe1597fd70961ffae3051ab2771147d6ccd638842772ed",
+      "meta": {
+        "name": "Image 027",
+        "notes": "Original prompt:\n1 9 9 0 s photograph. a giant robot standing in the high street of a run down seaside town \n\nPair ID: 11\nImage ID: 11-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:29:55.089Z\nGeneration completed (UTC): 2026-09-10T09:31:10.190Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1375 x 1144\nSource PNG SHA-256: 348817dcf5d08061b3344d57986bbe3f995aa33ab4eb7a9cd68ee59c96344cad\nPrompt SHA-256: 3bc7378bcf526049b3d5b3c4261832e85dc8d13b9336c788e4612d1b819d1949\nDemo copy: WebP, 1024 x 852, resized without cropping\nDemo copy SHA-256: 7fedb3cfaf9d3cb5a4fe1597fd70961ffae3051ab2771147d6ccd638842772ed",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-11"
+        ],
+        "aspectRatio": 1.2018779342723005,
+        "originalFileName": "image-027.webp"
+      }
+    },
+    {
+      "id": "12-diffusiondb",
+      "pairId": "12",
+      "title": "Rapper character design",
+      "source": "DiffusionDB / 2022",
+      "file": "images/12-diffusiondb.webp",
+      "bytes": 25988,
+      "sha256": "51ba3184071871d9ffee70f95307ff17de736faee85f5e8cec4031814911a259",
+      "meta": {
+        "name": "Image 052",
+        "notes": "Original prompt:\n2 d character design, female rapper, vector art, digital art, portrait, 4 k, 8 k, sharp focus, smooth, illustration, concept art, music artist \n\nPair ID: 12\nImage ID: 12-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 3587763562\nGuidance scale: 20.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: b2800282-36d9-47ea-b64b-e4deed09a663.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 4f348910e868010248d6a4c997e73b1cc7f5159683976bf6adbcf65a57aed7fd\nPrompt SHA-256: eeafbdbe5ee63312fc9381e81ebd79210b2ae9c6e788ab993d32552946de051f\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 51ba3184071871d9ffee70f95307ff17de736faee85f5e8cec4031814911a259",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-12"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-052.webp"
+      }
+    },
+    {
+      "id": "12-imagegen",
+      "pairId": "12",
+      "title": "Rapper character design",
+      "source": "Imagegen / 2026",
+      "file": "images/12-imagegen.webp",
+      "bytes": 141266,
+      "sha256": "3fc7771dabe27c75b67c82044db2ac2bd578607893ce88f94b90a054bf4aba5c",
+      "meta": {
+        "name": "Image 054",
+        "notes": "Original prompt:\n2 d character design, female rapper, vector art, digital art, portrait, 4 k, 8 k, sharp focus, smooth, illustration, concept art, music artist \n\nPair ID: 12\nImage ID: 12-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:29:55.090Z\nGeneration completed (UTC): 2026-09-10T09:31:54.817Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1024 x 1536\nSource PNG SHA-256: 0afc7fc9bf66fd52c0734f40c2cc0d037e0a1cea1cd9c074ed202e0da2d630b6\nPrompt SHA-256: eeafbdbe5ee63312fc9381e81ebd79210b2ae9c6e788ab993d32552946de051f\nDemo copy: WebP, 683 x 1024, resized without cropping\nDemo copy SHA-256: 3fc7771dabe27c75b67c82044db2ac2bd578607893ce88f94b90a054bf4aba5c",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-12"
+        ],
+        "aspectRatio": 0.6669921875,
+        "originalFileName": "image-054.webp"
+      }
+    },
+    {
+      "id": "13-diffusiondb",
+      "pairId": "13",
+      "title": "Sustainable house",
+      "source": "DiffusionDB / 2022",
+      "file": "images/13-diffusiondb.webp",
+      "bytes": 135384,
+      "sha256": "b7d0065ce818a6ca45325c10c0789092ce3cd8d4d5ddee922f391644a14f9686",
+      "meta": {
+        "name": "Image 015",
+        "notes": "Original prompt:\narchitecture photography of a sustainably built large curvy rammed earth and timber house, covered in plants \n\nPair ID: 13\nImage ID: 13-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 210115510\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 15ddd5d7-cd42-468f-a69c-0de084574272.png\nLicense: CC0-1.0\nDimensions: 768 x 512\nSource PNG SHA-256: 49b35b69011c27643f8f3086d8ce2196baf5484262db37e7abdb449eed0e20e8\nPrompt SHA-256: 95012842e2085d4517275cb641471e98098172cb41d24c6b3483c7455ae10d58\nDemo copy: WebP, 768 x 512, resized without cropping\nDemo copy SHA-256: b7d0065ce818a6ca45325c10c0789092ce3cd8d4d5ddee922f391644a14f9686",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-13"
+        ],
+        "aspectRatio": 1.5,
+        "originalFileName": "image-015.webp"
+      }
+    },
+    {
+      "id": "13-imagegen",
+      "pairId": "13",
+      "title": "Sustainable house",
+      "source": "Imagegen / 2026",
+      "file": "images/13-imagegen.webp",
+      "bytes": 254606,
+      "sha256": "95ce1a17edbeec2700cfa7082106b9ea1b85120a4496b6952a6bd4028d145f64",
+      "meta": {
+        "name": "Image 044",
+        "notes": "Original prompt:\narchitecture photography of a sustainably built large curvy rammed earth and timber house, covered in plants \n\nPair ID: 13\nImage ID: 13-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:29:55.090Z\nGeneration completed (UTC): 2026-09-10T09:32:32.381Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: f5d5d91d5874a1954e3165d4106322074af93479db884b9fc3628cd010ffeada\nPrompt SHA-256: 95012842e2085d4517275cb641471e98098172cb41d24c6b3483c7455ae10d58\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 95ce1a17edbeec2700cfa7082106b9ea1b85120a4496b6952a6bd4028d145f64",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-13"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-044.webp"
+      }
+    },
+    {
+      "id": "14-diffusiondb",
+      "pairId": "14",
+      "title": "Downward dog",
+      "source": "DiffusionDB / 2022",
+      "file": "images/14-diffusiondb.webp",
+      "bytes": 33324,
+      "sha256": "7c2df5292398868b177b05e348b328d7621ec2b4d38f0bb9bba38427732d3e4a",
+      "meta": {
+        "name": "Image 006",
+        "notes": "Original prompt:\nyoga pose downward dog \n\nPair ID: 14\nImage ID: 14-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 851054521\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 32c8b817-fcde-4027-864c-555152200358.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: d4091f5c6a0b0b1ba856d39118b489834cb767b26c75b78b68a5bea02f145883\nPrompt SHA-256: 82e404497735ea01003b2129dad471c09525b8fdb33a9577f7f6bcb5a5201a9f\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 7c2df5292398868b177b05e348b328d7621ec2b4d38f0bb9bba38427732d3e4a",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-14"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-006.webp"
+      }
+    },
+    {
+      "id": "14-imagegen",
+      "pairId": "14",
+      "title": "Downward dog",
+      "source": "Imagegen / 2026",
+      "file": "images/14-imagegen.webp",
+      "bytes": 43908,
+      "sha256": "db657f0f0f6622c73448cd9b8c8a7d4ae8227d7811fa95dc7986c6dbe18df0b3",
+      "meta": {
+        "name": "Image 025",
+        "notes": "Original prompt:\nyoga pose downward dog \n\nPair ID: 14\nImage ID: 14-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:29:55.090Z\nGeneration completed (UTC): 2026-09-10T09:32:54.807Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: 38d5f67111f6df2d1ef27009b396b3daaf6cd6dea965666e0e43abd1ca43a3b8\nPrompt SHA-256: 82e404497735ea01003b2129dad471c09525b8fdb33a9577f7f6bcb5a5201a9f\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: db657f0f0f6622c73448cd9b8c8a7d4ae8227d7811fa95dc7986c6dbe18df0b3",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-14"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-025.webp"
+      }
+    },
+    {
+      "id": "15-diffusiondb",
+      "pairId": "15",
+      "title": "Anime bunny",
+      "source": "DiffusionDB / 2022",
+      "file": "images/15-diffusiondb.webp",
+      "bytes": 42470,
+      "sha256": "2920aedb32c55fc137048c92ef5214ebd969ff1d364a6fb78c71a98435b9a45a",
+      "meta": {
+        "name": "Image 007",
+        "notes": "Original prompt:\nadorable anime bunny, eating a carrot, pastel colors \n\nPair ID: 15\nImage ID: 15-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 373861911\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 49904b5e-1603-43b2-80f4-d1ca9169f92d.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: e837e4b6cca648ae90b65623c41af72cbd35464199dad16568d2ac75b26137bd\nPrompt SHA-256: df89e93d54dc151b1c98f785cb16da0077555c882325416daa4a601c569a00f4\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 2920aedb32c55fc137048c92ef5214ebd969ff1d364a6fb78c71a98435b9a45a",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-15"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-007.webp"
+      }
+    },
+    {
+      "id": "15-imagegen",
+      "pairId": "15",
+      "title": "Anime bunny",
+      "source": "Imagegen / 2026",
+      "file": "images/15-imagegen.webp",
+      "bytes": 76574,
+      "sha256": "55b8d70edaf60a24bcd990b33026bfff9388480c087af254b3412edfd18b3b3f",
+      "meta": {
+        "name": "Image 014",
+        "notes": "Original prompt:\nadorable anime bunny, eating a carrot, pastel colors \n\nPair ID: 15\nImage ID: 15-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:29:55.090Z\nGeneration completed (UTC): 2026-09-10T09:33:28.303Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1254 x 1254\nSource PNG SHA-256: d27986ec18fc27cd57f5b7653338891ddf57d8b7ce91cbdd30027235334fecc2\nPrompt SHA-256: df89e93d54dc151b1c98f785cb16da0077555c882325416daa4a601c569a00f4\nDemo copy: WebP, 1024 x 1024, resized without cropping\nDemo copy SHA-256: 55b8d70edaf60a24bcd990b33026bfff9388480c087af254b3412edfd18b3b3f",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-15"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-014.webp"
+      }
+    },
+    {
+      "id": "16-diffusiondb",
+      "pairId": "16",
+      "title": "Bubbles within a bubble",
+      "source": "DiffusionDB / 2022",
+      "file": "images/16-diffusiondb.webp",
+      "bytes": 53080,
+      "sha256": "7bc301f693491bc094a74831b06e920045f7a546c76b61392a228bf4df972c8e",
+      "meta": {
+        "name": "Image 010",
+        "notes": "Original prompt:\nhyperrealistic bubble containing bubbles coloured bright light reflections photograph cinematic 3 5 mm \n\nPair ID: 16\nImage ID: 16-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2041580870\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: d31f1077-1632-4329-9f4c-d7b94d4e62f2.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: b6250a39b0ff0b77327417507f639b2f088895fa394a7a8a0b8a093d6905f579\nPrompt SHA-256: 26256edb0db4299a8dcde34d7ff816bbe7309378973d730d205f46148799e228\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 7bc301f693491bc094a74831b06e920045f7a546c76b61392a228bf4df972c8e",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-16"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-010.webp"
+      }
+    },
+    {
+      "id": "16-imagegen",
+      "pairId": "16",
+      "title": "Bubbles within a bubble",
+      "source": "Imagegen / 2026",
+      "file": "images/16-imagegen.webp",
+      "bytes": 79214,
+      "sha256": "03cffd1a5d06af1188171631a6e3004dbcfa9b7e78d9865aa9054ffd95b766b0",
+      "meta": {
+        "name": "Image 038",
+        "notes": "Original prompt:\nhyperrealistic bubble containing bubbles coloured bright light reflections photograph cinematic 3 5 mm \n\nPair ID: 16\nImage ID: 16-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:31:10.246Z\nGeneration completed (UTC): 2026-09-10T09:31:39.028Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: 48f5a0f2451f7dbb02ab4640787923810c6be1990e5c0d6d8d73f38f7c4b91fe\nPrompt SHA-256: 26256edb0db4299a8dcde34d7ff816bbe7309378973d730d205f46148799e228\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 03cffd1a5d06af1188171631a6e3004dbcfa9b7e78d9865aa9054ffd95b766b0",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-16"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-038.webp"
+      }
+    },
+    {
+      "id": "17-diffusiondb",
+      "pairId": "17",
+      "title": "Gummy bear mosh pit",
+      "source": "DiffusionDB / 2022",
+      "file": "images/17-diffusiondb.webp",
+      "bytes": 56928,
+      "sha256": "c38a98f2c8725aee0ca7c0e3565b789b3ba664ce3ff277b57427c9931cb63745",
+      "meta": {
+        "name": "Image 019",
+        "notes": "Original prompt:\ngummy bear mosh pit, action photography, 3 5 mm film \n\nPair ID: 17\nImage ID: 17-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2929635013\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: bab4670d-fe64-4f9a-bd40-f9fd446219f4.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 2b4b54acb0f20c9fd8a0d1d7488fcbed8f41b0271a66633c73596d588701dee1\nPrompt SHA-256: 7fc4663b3667ca23a6eb2bb6ea4243c8b0a673e18f8c2ad5d7bb0f06dde2a6a7\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: c38a98f2c8725aee0ca7c0e3565b789b3ba664ce3ff277b57427c9931cb63745",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-17"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-019.webp"
+      }
+    },
+    {
+      "id": "17-imagegen",
+      "pairId": "17",
+      "title": "Gummy bear mosh pit",
+      "source": "Imagegen / 2026",
+      "file": "images/17-imagegen.webp",
+      "bytes": 92760,
+      "sha256": "4bd910778c88ba0b154ce8cec2a9a762a66fc4e7dcb451f6153ecc5825bfece9",
+      "meta": {
+        "name": "Image 040",
+        "notes": "Original prompt:\ngummy bear mosh pit, action photography, 3 5 mm film \n\nPair ID: 17\nImage ID: 17-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:31:39.081Z\nGeneration completed (UTC): 2026-09-10T09:32:06.980Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: ef0da5a32e0f6f5e0387de5007547fe795098386afb65c2d438aab2fad540261\nPrompt SHA-256: 7fc4663b3667ca23a6eb2bb6ea4243c8b0a673e18f8c2ad5d7bb0f06dde2a6a7\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 4bd910778c88ba0b154ce8cec2a9a762a66fc4e7dcb451f6153ecc5825bfece9",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-17"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-040.webp"
+      }
+    },
+    {
+      "id": "18-diffusiondb",
+      "pairId": "18",
+      "title": "Nebula",
+      "source": "DiffusionDB / 2022",
+      "file": "images/18-diffusiondb.webp",
+      "bytes": 80836,
+      "sha256": "5d057898214d79a3143883b8516f2b223a96b2537998a79149db1ba9f44662c7",
+      "meta": {
+        "name": "Image 042",
+        "notes": "Original prompt:\na nebula in the night sky, hubble space telescope, astral photography \n\nPair ID: 18\nImage ID: 18-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1355676098\nGuidance scale: 10.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 643b07e3-40e8-4839-a919-e5076019d799.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: ee3d003d1c16e6645ef401478c9f17d3eba670b018f07539372009a180632d90\nPrompt SHA-256: 4915a2e053ac08ba3e73027bb9f5e90c8634c029570f07f3e3eed7bb13cbc6ff\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 5d057898214d79a3143883b8516f2b223a96b2537998a79149db1ba9f44662c7",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-18"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-042.webp"
+      }
+    },
+    {
+      "id": "18-imagegen",
+      "pairId": "18",
+      "title": "Nebula",
+      "source": "Imagegen / 2026",
+      "file": "images/18-imagegen.webp",
+      "bytes": 170742,
+      "sha256": "15741c561c8cc5a4d8634e9a3100964bad8ef05d4985ee310389e690bff1f672",
+      "meta": {
+        "name": "Image 001",
+        "notes": "Original prompt:\na nebula in the night sky, hubble space telescope, astral photography \n\nPair ID: 18\nImage ID: 18-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:32:07.050Z\nGeneration completed (UTC): 2026-09-10T09:32:54.025Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1370 x 1148\nSource PNG SHA-256: 0814944bbcabe010c73bb0c81c588f4a821acfa7d0e873c6d4cc38be759e4fa7\nPrompt SHA-256: 4915a2e053ac08ba3e73027bb9f5e90c8634c029570f07f3e3eed7bb13cbc6ff\nDemo copy: WebP, 1024 x 858, resized without cropping\nDemo copy SHA-256: 15741c561c8cc5a4d8634e9a3100964bad8ef05d4985ee310389e690bff1f672",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-18"
+        ],
+        "aspectRatio": 1.1934731934731935,
+        "originalFileName": "image-001.webp"
+      }
+    },
+    {
+      "id": "19-diffusiondb",
+      "pairId": "19",
+      "title": "Dream swimming pool",
+      "source": "DiffusionDB / 2022",
+      "file": "images/19-diffusiondb.webp",
+      "bytes": 79272,
+      "sha256": "10928831321342acdd7c88da60ed04f991dc9e67230e000cfad0a4c501f05149",
+      "meta": {
+        "name": "Image 051",
+        "notes": "Original prompt:\ndream swimming pool with nobody \n\nPair ID: 19\nImage ID: 19-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 3500509234\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 48eb7e17-a3cf-4eb8-96a9-d8e3e23fa1af.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 9cb8dbd6db089091736f8fd34cd70b8c682ba96ce4d583ac54d12f1dfa823c1f\nPrompt SHA-256: e20900c1ab921bb33b1b7b1e1330d459843342c788ced07dec7b20e10a2a55bd\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 10928831321342acdd7c88da60ed04f991dc9e67230e000cfad0a4c501f05149",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-19"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-051.webp"
+      }
+    },
+    {
+      "id": "19-imagegen",
+      "pairId": "19",
+      "title": "Dream swimming pool",
+      "source": "Imagegen / 2026",
+      "file": "images/19-imagegen.webp",
+      "bytes": 119978,
+      "sha256": "671c4ef850b5655036040d149ba76252686ee793ab85997b8b2a253ce01daac4",
+      "meta": {
+        "name": "Image 012",
+        "notes": "Original prompt:\ndream swimming pool with nobody \n\nPair ID: 19\nImage ID: 19-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:32:54.040Z\nGeneration completed (UTC): 2026-09-10T09:33:16.597Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: 391500dc11ada3fa7d82ca22e89800edb837d9f05d1c5814c0f16fea5af391b4\nPrompt SHA-256: e20900c1ab921bb33b1b7b1e1330d459843342c788ced07dec7b20e10a2a55bd\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 671c4ef850b5655036040d149ba76252686ee793ab85997b8b2a253ce01daac4",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-19"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-012.webp"
+      }
+    },
+    {
+      "id": "20-diffusiondb",
+      "pairId": "20",
+      "title": "Robot portrait",
+      "source": "DiffusionDB / 2022",
+      "file": "images/20-diffusiondb.webp",
+      "bytes": 46234,
+      "sha256": "a36d54aae534f8054481efa6ecc806c4f517d46fa1c141d0c63152f8ad792857",
+      "meta": {
+        "name": "Image 020",
+        "notes": "Original prompt:\na portrait of a female robot made from code, very intricate details, octane render, 8 k, trending on artstation \n\nPair ID: 20\nImage ID: 20-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2615452544\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 2217ccbd-a1c6-47ac-9a2d-79649727c834.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: b12fb965ab3bef5dbf8c4f4f05863aa8cfc4f1271ada8fae81711a9633960532\nPrompt SHA-256: 635d85b929ebe777440df64311400f20bd89748484e0a6e9009c1f2b8ce75874\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: a36d54aae534f8054481efa6ecc806c4f517d46fa1c141d0c63152f8ad792857",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-20"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-020.webp"
+      }
+    },
+    {
+      "id": "20-imagegen",
+      "pairId": "20",
+      "title": "Robot portrait",
+      "source": "Imagegen / 2026",
+      "file": "images/20-imagegen.webp",
+      "bytes": 200594,
+      "sha256": "1052a1ad7db3edbc229f3989935130f0c991f9a70113a24a6dd0c488e30cdb04",
+      "meta": {
+        "name": "Image 004",
+        "notes": "Original prompt:\na portrait of a female robot made from code, very intricate details, octane render, 8 k, trending on artstation \n\nPair ID: 20\nImage ID: 20-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:33:16.598Z\nGeneration completed (UTC): 2026-09-10T09:34:27.081Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1024 x 1536\nSource PNG SHA-256: b4542b70fbfa7f5793da9a68ed1de207cb31a17712f33e459f33852a5ce426c4\nPrompt SHA-256: 635d85b929ebe777440df64311400f20bd89748484e0a6e9009c1f2b8ce75874\nDemo copy: WebP, 683 x 1024, resized without cropping\nDemo copy SHA-256: 1052a1ad7db3edbc229f3989935130f0c991f9a70113a24a6dd0c488e30cdb04",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-20"
+        ],
+        "aspectRatio": 0.6669921875,
+        "originalFileName": "image-004.webp"
+      }
+    },
+    {
+      "id": "21-diffusiondb",
+      "pairId": "21",
+      "title": "One hundred frogs",
+      "source": "DiffusionDB / 2022",
+      "file": "images/21-diffusiondb.webp",
+      "bytes": 116456,
+      "sha256": "2efc362ab6ef5cd3f6abf198d1bf585a75395e25cd06e05af58703b0a3863310",
+      "meta": {
+        "name": "Image 043",
+        "notes": "Original prompt:\n1 0 0 frogs digital art \n\nPair ID: 21\nImage ID: 21-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 368718460\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: d8e341c5-86a6-4213-8cd4-edf5711c5064.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 1f8947068c2f5c02bcb7fb6c10441156d01e6a9de978da0d5b145629a2b1ea86\nPrompt SHA-256: 123dbf056735391f586515e252998744c4ee1dcc95c146932b8189ae7866abfb\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 2efc362ab6ef5cd3f6abf198d1bf585a75395e25cd06e05af58703b0a3863310",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-21"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-043.webp"
+      }
+    },
+    {
+      "id": "21-imagegen",
+      "pairId": "21",
+      "title": "One hundred frogs",
+      "source": "Imagegen / 2026",
+      "file": "images/21-imagegen.webp",
+      "bytes": 210656,
+      "sha256": "3d3dcabfc98d3383505cf049ca29b6fa4bca10e7931d362893d813f8ba233043",
+      "meta": {
+        "name": "Image 026",
+        "notes": "Original prompt:\n1 0 0 frogs digital art \n\nPair ID: 21\nImage ID: 21-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:33:16.599Z\nGeneration completed (UTC): 2026-09-10T09:33:51.236Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: f7b93f82a7e7d7b11c89e1f89f3549a9b422675e1b29e524483682f84dbdb449\nPrompt SHA-256: 123dbf056735391f586515e252998744c4ee1dcc95c146932b8189ae7866abfb\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 3d3dcabfc98d3383505cf049ca29b6fa4bca10e7931d362893d813f8ba233043",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-21"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-026.webp"
+      }
+    },
+    {
+      "id": "22-diffusiondb",
+      "pairId": "22",
+      "title": "Flowing fabrics",
+      "source": "DiffusionDB / 2022",
+      "file": "images/22-diffusiondb.webp",
+      "bytes": 133348,
+      "sha256": "c7535efcc5b4abc87b78462e2e0697d8920487f1bafefb4f558f291bb93d40a9",
+      "meta": {
+        "name": "Image 003",
+        "notes": "Original prompt:\nsustainable fabrics flowing on sand \n\nPair ID: 22\nImage ID: 22-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1378222928\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: e1ef264f-c78c-4b20-a1b1-a6ca1554dfb8.png\nLicense: CC0-1.0\nDimensions: 768 x 512\nSource PNG SHA-256: c588a24bad71d93f61f5b4058cac344a730427d86c384985ca10da11dcbbd661\nPrompt SHA-256: 321cf0af38c98bbf46eb2216db66c49734fd4f95f6b6130411b1a0953cffbda7\nDemo copy: WebP, 768 x 512, resized without cropping\nDemo copy SHA-256: c7535efcc5b4abc87b78462e2e0697d8920487f1bafefb4f558f291bb93d40a9",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-22"
+        ],
+        "aspectRatio": 1.5,
+        "originalFileName": "image-003.webp"
+      }
+    },
+    {
+      "id": "22-imagegen",
+      "pairId": "22",
+      "title": "Flowing fabrics",
+      "source": "Imagegen / 2026",
+      "file": "images/22-imagegen.webp",
+      "bytes": 108346,
+      "sha256": "364481979e7c7fb875fb59c126722887841094f6c705f3c9265d32267a1713e2",
+      "meta": {
+        "name": "Image 055",
+        "notes": "Original prompt:\nsustainable fabrics flowing on sand \n\nPair ID: 22\nImage ID: 22-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:33:51.296Z\nGeneration completed (UTC): 2026-09-10T09:34:17.938Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: ab1cf4df4ee7b0490822ebbfbe6ca21410cf417855cd68180439a780d2fd07b3\nPrompt SHA-256: 321cf0af38c98bbf46eb2216db66c49734fd4f95f6b6130411b1a0953cffbda7\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 364481979e7c7fb875fb59c126722887841094f6c705f3c9265d32267a1713e2",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-22"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-055.webp"
+      }
+    },
+    {
+      "id": "23-diffusiondb",
+      "pairId": "23",
+      "title": "Weightlifting dog",
+      "source": "DiffusionDB / 2022",
+      "file": "images/23-diffusiondb.webp",
+      "bytes": 58448,
+      "sha256": "6ad9fa560529d0a676e816de2161054229fc9d32f2eaa60e6799c529cd5f0890",
+      "meta": {
+        "name": "Image 018",
+        "notes": "Original prompt:\na dog doing weights. epic oil painting. \n\nPair ID: 23\nImage ID: 23-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1312381211\nGuidance scale: 12.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 601d9792-eccd-4850-97a7-edbe91d3464c.png\nLicense: CC0-1.0\nDimensions: 512 x 768\nSource PNG SHA-256: e7602e66d05fd43b7350eeeba24027b70102f4c2360fc15ea73d4be2848302d6\nPrompt SHA-256: 40f3a58554e1d3428f746fae03946dd13166e36b9a93104820f44a1097171894\nDemo copy: WebP, 512 x 768, resized without cropping\nDemo copy SHA-256: 6ad9fa560529d0a676e816de2161054229fc9d32f2eaa60e6799c529cd5f0890",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-23"
+        ],
+        "aspectRatio": 0.6666666666666666,
+        "originalFileName": "image-018.webp"
+      }
+    },
+    {
+      "id": "23-imagegen",
+      "pairId": "23",
+      "title": "Weightlifting dog",
+      "source": "Imagegen / 2026",
+      "file": "images/23-imagegen.webp",
+      "bytes": 199394,
+      "sha256": "8efb3dc822a7a300e3e0160436443845cc413ab2dc8c640ebe4f8af0858e256b",
+      "meta": {
+        "name": "Image 053",
+        "notes": "Original prompt:\na dog doing weights. epic oil painting. \n\nPair ID: 23\nImage ID: 23-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:33:51.297Z\nGeneration completed (UTC): 2026-09-10T09:35:02.313Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1370 x 1148\nSource PNG SHA-256: 9a1236dfffbb09b7828741aeb1df236d126bf833c316d2f8a277418d5e1dfbcf\nPrompt SHA-256: 40f3a58554e1d3428f746fae03946dd13166e36b9a93104820f44a1097171894\nDemo copy: WebP, 1024 x 858, resized without cropping\nDemo copy SHA-256: 8efb3dc822a7a300e3e0160436443845cc413ab2dc8c640ebe4f8af0858e256b",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-23"
+        ],
+        "aspectRatio": 1.1934731934731935,
+        "originalFileName": "image-053.webp"
+      }
+    },
+    {
+      "id": "24-diffusiondb",
+      "pairId": "24",
+      "title": "Cat in a red bottle",
+      "source": "DiffusionDB / 2022",
+      "file": "images/24-diffusiondb.webp",
+      "bytes": 65308,
+      "sha256": "5fa63b6167f56d888b403c96ede54c4947d48f459f96dba2b56fbdd2d2ac4fe5",
+      "meta": {
+        "name": "Image 046",
+        "notes": "Original prompt:\na cat in a large clear red bottle pastel, color palette, dramatic lighting \n\nPair ID: 24\nImage ID: 24-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 1787239729\nGuidance scale: 15.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 9329287c-074c-43ea-a69d-afe7105a695d.png\nLicense: CC0-1.0\nDimensions: 768 x 512\nSource PNG SHA-256: b926b27c04e77de0ae96e1884c53e95e0d2e9476602f1a56a505b64cc14b4f7d\nPrompt SHA-256: 72a3cf8215241d77df64b79109a5ba0a1c2fc23b0f4ec05c7ef8611c485514ef\nDemo copy: WebP, 768 x 512, resized without cropping\nDemo copy SHA-256: 5fa63b6167f56d888b403c96ede54c4947d48f459f96dba2b56fbdd2d2ac4fe5",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-24"
+        ],
+        "aspectRatio": 1.5,
+        "originalFileName": "image-046.webp"
+      }
+    },
+    {
+      "id": "24-imagegen",
+      "pairId": "24",
+      "title": "Cat in a red bottle",
+      "source": "Imagegen / 2026",
+      "file": "images/24-imagegen.webp",
+      "bytes": 98508,
+      "sha256": "9b0873cc81acd9188c4a526d3aabe65ef3e2eafbb8664d65860f04069ab6b835",
+      "meta": {
+        "name": "Image 039",
+        "notes": "Original prompt:\na cat in a large clear red bottle pastel, color palette, dramatic lighting \n\nPair ID: 24\nImage ID: 24-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:34:27.081Z\nGeneration completed (UTC): 2026-09-10T09:34:56.206Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1024 x 1536\nSource PNG SHA-256: af6378b53bc45995af2d2a43f038a4facc79723a181a438c820c5d43d01e9793\nPrompt SHA-256: 72a3cf8215241d77df64b79109a5ba0a1c2fc23b0f4ec05c7ef8611c485514ef\nDemo copy: WebP, 683 x 1024, resized without cropping\nDemo copy SHA-256: 9b0873cc81acd9188c4a526d3aabe65ef3e2eafbb8664d65860f04069ab6b835",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-24"
+        ],
+        "aspectRatio": 0.6669921875,
+        "originalFileName": "image-039.webp"
+      }
+    },
+    {
+      "id": "25-diffusiondb",
+      "pairId": "25",
+      "title": "Cyberpunk ocean diorama",
+      "source": "DiffusionDB / 2022",
+      "file": "images/25-diffusiondb.webp",
+      "bytes": 107740,
+      "sha256": "2213b3e13cdde26d62f115e1fc268238f972cb6ffe6d35cc8c8ab84ece9fac86",
+      "meta": {
+        "name": "Image 016",
+        "notes": "Original prompt:\nisometric cyberpunk diorama!!! in ocean, magical lighting, photorealistic rendering, raytraced reflections, cinematic lighting \n\nPair ID: 25\nImage ID: 25-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2198710515\nGuidance scale: 15.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 4414bc3a-15ce-422c-9da2-c03241f01562.png\nLicense: CC0-1.0\nDimensions: 704 x 704\nSource PNG SHA-256: e737a82fb430ead1639bb80e04650ab78e008dd01347e271e54bf563c696e910\nPrompt SHA-256: aada1d48659d4eb9574308da637792190417a31222d7c87ae16216b06ce33eb7\nDemo copy: WebP, 704 x 704, resized without cropping\nDemo copy SHA-256: 2213b3e13cdde26d62f115e1fc268238f972cb6ffe6d35cc8c8ab84ece9fac86",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-25"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-016.webp"
+      }
+    },
+    {
+      "id": "25-imagegen",
+      "pairId": "25",
+      "title": "Cyberpunk ocean diorama",
+      "source": "Imagegen / 2026",
+      "file": "images/25-imagegen.webp",
+      "bytes": 178942,
+      "sha256": "5c31ce4e73a4cf216f1e9a3fca2bf3f36f0e20d938002b75effa3dbcb324c4d5",
+      "meta": {
+        "name": "Image 037",
+        "notes": "Original prompt:\nisometric cyberpunk diorama!!! in ocean, magical lighting, photorealistic rendering, raytraced reflections, cinematic lighting \n\nPair ID: 25\nImage ID: 25-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:34:28.093Z\nGeneration completed (UTC): 2026-09-10T09:35:45.398Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1370 x 1148\nSource PNG SHA-256: fb868900eb07a1433dbbf56d7a43f962a7be4161467fb87ee6094018436270cf\nPrompt SHA-256: aada1d48659d4eb9574308da637792190417a31222d7c87ae16216b06ce33eb7\nDemo copy: WebP, 1024 x 858, resized without cropping\nDemo copy SHA-256: 5c31ce4e73a4cf216f1e9a3fca2bf3f36f0e20d938002b75effa3dbcb324c4d5",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-25"
+        ],
+        "aspectRatio": 1.1934731934731935,
+        "originalFileName": "image-037.webp"
+      }
+    },
+    {
+      "id": "26-diffusiondb",
+      "pairId": "26",
+      "title": "Portrait of twin women",
+      "source": "DiffusionDB / 2022",
+      "file": "images/26-diffusiondb.webp",
+      "bytes": 42684,
+      "sha256": "19d155e1b56d0f9fd59fcb0ba73312b6b8f5e2c9e93926e09d5da5c9936aa7ed",
+      "meta": {
+        "name": "Image 023",
+        "notes": "Original prompt:\nfrontal portrait of ragged, worried twin women, by john singer sargent and j. c. leyendecker. \n\nPair ID: 26\nImage ID: 26-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 4034137294\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 3c835fdc-9047-4298-ac8a-7461f5490132.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 317b093f3edaedd997a87c1dfe31cbfd4bad235288d9ab38e66a31fae4c7e8d7\nPrompt SHA-256: cf0db9b986a2dafa8914d4588ae26230b074c8d5640140c42690ca8a23c7e924\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 19d155e1b56d0f9fd59fcb0ba73312b6b8f5e2c9e93926e09d5da5c9936aa7ed",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-26"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-023.webp"
+      }
+    },
+    {
+      "id": "26-imagegen",
+      "pairId": "26",
+      "title": "Portrait of twin women",
+      "source": "Imagegen / 2026",
+      "file": "images/26-imagegen.webp",
+      "bytes": 150090,
+      "sha256": "822ed916bd05ba3c72d3183dc4c9592b39cee54f286365ed5660b0ce136b9235",
+      "meta": {
+        "name": "Image 032",
+        "notes": "Original prompt:\nfrontal portrait of ragged, worried twin women, by john singer sargent and j. c. leyendecker. \n\nPair ID: 26\nImage ID: 26-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:34:56.207Z\nGeneration completed (UTC): 2026-09-10T09:35:44.201Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1312 x 1199\nSource PNG SHA-256: 30ff96dd2f36bd85ecc90e37bbc607e2ab8f40b2e8f9647369824e706a80d3c4\nPrompt SHA-256: cf0db9b986a2dafa8914d4588ae26230b074c8d5640140c42690ca8a23c7e924\nDemo copy: WebP, 1024 x 936, resized without cropping\nDemo copy SHA-256: 822ed916bd05ba3c72d3183dc4c9592b39cee54f286365ed5660b0ce136b9235",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-26"
+        ],
+        "aspectRatio": 1.0940170940170941,
+        "originalFileName": "image-032.webp"
+      }
+    },
+    {
+      "id": "27-diffusiondb",
+      "pairId": "27",
+      "title": "Paper-quilled corgi",
+      "source": "DiffusionDB / 2022",
+      "file": "images/27-diffusiondb.webp",
+      "bytes": 25620,
+      "sha256": "159d297ac355728002d07231276a84a8110003de259ee79078f9f68d16d1b41a",
+      "meta": {
+        "name": "Image 013",
+        "notes": "Original prompt:\nadorable corgi puppy, intricate paper quilling, white background \n\nPair ID: 27\nImage ID: 27-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2017980003\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 7b77841b-f7dc-4549-9926-38af11eb0eee.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 4355c14ced7495330d44b31838aaeb108241513d81d4fffeaf4eb4f747a835af\nPrompt SHA-256: 9f67458cdab0affa6dc6fa8674e039453bd8eb88a201979bc426b1cb3857e59f\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: 159d297ac355728002d07231276a84a8110003de259ee79078f9f68d16d1b41a",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-27"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-013.webp"
+      }
+    },
+    {
+      "id": "27-imagegen",
+      "pairId": "27",
+      "title": "Paper-quilled corgi",
+      "source": "Imagegen / 2026",
+      "file": "images/27-imagegen.webp",
+      "bytes": 143078,
+      "sha256": "4c2e4e68a038fef0b94b717658de330be83f8cfd3dce51aaa6ed0fdb93fdcfd0",
+      "meta": {
+        "name": "Image 041",
+        "notes": "Original prompt:\nadorable corgi puppy, intricate paper quilling, white background \n\nPair ID: 27\nImage ID: 27-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:34:56.208Z\nGeneration completed (UTC): 2026-09-10T09:36:17.506Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1254 x 1254\nSource PNG SHA-256: a16e0e39b9e5322c6f408babcd196a115393dba6b82496725fe21db54d7f1fbd\nPrompt SHA-256: 9f67458cdab0affa6dc6fa8674e039453bd8eb88a201979bc426b1cb3857e59f\nDemo copy: WebP, 1024 x 1024, resized without cropping\nDemo copy SHA-256: 4c2e4e68a038fef0b94b717658de330be83f8cfd3dce51aaa6ed0fdb93fdcfd0",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-27"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-041.webp"
+      }
+    },
+    {
+      "id": "28-diffusiondb",
+      "pairId": "28",
+      "title": "Second law of thermodynamics",
+      "source": "DiffusionDB / 2022",
+      "file": "images/28-diffusiondb.webp",
+      "bytes": 33778,
+      "sha256": "fc6c8ab1780f96bab65d2f2bce3944d32af0864cba458d484e44f5dc8ac3e348",
+      "meta": {
+        "name": "Image 029",
+        "notes": "Original prompt:\nan illustration of the second law of thermodynamics \n\nPair ID: 28\nImage ID: 28-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 3126552256\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 1fe96105-86ba-4e6d-aced-9ae5f34f88a2.png\nLicense: CC0-1.0\nDimensions: 512 x 512\nSource PNG SHA-256: 2f563723c740d570f44e513180e76bc39c480c8b0669a120c5e51970dc4946f6\nPrompt SHA-256: 1facf81a711380767f01ef9a15bbc52254b7ab8801f38941ba9e02f4618be60f\nDemo copy: WebP, 512 x 512, resized without cropping\nDemo copy SHA-256: fc6c8ab1780f96bab65d2f2bce3944d32af0864cba458d484e44f5dc8ac3e348",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-28"
+        ],
+        "aspectRatio": 1.0,
+        "originalFileName": "image-029.webp"
+      }
+    },
+    {
+      "id": "28-imagegen",
+      "pairId": "28",
+      "title": "Second law of thermodynamics",
+      "source": "Imagegen / 2026",
+      "file": "images/28-imagegen.webp",
+      "bytes": 78126,
+      "sha256": "cabd02da7db68f459fa975cd5bc660919dee5796c43e1a737254a80a9d3ece65",
+      "meta": {
+        "name": "Image 017",
+        "notes": "Original prompt:\nan illustration of the second law of thermodynamics \n\nPair ID: 28\nImage ID: 28-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:36:17.507Z\nGeneration completed (UTC): 2026-09-10T09:36:33.902Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: 1286252a80c0392d2003a7f611788bbe3b7dcc81c226d92b9377b3d1273cb417\nPrompt SHA-256: 1facf81a711380767f01ef9a15bbc52254b7ab8801f38941ba9e02f4618be60f\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: cabd02da7db68f459fa975cd5bc660919dee5796c43e1a737254a80a9d3ece65",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-28"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-017.webp"
+      }
+    },
+    {
+      "id": "29-diffusiondb",
+      "pairId": "29",
+      "title": "Camel in boots",
+      "source": "DiffusionDB / 2022",
+      "file": "images/29-diffusiondb.webp",
+      "bytes": 137502,
+      "sha256": "2fc478520752b1a44f748002f87b6609f407b750f201d51ee0ab11927af74872",
+      "meta": {
+        "name": "Image 060",
+        "notes": "Original prompt:\ncamel wearing boots and an eyepatch, hyper realism, photograph, dust, \n\nPair ID: 29\nImage ID: 29-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 711896735\nGuidance scale: 7.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 296039b7-61ef-49f4-bb48-59a533fb3813.png\nLicense: CC0-1.0\nDimensions: 768 x 512\nSource PNG SHA-256: b68b408f664e100fdcacf4372afd1fc70d87e4a4079a3d2d06291c6680a1142f\nPrompt SHA-256: cd12c480e78a79de223e77ef24105fa79c41eca618746e0104eff310dd945b08\nDemo copy: WebP, 768 x 512, resized without cropping\nDemo copy SHA-256: 2fc478520752b1a44f748002f87b6609f407b750f201d51ee0ab11927af74872",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-29"
+        ],
+        "aspectRatio": 1.5,
+        "originalFileName": "image-060.webp"
+      }
+    },
+    {
+      "id": "29-imagegen",
+      "pairId": "29",
+      "title": "Camel in boots",
+      "source": "Imagegen / 2026",
+      "file": "images/29-imagegen.webp",
+      "bytes": 106202,
+      "sha256": "9fcc52bb7b471125462615680efa1235c26dbb1f5df78a709bff6e33f64d3f0b",
+      "meta": {
+        "name": "Image 050",
+        "notes": "Original prompt:\ncamel wearing boots and an eyepatch, hyper realism, photograph, dust, \n\nPair ID: 29\nImage ID: 29-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:36:17.577Z\nGeneration completed (UTC): 2026-09-10T09:36:59.849Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1536 x 1024\nSource PNG SHA-256: 6d976ec5b068927bec8afa3bf4b8884b319a3c71961d86b822cd0b006ca8fbfe\nPrompt SHA-256: cd12c480e78a79de223e77ef24105fa79c41eca618746e0104eff310dd945b08\nDemo copy: WebP, 1024 x 683, resized without cropping\nDemo copy SHA-256: 9fcc52bb7b471125462615680efa1235c26dbb1f5df78a709bff6e33f64d3f0b",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-29"
+        ],
+        "aspectRatio": 1.499267935578331,
+        "originalFileName": "image-050.webp"
+      }
+    },
+    {
+      "id": "30-diffusiondb",
+      "pairId": "30",
+      "title": "Gummy bear factory",
+      "source": "DiffusionDB / 2022",
+      "file": "images/30-diffusiondb.webp",
+      "bytes": 74384,
+      "sha256": "4851771cc70376f5a893e1a90ace2a3051d382a2ee3c82ff83df206e0de34ee7",
+      "meta": {
+        "name": "Image 034",
+        "notes": "Original prompt:\na gummy bear manufacturing factory \n\nPair ID: 30\nImage ID: 30-diffusiondb\nAI-generated: Yes\nSource: DiffusionDB\nCollection year: 2022\nModel family: Stable Diffusion\nExact checkpoint: Unknown\nIndividual generation date: Unknown\nSeed: 2710519559\nGuidance scale: 15.0\nSteps: 50\nSampler: k_lms\nDataset: https://huggingface.co/datasets/poloclub/diffusiondb\nSource archive: https://huggingface.co/datasets/poloclub/diffusiondb/resolve/main/images/part-000001.zip\nSource file: 774d2b10-d9a2-402f-935a-6e4b1a5274d7.png\nLicense: CC0-1.0\nDimensions: 704 x 512\nSource PNG SHA-256: 5b6ef8c66e86e95f6f7dd22d321e2139a8698e64dd365266c0d105f4c8c82edc\nPrompt SHA-256: 3de980c42dd193a9bbba4eda0e8e478a2b650345f0c51a35f8cddd38ab61a6d4\nDemo copy: WebP, 704 x 512, resized without cropping\nDemo copy SHA-256: 4851771cc70376f5a893e1a90ace2a3051d382a2ee3c82ff83df206e0de34ee7",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "diffusiondb",
+          "2022",
+          "pair-30"
+        ],
+        "aspectRatio": 1.375,
+        "originalFileName": "image-034.webp"
+      }
+    },
+    {
+      "id": "30-imagegen",
+      "pairId": "30",
+      "title": "Gummy bear factory",
+      "source": "Imagegen / 2026",
+      "file": "images/30-imagegen.webp",
+      "bytes": 206584,
+      "sha256": "ca365b14c3739471292275fb92f7bdcd1dc37dcc912b9fc25684eba33ea27ad3",
+      "meta": {
+        "name": "Image 011",
+        "notes": "Original prompt:\na gummy bear manufacturing factory \n\nPair ID: 30\nImage ID: 30-imagegen\nAI-generated: Yes\nSource: OpenAI built-in Imagegen\nGeneration started (UTC): 2026-09-10T09:36:33.903Z\nGeneration completed (UTC): 2026-09-10T09:37:44.365Z\nTool: image_gen.imagegen\nExact model: Not reported\nSeed: Not reported\nRevised prompt: Not reported\nReference images: None\nGeneration attempts: 1\nRights: Not designated CC0; separate from the DiffusionDB license\nDimensions: 1370 x 1148\nSource PNG SHA-256: 7a671e0f4b897ea259821d326a13ef8dd8de7536195cd4ccbd3e8567c336436a\nPrompt SHA-256: 3de980c42dd193a9bbba4eda0e8e478a2b650345f0c51a35f8cddd38ab61a6d4\nDemo copy: WebP, 1024 x 858, resized without cropping\nDemo copy SHA-256: ca365b14c3739471292275fb92f7bdcd1dc37dcc912b9fc25684eba33ea27ad3",
+        "tags": [
+          "demo",
+          "ai-generated",
+          "imagegen",
+          "2026",
+          "pair-30"
+        ],
+        "aspectRatio": 1.1934731934731935,
+        "originalFileName": "image-011.webp"
+      }
+    }
+  ],
+  "presets": [
+    {
+      "id": "open-sort-60",
+      "name": "Open Sort - Visual Connections",
+      "type": "open",
+      "imageIds": [
+        "18-imagegen",
+        "01-imagegen",
+        "22-diffusiondb",
+        "20-imagegen",
+        "07-diffusiondb",
+        "14-diffusiondb",
+        "15-diffusiondb",
+        "02-diffusiondb",
+        "02-imagegen",
+        "16-diffusiondb",
+        "30-imagegen",
+        "19-imagegen",
+        "27-diffusiondb",
+        "15-imagegen",
+        "13-diffusiondb",
+        "25-diffusiondb",
+        "28-imagegen",
+        "23-diffusiondb",
+        "17-diffusiondb",
+        "20-diffusiondb",
+        "11-diffusiondb",
+        "10-diffusiondb",
+        "26-diffusiondb",
+        "10-imagegen",
+        "14-imagegen",
+        "21-imagegen",
+        "11-imagegen",
+        "08-imagegen",
+        "28-diffusiondb",
+        "04-diffusiondb",
+        "07-imagegen",
+        "26-imagegen",
+        "08-diffusiondb",
+        "30-diffusiondb",
+        "09-imagegen",
+        "05-imagegen",
+        "25-imagegen",
+        "16-imagegen",
+        "24-imagegen",
+        "17-imagegen",
+        "27-imagegen",
+        "18-diffusiondb",
+        "21-diffusiondb",
+        "13-imagegen",
+        "05-diffusiondb",
+        "24-diffusiondb",
+        "06-imagegen",
+        "03-imagegen",
+        "01-diffusiondb",
+        "29-imagegen",
+        "19-diffusiondb",
+        "12-diffusiondb",
+        "23-imagegen",
+        "12-imagegen",
+        "22-imagegen",
+        "06-diffusiondb",
+        "03-diffusiondb",
+        "09-diffusiondb",
+        "04-imagegen",
+        "29-diffusiondb"
+      ],
+      "instructions": "Arrange the images in groups that make sense to you. Create and name stacks to describe the connections you see. There are no predefined categories.",
+      "distribution": null
+    },
+    {
+      "id": "closed-sort-15",
+      "name": "Closed Sort - Perceived AI Origin",
+      "type": "closed",
+      "imageIds": [
+        "22-diffusiondb",
+        "14-diffusiondb",
+        "02-imagegen",
+        "19-imagegen",
+        "11-diffusiondb",
+        "04-diffusiondb",
+        "07-imagegen",
+        "08-diffusiondb",
+        "30-diffusiondb",
+        "09-imagegen",
+        "17-imagegen",
+        "27-imagegen",
+        "18-diffusiondb",
+        "13-imagegen",
+        "01-diffusiondb"
+      ],
+      "instructions": "Sort each image by how it looks to you: Looks AI-generated or Looks non-AI-generated. Judge the image itself. If uncertain, choose your best guess. These labels describe perceived origin.",
+      "distribution": null
+    },
+    {
+      "id": "q-sort-24",
+      "name": "Q-Sort - Slop or Worth Keeping",
+      "type": "qsort",
+      "imageIds": [
+        "02-diffusiondb",
+        "02-imagegen",
+        "30-imagegen",
+        "19-imagegen",
+        "28-imagegen",
+        "23-diffusiondb",
+        "17-diffusiondb",
+        "28-diffusiondb",
+        "04-diffusiondb",
+        "30-diffusiondb",
+        "09-imagegen",
+        "05-imagegen",
+        "17-imagegen",
+        "05-diffusiondb",
+        "06-imagegen",
+        "03-imagegen",
+        "19-diffusiondb",
+        "12-diffusiondb",
+        "23-imagegen",
+        "12-imagegen",
+        "06-diffusiondb",
+        "03-diffusiondb",
+        "09-diffusiondb",
+        "04-imagegen"
+      ],
+      "instructions": "Rank the images from Feels like slop (-3) to Feels worth keeping (+3), according to your own judgement. Slop may feel generic, disposable, or low-effort; worth keeping may feel distinctive, engaging, or meaningful. First split the images by which end they lean toward. Then fill every slot in the seven-column distribution. The middle is relative to this set, not a separate pre-sort group.",
+      "distribution": [
+        2,
+        3,
+        4,
+        6,
+        4,
+        3,
+        2
+      ]
+    }
+  ]
+}

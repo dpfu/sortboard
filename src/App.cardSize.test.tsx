@@ -23,11 +23,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -107,12 +109,12 @@ describe('App setup card size slider', () => {
     await renderAppReady();
     expect(screen.getByLabelText('Card size')).toBeTruthy();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await screen.findByRole('button', { name: 'End sorting →' });
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Finish sorting' });
     expect(screen.queryByLabelText('Card size')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'End sorting →' }));
-    await screen.findByText('Replay');
+    await userEvent.click(screen.getByRole('button', { name: 'Finish sorting' }));
+    await screen.findByText('Result');
     expect(screen.queryByLabelText('Card size')).toBeNull();
   });
 

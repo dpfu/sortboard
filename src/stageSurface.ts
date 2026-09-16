@@ -123,6 +123,7 @@ export type StageSurfaceScene = {
   canvasH: number;
   viewportX: number;
   surfaces: BoardSurfaceView[];
+  cardFrame?: { w: number; h: number; columns: number };
 };
 
 const OUTER_PAD_X = 32;
@@ -132,8 +133,6 @@ const COLUMN_GAP = 24;
 const SINK_GAP = 18;
 const SURFACE_INNER_PAD = 18;
 const GRID_GAP = 18;
-const WORK_STAGGER_X = 26;
-const WORK_STAGGER_Y = 8;
 const WORK_AREA_HEADER_PAD = 72;
 const SINK_HEADER_PAD = 74;
 const QSORT_LANE_HEADER_PAD = 52;
@@ -189,7 +188,7 @@ function insetRect(rect: Rect, insets: { top?: number; right?: number; bottom?: 
   };
 }
 
-function buildClosedOrPreSortScene(
+function buildLegacyClosedOrPreSortScene(
   workflow: SortWorkflowData,
   stageId: string,
   cards: CardData[],
@@ -316,6 +315,56 @@ function buildClosedOrPreSortScene(
     canvasH: Math.max(viewport.height, topPad + contentH + OUTER_PAD_Y),
     viewportX: 0,
     surfaces,
+  };
+}
+
+function buildClosedOrPreSortScene(
+  workflow: SortWorkflowData,
+  stageId: string,
+  cards: CardData[],
+  selectedWidgetId: string | null,
+  mode: Mode,
+  viewport: { width: number; height: number },
+  activeDrop?: { widgetId: string; zoneId: string; state: WidgetDropState } | null
+): StageSurfaceScene {
+  const scene = buildLegacyClosedOrPreSortScene(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
+  const source = scene.surfaces.find(surface => surface.kind === 'work-area');
+  const targets = scene.surfaces.filter(surface => surface.kind === 'sink');
+  if (!source) return scene;
+
+  const pad = 24;
+  const gap = 24;
+  const top = mode === 'sort' ? 88 : 24;
+  const sourceW = Math.round((viewport.width - pad * 2 - gap) * (targets.length > 1 ? 0.44 : 0.52));
+  const bodyW = sourceW - SURFACE_INNER_PAD * 2;
+  const availableH = Math.max(260, viewport.height - top - pad);
+  const bodyH = availableH - WORK_AREA_HEADER_PAD - SURFACE_INNER_PAD;
+  // Size the initial grid from the entire set, so removing a card never changes
+  // the display size or the remaining cards' positions.
+  const columns = clamp(Math.round(Math.sqrt(Math.max(1, cards.length) * bodyW / bodyH)), 1, Math.max(1, Math.floor((bodyW + GRID_GAP) / (88 + GRID_GAP))));
+  const rows = Math.max(1, Math.ceil(cards.length / columns));
+  const frameW = Math.floor((bodyW - (columns - 1) * GRID_GAP) / columns);
+  const frameH = Math.max(96, Math.min(180, Math.floor((bodyH - (rows - 1) * GRID_GAP) / rows)));
+  const contentH = Math.max(availableH, WORK_AREA_HEADER_PAD + rows * frameH + (rows - 1) * GRID_GAP + SURFACE_INNER_PAD);
+  const targetCols = Math.min(2, Math.max(1, targets.length));
+  const targetRows = Math.ceil(targets.length / targetCols);
+  const targetW = (viewport.width - pad * 2 - sourceW - gap - (targetCols - 1) * 16) / targetCols;
+  const targetH = Math.max(220, (Math.min(contentH, Math.max(480, viewport.height * 0.68)) - Math.max(0, targetRows - 1) * 16) / Math.max(1, targetRows));
+  return {
+    ...scene,
+    canvasH: top + Math.max(contentH, targetRows * targetH + Math.max(0, targetRows - 1) * 16) + pad,
+    cardFrame: { w: Math.min(200, frameW), h: frameH, columns },
+    surfaces: [
+      { ...source, x: pad, y: top, w: sourceW, h: contentH, title: 'Unsorted' },
+      ...targets.map((surface, index) => ({
+        ...surface,
+        x: pad + sourceW + gap + (index % targetCols) * (targetW + 16),
+        y: top + Math.floor(index / targetCols) * (targetH + 16),
+        w: targetW,
+        h: targetH,
+        placeholderLabel: undefined,
+      })),
+    ],
   };
 }
 
@@ -461,14 +510,18 @@ export function buildStageSurfaceScene(
   selectedWidgetId: string | null,
   mode: Mode,
   viewportInput: { width: number; height: number },
-  activeDrop?: { widgetId: string; zoneId: string; state: WidgetDropState } | null
+  activeDrop?: { widgetId: string; zoneId: string; state: WidgetDropState } | null,
+  layoutVersion: 1 | 2 = 2
 ): StageSurfaceScene {
-  const viewport = getViewportSize(viewportInput);
   const stageKind = getStageById(workflow, stageId)?.kind || 'closed-sort';
+  const viewport = getViewportSize(viewportInput);
+  if (stageKind !== 'qsort' && layoutVersion === 2) {
+    viewport.width = Math.max(560, Math.round(viewportInput.width || 1200));
+  }
   if (stageKind === 'qsort') {
     return buildQSortScene(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
   }
-  return buildClosedOrPreSortScene(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
+  return (layoutVersion === 1 ? buildLegacyClosedOrPreSortScene : buildClosedOrPreSortScene)(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
 }
 
 function maxCardSize(cards: CardData[], getBounds: (card: CardData) => CardBounds) {
@@ -488,6 +541,11 @@ function fitCardDimensions(bounds: CardBounds, maxW: number, maxH: number) {
     w: Math.max(1, Math.round(bounds.w * scale)),
     h: Math.max(1, Math.round(bounds.h * scale)),
   };
+}
+
+export function getSurfaceCardDimensions(card: CardData, scene: StageSurfaceScene | null | undefined, getBounds: (card: CardData) => CardBounds) {
+  const full = getBounds(card);
+  return scene?.cardFrame ? fitCardDimensions(full, scene.cardFrame.w, scene.cardFrame.h) : { w: full.w, h: full.h };
 }
 
 export function getQSortCardDisplayDimensions(
@@ -535,7 +593,7 @@ function layoutCardsAsShelf(cards: CardData[], rect: Rect, getBounds: (card: Car
   return next;
 }
 
-export function layoutCardsInWorkArea(cards: CardData[], rect: Rect, getBounds: (card: CardData) => CardBounds) {
+export function layoutCardsInWorkArea(cards: CardData[], rect: Rect, getBounds: (card: CardData) => CardBounds, frame?: StageSurfaceScene['cardFrame']) {
   if (cards.length === 0) return new Map<string, { x: number; y: number }>();
   const bodyRect = insetRect(rect, {
     top: WORK_AREA_HEADER_PAD,
@@ -545,21 +603,17 @@ export function layoutCardsInWorkArea(cards: CardData[], rect: Rect, getBounds: 
   });
   const { maxW, maxH } = maxCardSize(cards, getBounds);
   const usableW = Math.max(1, bodyRect.w);
-  const cols = Math.max(1, Math.floor((usableW + GRID_GAP) / (maxW + GRID_GAP)));
-  const rows = Math.ceil(cards.length / cols);
-  const rowStep = maxH + GRID_GAP + WORK_STAGGER_X;
-  const requiredH = maxH + Math.max(0, rows - 1) * rowStep + WORK_STAGGER_Y;
-  const useCascade = requiredH > bodyRect.h;
-  const cascadeStepY = rows > 1 ? Math.max(0, bodyRect.h - maxH) / (rows - 1) : 0;
+  const cols = frame?.columns || Math.max(1, Math.floor((usableW + GRID_GAP) / (maxW + GRID_GAP)));
+  const cellW = (usableW - (cols - 1) * GRID_GAP) / cols;
+  const rowHeight = frame?.h || maxH;
   const next = new Map<string, { x: number; y: number }>();
   cards.forEach((card, index) => {
     const col = index % cols;
     const row = Math.floor(index / cols);
-    const staggerX = useCascade || row % 2 === 0 ? 0 : Math.round(maxW * 0.12);
-    const staggerY = useCascade || col % 2 === 0 ? 0 : WORK_STAGGER_Y;
+    const dims = getBounds(card);
     next.set(card.id, {
-      x: Math.round(bodyRect.x + staggerX + col * (maxW + GRID_GAP)),
-      y: Math.round(bodyRect.y + staggerY + row * (useCascade ? cascadeStepY : rowStep)),
+      x: Math.round(bodyRect.x + col * (cellW + GRID_GAP) + (cellW - dims.w) / 2),
+      y: Math.round(bodyRect.y + row * (rowHeight + GRID_GAP) + (rowHeight - dims.h) / 2),
     });
   });
   return next;
@@ -638,10 +692,11 @@ export function reflowCardsForStage(
   };
   const stageKind = scene.stageKind;
   if (stageKind === 'closed-sort' || stageKind === 'presort') {
+    const displayBounds = (card: CardData) => ({ x: card.x, y: card.y, ...getSurfaceCardDimensions(card, scene, getBounds) });
     const workArea = scene.surfaces.find((surface): surface is WorkAreaSurfaceView => surface.kind === 'work-area');
     if (workArea) {
       const zoneCards = getCardsInWidgetZone(cards, stageId, workArea.widgetId, WIDGET_ZONE_CONTENT);
-      const layout = layoutCardsInWorkArea(zoneCards, workArea, getBounds);
+      const layout = layoutCardsInWorkArea(zoneCards, workArea, displayBounds, scene.cardFrame);
       for (const card of zoneCards) {
         setPosition(card, layout.get(card.id));
       }
@@ -652,7 +707,7 @@ export function reflowCardsForStage(
       const layoutMode =
         stageKind === 'closed-sort' && stageWidget?.kind === 'category' ? stageWidget.layout : 'fan';
       const zoneCards = getCardsInWidgetZone(cards, stageId, surface.widgetId, surface.zoneId);
-      const layout = layoutCardsInSink(zoneCards, surface, getBounds, layoutMode);
+      const layout = layoutCardsInSink(zoneCards, surface, displayBounds, layoutMode);
       for (const card of zoneCards) {
         setPosition(card, layout.get(card.id));
       }

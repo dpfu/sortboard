@@ -23,11 +23,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -138,13 +140,13 @@ describe('App qsort workflow', () => {
     firstView.unmount();
     const secondView = await renderAppReady();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    expect(await screen.findByRole('button', { name: 'Next stage →' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    expect(await screen.findByRole('button', { name: 'Continue to Q-Sort' })).toBeTruthy();
     expect(await screen.findByTestId(`surface-work-area-${qsortBoard.workflow!.widgets.find((widget) => widget.kind === 'source' && widget.stageId === presortStage.id)!.id}`)).toBeTruthy();
     expect(await screen.findByTestId(`surface-sink-${presortWidget.id}-${presortWidget.zones[0]!.id}`)).toBeTruthy();
     expect(await screen.findByTestId(`surface-sink-${presortWidget.id}-${presortWidget.zones[1]!.id}`)).toBeTruthy();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Next stage →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to Q-Sort' }));
 
     await waitFor(() => {
       expect(secondView.container.querySelector(`[data-testid="surface-sink-${presortWidget.id}-${presortWidget.zones[0]!.id}"]`)).toBeNull();
@@ -166,7 +168,7 @@ describe('App qsort workflow', () => {
     const centerColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${centerBucket.id}`);
     const edgeColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${edgeBucket.id}`);
     expect(parseFloat(centerColumn.style.height)).toBe(parseFloat(edgeColumn.style.height));
-    expect(screen.getByRole('button', { name: 'End sorting →' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Finish sorting' })).toBeTruthy();
 
     expect(activeProjectId).toBeTruthy();
   });
@@ -178,6 +180,7 @@ describe('App qsort workflow', () => {
     const qSortStageButton = screen.getAllByRole('button', { name: 'Q-Sort' }).at(-1)!;
     await userEvent.click(qSortStageButton);
 
+    await userEvent.click(document.querySelector('[data-testid^="surface-qsort-"] button.boardSurface__header') as HTMLElement);
     const capacityInputs = await screen.findAllByLabelText(/^Capacity for /);
     const firstLabel = screen.getByLabelText('Label for scale position 1') as HTMLInputElement;
     fireEvent.change(firstLabel, { target: { value: 'Strongly disagree' } });
@@ -188,14 +191,14 @@ describe('App qsort workflow', () => {
     fireEvent.change(positiveCapacity!, { target: { value: '0' } });
 
     await waitFor(() => {
-      const start = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+      const start = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
       expect(start.disabled).toBe(true);
       expect(screen.getByText(/The distribution has \d+ places for 24 cards\. Open the Q-Sort stage/)).toBeTruthy();
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'Regenerate distribution' }));
     await waitFor(() => {
-      expect((screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement).disabled).toBe(false);
+      expect((screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement).disabled).toBe(false);
       expect((screen.getByLabelText('Label for scale position 1') as HTMLInputElement).value).toBe('Strongly disagree');
     });
   });

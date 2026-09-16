@@ -1,3 +1,4 @@
+import { openProjectMenu } from './helpers/app';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import {
   cardFromTop,
@@ -191,16 +192,20 @@ test('@smoke flushes a pending card edit before switching projects', async ({ pa
   await page.setViewportSize({ width: 980, height: VIEWPORT_HEIGHT });
   await openFreshApp(page);
 
+  await openProjectMenu(page);
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await expect.poll(() => selectedProjectName(page)).toBe('Project 2');
+  await openProjectMenu(page);
   await page.getByLabel('Select project').selectOption({ label: 'Demo Project' });
   await expect.poll(() => selectedProjectName(page)).toBe('Demo Project');
 
   const cardTestId = await editTopCard(page, 'Name', 'Saved before project switch');
   await closeDetailsDrawerIfPresent(page);
+  await openProjectMenu(page);
   await page.getByLabel('Select project').selectOption({ label: 'Project 2' });
   await expect.poll(() => selectedProjectName(page)).toBe('Project 2');
 
+  await openProjectMenu(page);
   await page.getByLabel('Select project').selectOption({ label: 'Demo Project' });
   await expect.poll(() => selectedProjectName(page)).toBe('Demo Project');
   await page.getByTestId(cardTestId).click();
@@ -248,9 +253,10 @@ test('@smoke flushes a pending card edit before sorting starts', async ({ page }
 
   const cardTestId = await editTopCard(page, 'Name', 'Saved before sort start');
   await closeDetailsDrawerIfPresent(page);
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
-  await expect(page.getByRole('button', { name: 'End sorting →' })).toBeVisible();
-  await handleDialog(page, () => page.getByRole('button', { name: '← Setup' }).click(), {
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByTestId('recording-status')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeVisible();
+  await handleDialog(page, () => page.getByRole('button', { name: 'Leave sorting' }).click(), {
     messageIncludes: 'This unfinished session will not be available for replay.',
   });
   await waitForAppReady(page);
@@ -284,7 +290,8 @@ test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', 
   expect(cardTestIds).toHaveLength(24);
 
   await page.getByRole('button', { name: 'Closed sort' }).click();
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByTestId('recording-status')).toBeVisible();
 
   const board = page.getByTestId('board-root');
   const source = page.locator('[data-testid^="surface-work-area-"]');
@@ -301,12 +308,12 @@ test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', 
     await expect(source.locator('.boardSurface__count')).toHaveText(String(cardTestIds.length - index - 1));
   }
 
-  await expect(page.getByText('All cards placed', { exact: true })).toBeVisible();
+  await expect(page.getByText('All cards placed.', { exact: true })).toBeVisible();
   await expect(page.getByText('Recording · 24 actions')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'End sorting →' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeEnabled();
   await expect.poll(() => allCardsAreInsideCanvas(page)).toBe(true);
-  await page.getByRole('button', { name: 'End sorting →' }).click();
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await page.getByRole('button', { name: 'Finish sorting' }).click();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   await expect(cards(page)).toHaveCount(24);
 });
 
@@ -319,7 +326,8 @@ test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the out
   expect(cardTestIds).toHaveLength(24);
 
   await page.getByRole('button', { name: 'Q-Sort' }).click();
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByTestId('recording-status')).toBeVisible();
 
   const board = page.getByTestId('board-root');
   const source = page.locator('[data-testid^="surface-work-area-"]');
@@ -343,8 +351,8 @@ test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the out
     await expect(source.locator('.boardSurface__count')).toHaveText(String(cardTestIds.length - index - 1));
   }
 
-  await expect(page.getByRole('button', { name: 'Next stage →' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Next stage →' }).click();
+  await expect(page.getByRole('button', { name: 'Continue to Q-Sort' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Continue to Q-Sort' }).click();
 
   const qSortSurface = page.locator('[data-testid^="surface-qsort-"]');
   const qSortBuckets = page.locator('[data-testid^="qsort-bucket-"]');

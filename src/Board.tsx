@@ -1,9 +1,13 @@
+import { StackNameInput } from './StackNameInput';
 import * as React from 'react';
-import type { CardData, CardLayoutMode, Mode, SortConfig } from './types';
+import { LocateFixed, Pencil } from 'lucide-react';
+import type { CameraFrameSource, CardData, CardLayoutMode, Mode, SortConfig } from './types';
+import { boardPanGutter, type CameraView } from './camera';
+import { useBoardPan } from './useBoardPan';
 import { DraggableCard, type ResizeEdge, type ResizeStartPayload } from './DraggableCard';
 import { isSupportedMediaFile } from './utils';
 import { getCardDimensions } from './cardLayout';
-import { getQSortCardDisplayDimensions, type QSortCanvasSurfaceView, type StageSurfaceScene } from './stageSurface';
+import { getQSortCardDisplayDimensions, getSurfaceCardDimensions, type QSortCanvasSurfaceView, type StageSurfaceScene } from './stageSurface';
 
 export interface StackBadgeView {
   stackId: string;
@@ -47,11 +51,18 @@ export interface BoardProps {
   sortConfig: SortConfig;
   cards: CardData[];
   stackBadges?: StackBadgeView[];
+  stackDropPreview?: { x: number; y: number; w: number; h: number; label: string } | null;
+  onRenameStack?: (stackId: string, name: string) => void;
   surfaceScene?: StageSurfaceScene | null;
   baseCardWidth: number;
   cardLayoutMode: CardLayoutMode;
   selectedCardIds?: string[];
   liftedCardIds?: string[];
+  viewScale?: number;
+  viewCenter?: { x: number; y: number };
+  worldSize?: { width: number; height: number };
+  panEnabled?: boolean;
+  onViewChange?: (view: CameraView, source: CameraFrameSource) => void;
   boardRef: React.RefObject<HTMLDivElement>;
   dragEnabled: boolean;
   onBringToFront: (id: string) => void;
@@ -73,15 +84,6 @@ export interface BoardProps {
   onOpenPreview?: (id: string) => void;
 }
 
-function canvasPoint(event: React.PointerEvent<HTMLDivElement>) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const scrollLeft = event.currentTarget.scrollLeft || 0;
-  const scrollTop = event.currentTarget.scrollTop || 0;
-  return {
-    x: Math.max(0, Math.min(rect.width + scrollLeft, event.clientX - rect.left + scrollLeft)),
-    y: Math.max(0, Math.min(rect.height + scrollTop, event.clientY - rect.top + scrollTop)),
-  };
-}
 
 function surfaceStateClass(state?: string) {
   return state && state !== 'idle' ? `is-${state}` : '';
@@ -198,11 +200,18 @@ export function Board({
   sortConfig: _sortConfig,
   cards,
   stackBadges,
+  stackDropPreview,
+  onRenameStack,
   surfaceScene,
   baseCardWidth,
   cardLayoutMode,
   selectedCardIds,
   liftedCardIds,
+  viewScale = 1,
+  viewCenter,
+  worldSize,
+  panEnabled = false,
+  onViewChange,
   boardRef,
   dragEnabled,
   onBringToFront,
@@ -223,12 +232,17 @@ export function Board({
   onDragTraceSample,
   onOpenPreview,
 }: BoardProps) {
+  const [editingStackId, setEditingStackId] = React.useState<string | null>(null);
   const [isFileOver, setIsFileOver] = React.useState(false);
   const [keyboardAnnouncement, setKeyboardAnnouncement] = React.useState('');
   const [lassoRect, setLassoRect] = React.useState<{ x0: number; y0: number; x1: number; y1: number; append: boolean } | null>(null);
   const lassoPointerIdRef = React.useRef<number | null>(null);
   const badgeDragRef = React.useRef<{ pointerId: number; stackId: string } | null>(null);
   const canvasRef = React.useRef<HTMLDivElement>(null);
+  const cameraLayoutRef = React.useRef<HTMLDivElement>(null);
+  const cameraModeRef = React.useRef(mode);
+  const lastViewCenterRef = React.useRef<{ x: number; y: number } | null>(null);
+  const suppressCameraScrollRef = React.useRef(false);
   const hasSetupSelection = mode === 'setup' && !!selectedCardIds && selectedCardIds.length > 0;
   const qSortSurface = React.useMemo(
     () => surfaceScene?.surfaces.find((surface): surface is QSortCanvasSurfaceView => surface.kind === 'qsort-stage') || null,
@@ -248,11 +262,11 @@ export function Board({
       const lifted = liftedCardDimsById.get(card.id) || getCardDimensions(card, cardLayoutMode, baseCardWidth);
       const dims = qSortSurface && !liftedCardIdSet.has(card.id)
         ? getQSortCardDisplayDimensions(card, qSortSurface, () => ({ x: card.x, y: card.y, ...lifted }))
-        : lifted;
+        : getSurfaceCardDimensions(card, surfaceScene, () => ({ x: card.x, y: card.y, ...lifted }));
       next.set(card.id, dims);
     }
     return next;
-  }, [baseCardWidth, cardLayoutMode, cards, liftedCardDimsById, liftedCardIdSet, qSortSurface]);
+  }, [baseCardWidth, cardLayoutMode, cards, liftedCardDimsById, liftedCardIdSet, qSortSurface, surfaceScene]);
   const keyboardTargets = React.useMemo(() => keyboardDropTargets(surfaceScene), [surfaceScene]);
   const cardsRef = React.useRef(cards);
   const cardDimsByIdRef = React.useRef(cardDimsById);
@@ -301,13 +315,23 @@ export function Board({
         return;
       }
 
+      let destination = { x: target.x + (target.w - dims.w) / 2, y: target.y + (target.h - dims.h) / 2 };
+      if (surfaceScene?.cardFrame) {
+        // Keyboard placement uses an empty spot; pointer placement keeps the
+        // release position. Neither gesture rearranges other cards.
+        findSpace: for (let y = target.y + 72; y + dims.h <= target.y + target.h - 16; y += dims.h + 18) {
+          for (let x = target.x + 16; x + dims.w <= target.x + target.w - 16; x += dims.w + 18) {
+            const occupied = currentCards.some(other => {
+              if (other.id === id) return false;
+              const bounds = cardDimsByIdRef.current.get(other.id)!;
+              return other.x < x + dims.w + 8 && other.x + bounds.w > x - 8 && other.y < y + dims.h + 8 && other.y + bounds.h > y - 8;
+            });
+            if (!occupied) { destination = { x, y }; break findSpace; }
+          }
+        }
+      }
       onDragTraceStart?.(id, card.x, card.y);
-      const moved = onMoveEnd(
-        id,
-        target.x + (target.w - dims.w) / 2,
-        target.y + (target.h - dims.h) / 2,
-        { x: target.x + target.w / 2, y: target.y + target.h / 2 }
-      );
+      const moved = onMoveEnd(id, destination.x, destination.y, { x: destination.x + dims.w / 2, y: destination.y + dims.h / 2 });
       setKeyboardAnnouncement(
         moved ? `Moved ${card.meta.name} to ${target.label}.` : `${card.meta.name} cannot move to ${target.label}.`
       );
@@ -316,22 +340,101 @@ export function Board({
       // the viewport. Keep the user's context and keyboard focus on the moved card.
       restoreCardFocus();
     },
-    [baseCardWidth, cardLayoutMode, dragEnabled, mode, onDragTraceStart, onMoveEnd]
+    [baseCardWidth, cardLayoutMode, dragEnabled, mode, onDragTraceStart, onMoveEnd, surfaceScene?.cardFrame]
   );
 
   React.useEffect(() => {
     const board = boardRef.current;
     if (!board) return;
     if (!surfaceScene) {
-      board.scrollLeft = 0;
-      board.scrollTop = 0;
+      if (!worldSize) {
+        board.scrollLeft = 0;
+        board.scrollTop = 0;
+      }
       return;
     }
     const targetX = surfaceScene.stageKind === 'qsort' ? surfaceScene.viewportX : 0;
     if (Math.abs(board.scrollLeft - targetX) > 1) {
       board.scrollLeft = targetX;
     }
-  }, [boardRef, surfaceScene]);
+  }, [boardRef, surfaceScene, worldSize]);
+
+  const cameraScale = worldSize ? Math.max(0.01, viewScale) : 1;
+  // A gutter on every side makes panning possible at 100% and below, while
+  // keeping card coordinates independent of the scrollable camera frame.
+  const gutter = worldSize ? boardPanGutter(worldSize.width, worldSize.height) : { x: 0, y: 0 };
+  const gutterX = gutter.x * cameraScale;
+  const gutterY = gutter.y * cameraScale;
+  const canvasPoint = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    return { x: (event.clientX - (rect?.left || 0)) / cameraScale, y: (event.clientY - (rect?.top || 0)) / cameraScale };
+  }, [cameraScale]);
+  const readCameraView = React.useCallback((): CameraView | null => {
+    const board = boardRef.current;
+    if (!board || !worldSize) return null;
+    const scaledW = worldSize.width * cameraScale;
+    const scaledH = worldSize.height * cameraScale;
+    const layoutW = Math.max(board.clientWidth, scaledW);
+    const layoutH = Math.max(board.clientHeight, scaledH);
+    const frameLeft = gutterX + (layoutW - scaledW) / 2;
+    const frameTop = gutterY + (layoutH - scaledH) / 2;
+    return {
+      scale: cameraScale,
+      centerX: (board.scrollLeft + board.clientWidth / 2 - frameLeft) / cameraScale,
+      centerY: (board.scrollTop + board.clientHeight / 2 - frameTop) / cameraScale,
+      viewportW: Math.max(1, board.clientWidth),
+      viewportH: Math.max(1, board.clientHeight),
+    };
+  }, [boardRef, cameraScale, gutterX, gutterY, worldSize]);
+
+  const emitCameraView = React.useCallback(
+    (source: CameraFrameSource) => {
+      const view = readCameraView();
+      if (!view) return;
+      lastViewCenterRef.current = { x: view.centerX, y: view.centerY };
+      onViewChange?.(view, source);
+    },
+    [onViewChange, readCameraView]
+  );
+
+  const placeCamera = React.useCallback((target: { x: number; y: number }) => {
+    const board = boardRef.current;
+    if (!board || !worldSize) return;
+    const scaledW = worldSize.width * cameraScale;
+    const scaledH = worldSize.height * cameraScale;
+    const layoutW = Math.max(board.clientWidth, scaledW);
+    const layoutH = Math.max(board.clientHeight, scaledH);
+    const frameLeft = gutterX + (layoutW - scaledW) / 2;
+    const frameTop = gutterY + (layoutH - scaledH) / 2;
+    suppressCameraScrollRef.current = true;
+    board.scrollLeft = Math.max(0, frameLeft + target.x * cameraScale - board.clientWidth / 2);
+    board.scrollTop = Math.max(0, frameTop + target.y * cameraScale - board.clientHeight / 2);
+  }, [boardRef, cameraScale, gutterX, gutterY, worldSize]);
+
+  React.useLayoutEffect(() => {
+    if (cameraModeRef.current !== mode) {
+      cameraModeRef.current = mode;
+      lastViewCenterRef.current = null;
+    }
+    if (!worldSize) return;
+    const initialCenter = mode === 'setup'
+      ? { x: (boardRef.current?.clientWidth || worldSize.width) / 2, y: (boardRef.current?.clientHeight || worldSize.height) / 2 }
+      : { x: worldSize.width / 2, y: worldSize.height / 2 };
+    placeCamera(viewCenter || lastViewCenterRef.current || initialCenter);
+    emitCameraView('zoom');
+    const frame = window.requestAnimationFrame(() => {
+      suppressCameraScrollRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [boardRef, emitCameraView, mode, placeCamera, viewCenter?.x, viewCenter?.y, worldSize]);
+
+  React.useEffect(() => {
+    const board = boardRef.current;
+    if (!board || !worldSize || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => emitCameraView('resize'));
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, [boardRef, emitCameraView, worldSize]);
 
   const handleDragOver = React.useCallback(
     (e: React.DragEvent) => {
@@ -362,6 +465,14 @@ export function Board({
     [mode, onFilesAdded]
   );
 
+  const pan = useBoardPan({
+    enabled: !!worldSize && panEnabled,
+    setup: mode === 'setup',
+    boardRef,
+    onPanEnd: () => emitCameraView('pan'),
+    onBlankClick: onClearSelection,
+  });
+
   const handleCanvasPointerDown = React.useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (mode !== 'setup') return;
@@ -369,7 +480,8 @@ export function Board({
       // remains pannable. Lasso selection is a mouse/pen interaction.
       if (event.pointerType === 'touch') return;
       if (event.button !== 0) return;
-      if (event.target !== event.currentTarget) return;
+      if (!(event.target as Element).hasAttribute('data-board-background')) return;
+      if (worldSize && panEnabled && !event.shiftKey) return;
       const point = canvasPoint(event);
       lassoPointerIdRef.current = event.pointerId;
       try {
@@ -385,7 +497,7 @@ export function Board({
         append: event.shiftKey,
       });
     },
-    [mode]
+    [canvasPoint, mode, panEnabled, worldSize]
   );
 
   const handleCanvasPointerMove = React.useCallback(
@@ -395,7 +507,7 @@ export function Board({
       const point = canvasPoint(event);
       setLassoRect((prev) => (prev ? { ...prev, x1: point.x, y1: point.y } : prev));
     },
-    [lassoRect]
+    [canvasPoint, lassoRect]
   );
 
   const handleCanvasPointerUp = React.useCallback(
@@ -463,7 +575,7 @@ export function Board({
 
   const handleStackBadgePointerDown = React.useCallback(
     (stackId: string, event: React.PointerEvent<HTMLElement>) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || mode === 'end') return;
       event.preventDefault();
       event.stopPropagation();
       badgeDragRef.current = { pointerId: event.pointerId, stackId };
@@ -475,7 +587,7 @@ export function Board({
       onSelectStack?.(stackId);
       onStackDragStart?.(stackId, event.clientX, event.clientY);
     },
-    [onSelectStack, onStackDragStart]
+    [mode, onSelectStack, onStackDragStart]
   );
 
   const handleStackBadgePointerMove = React.useCallback(
@@ -539,21 +651,51 @@ export function Board({
 
   const canvasStyle = React.useMemo<React.CSSProperties>(
     () => ({
-      width: surfaceScene ? surfaceScene.canvasW : '100%',
-      height: surfaceScene ? surfaceScene.canvasH : '100%',
-      minWidth: '100%',
-      minHeight: '100%',
+      width: worldSize?.width ?? (surfaceScene ? surfaceScene.canvasW : '100%'),
+      height: worldSize?.height ?? (surfaceScene ? surfaceScene.canvasH : '100%'),
+      minWidth: worldSize ? undefined : '100%',
+      minHeight: worldSize ? undefined : '100%',
+      transform: worldSize ? `scale(${cameraScale})` : undefined,
+      transformOrigin: worldSize ? 'top left' : undefined,
     }),
-    [surfaceScene]
+    [cameraScale, surfaceScene, worldSize]
+  );
+  const numericCanvasW = worldSize?.width ?? surfaceScene?.canvasW;
+  const numericCanvasH = worldSize?.height ?? surfaceScene?.canvasH;
+  const scaledCanvasW = numericCanvasW ? numericCanvasW * cameraScale : null;
+  const scaledCanvasH = numericCanvasH ? numericCanvasH * cameraScale : null;
+  const cameraLayoutStyle = React.useMemo<React.CSSProperties>(
+    () => ({
+      width: scaledCanvasW ? `calc(max(100%, ${scaledCanvasW}px) + ${gutterX * 2}px)` : '100%',
+      height: scaledCanvasH ? `calc(max(100%, ${scaledCanvasH}px) + ${gutterY * 2}px)` : '100%',
+    }),
+    [gutterX, gutterY, scaledCanvasH, scaledCanvasW]
+  );
+  const cameraFrameStyle = React.useMemo<React.CSSProperties>(
+    () => ({
+      width: scaledCanvasW ?? '100%',
+      height: scaledCanvasH ?? '100%',
+    }),
+    [scaledCanvasH, scaledCanvasW]
   );
 
   return (
+    <>
     <div
       ref={boardRef}
       data-testid="board-root"
+      tabIndex={-1}
+      role="region"
+      aria-label="Sorting board"
+      data-board-background
+      {...pan.handlers}
       className={`board ${mode === 'setup' ? 'board--setup' : 'board--sort'} ${
         hasSetupSelection ? 'board--hasSelection' : ''
-      } ${isFileOver ? 'board--fileover' : ''} ${surfaceScene?.stageKind === 'qsort' ? 'board--canvasScrollX' : ''}`}
+      } ${isFileOver ? 'board--fileover' : ''} ${surfaceScene?.stageKind === 'qsort' ? 'board--canvasScrollX' : ''} ${
+        worldSize && panEnabled ? 'board--cameraPannable' : ''
+      } ${pan.panning ? 'isCameraPanning' : ''} ${pan.handMode ? 'isHandMode' : ''} ${
+        worldSize && mode === 'end' && !panEnabled ? 'board--cameraLocked' : ''
+      }`}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
@@ -561,6 +703,9 @@ export function Board({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onScroll={() => {
+        if (!suppressCameraScrollRef.current) emitCameraView('pan');
+      }}
     >
       {isFileOver && mode === 'setup' ? (
         <div className="fileOverlay" aria-hidden>
@@ -568,21 +713,20 @@ export function Board({
         </div>
       ) : null}
 
-      <div
-        ref={canvasRef}
-        data-testid="board-canvas"
-        className={`boardCanvas ${surfaceScene?.stageKind === 'qsort' ? 'boardCanvas--qsort' : ''}`}
-        style={canvasStyle}
-        onPointerDown={handleCanvasPointerDown}
-        onPointerMove={handleCanvasPointerMove}
-        onPointerUp={handleCanvasPointerUp}
-        onPointerCancel={handleCanvasPointerCancel}
-      >
+      <div ref={cameraLayoutRef} data-board-background className="boardCameraLayout" style={cameraLayoutStyle}>
+        <div data-board-background className="boardCameraFrame" style={cameraFrameStyle}>
+          <div
+            ref={canvasRef}
+            data-testid="board-canvas"
+            data-board-background
+            className={`boardCanvas ${surfaceScene?.stageKind === 'qsort' ? 'boardCanvas--qsort' : ''} ${surfaceScene?.cardFrame ? 'boardCanvas--loose' : ''}`}
+            style={canvasStyle}
+          >
         <p className="srOnly" id="setup-card-keyboard-help">
-          Press Enter or Space to select this card. Hold Shift to add or remove it from the selection.
+          {panEnabled ? 'Press Enter to select this card. Hold Space and drag to pan the board.' : 'Press Enter or Space to select this card.'} Hold Shift to add or remove it from the selection.
         </p>
         <p className="srOnly" id="sort-card-keyboard-help">
-          Use the arrow keys to move this card.
+          Use the arrow keys to move this card. {panEnabled ? 'Hold Space and drag to pan the board.' : ''}
         </p>
         <p className="srOnly" role="status" aria-live="polite" aria-atomic="true">
           {keyboardAnnouncement}
@@ -771,9 +915,9 @@ export function Board({
               >
                 <div className="boardQSort__distributionHeader">
                   <div>
-                    <div className="boardQSort__distributionTitle">Sort the cards into a forced distribution</div>
+                    <div className="boardQSort__distributionTitle">Rank the cards</div>
                     <div className="boardQSort__distributionHelp">
-                      Pick up a card from either tray, then drop it into an available slot.
+                      Drag from either tray into an empty slot.
                     </div>
                   </div>
                 </div>
@@ -830,6 +974,7 @@ export function Board({
           );
         })}
 
+        {stackDropPreview ? <div className="stackDropPreview" role="status" style={{ left: stackDropPreview.x - 8, top: stackDropPreview.y - 8, width: stackDropPreview.w + 16, height: stackDropPreview.h + 16 }}><span>{stackDropPreview.label}</span></div> : null}
         {stackBadges?.map((badge) => (
           <div
             key={badge.stackId}
@@ -869,12 +1014,19 @@ export function Board({
               onPointerUp={(event) => finishStackBadgeDrag(badge.stackId, event)}
               onPointerCancel={(event) => finishStackBadgeDrag(badge.stackId, event)}
             />
-            <button
+            {editingStackId === badge.stackId && onRenameStack ? <StackNameInput name={badge.name}
+              onCommit={name => onRenameStack(badge.stackId, name)} onClose={() => setEditingStackId(null)} /> : <button
               className="stackHalo__handle"
               type="button"
               aria-label={`Stack with ${badge.count} cards`}
-              title={badge.name}
-              tabIndex={mode === 'setup' && !!onSelectStack ? 0 : -1}
+              title={onRenameStack ? `${badge.name} · Double-click to rename` : badge.name}
+              tabIndex={onRenameStack || onSelectStack ? 0 : -1}
+              onDoubleClick={() => { if (onRenameStack) setEditingStackId(badge.stackId); }}
+              onKeyDown={event => {
+                if (onRenameStack && (event.key === 'Enter' || event.key === 'F2')) {
+                  event.preventDefault(); event.stopPropagation(); setEditingStackId(badge.stackId);
+                }
+              }}
               onPointerDown={(event) => handleStackBadgePointerDown(badge.stackId, event)}
               onPointerMove={(event) => handleStackBadgePointerMove(badge.stackId, event)}
               onPointerUp={(event) => finishStackBadgeDrag(badge.stackId, event)}
@@ -882,10 +1034,11 @@ export function Board({
               onClick={() => onSelectStack?.(badge.stackId)}
             >
               <span className="stackHalo__name">{badge.name}</span>
+              {onRenameStack ? <Pencil className="stackHalo__edit" /> : null}
               <span className="stackHalo__count" aria-hidden>
                 {badge.count}
               </span>
-            </button>
+            </button>}
           </div>
         ))}
 
@@ -903,7 +1056,8 @@ export function Board({
               mode={mode}
               isSelected={mode === 'setup' && !!selectedCardIds?.includes(card.id)}
               dragEnabled={dragEnabled}
-              dragConstraintsRef={canvasRef}
+              coordinateScale={cameraScale}
+              dragConstraintsRef={worldSize ? cameraLayoutRef : canvasRef}
               onBringToFront={onBringToFront}
               onMoveEnd={onMoveEnd}
               onResizeStart={onResizeStart}
@@ -918,7 +1072,19 @@ export function Board({
             />
           );
         })}
+          </div>
+        </div>
       </div>
     </div>
+    {worldSize && panEnabled && mode !== 'end' ? (
+      <div className="boardPanHelp">
+        <button type="button" onClick={() => {
+          placeCamera({ x: worldSize.width / 2, y: worldSize.height / 2 });
+          emitCameraView('pan');
+          window.requestAnimationFrame(() => { suppressCameraScrollRef.current = false; });
+        }}><LocateFixed />Center board</button>
+      </div>
+    ) : null}
+    </>
   );
 }

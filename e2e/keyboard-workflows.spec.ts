@@ -1,3 +1,4 @@
+import { openProjectMenu } from './helpers/app';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { cards, openFreshApp } from './helpers/app';
 
@@ -5,11 +6,12 @@ type Point = { x: number; y: number };
 
 async function createTextCardProject(page: Page, count: number) {
   await openFreshApp(page);
+  await openProjectMenu(page);
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await expect(cards(page)).toHaveCount(0);
 
   for (let index = 0; index < count; index += 1) {
-    await page.getByRole('button', { name: '+ Text card', exact: true }).click();
+    await page.getByRole('button', { name: 'Text card', exact: true }).click();
     await expect(cards(page)).toHaveCount(index + 1);
   }
 
@@ -108,7 +110,7 @@ async function seekReplayToEnd(page: Page) {
 test.describe('keyboard card workflows', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Keyboard workflow coverage is Chromium-specific.');
 
-  test('selects setup cards with Enter and Space, then replays one Open arrow move', async ({ page }) => {
+  test('selects setup cards with Enter and Shift+Enter, then replays one Open arrow move', async ({ page }) => {
     const [firstTestId, secondTestId] = await createTextCardProject(page, 2);
     const firstCard = page.getByTestId(firstTestId);
     const secondCard = page.getByTestId(secondTestId);
@@ -119,11 +121,11 @@ test.describe('keyboard card workflows', () => {
     await expect(secondCard).toHaveAttribute('aria-pressed', 'false');
 
     await secondCard.focus();
-    await page.keyboard.press('Shift+Space');
+    await page.keyboard.press('Shift+Enter');
     await expect(firstCard).toHaveAttribute('aria-pressed', 'true');
     await expect(secondCard).toHaveAttribute('aria-pressed', 'true');
 
-    await page.getByRole('button', { name: 'Start sorting →', exact: true }).click();
+    await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
     const start = await settledCardPoint(firstCard);
     await firstCard.focus();
     await page.keyboard.press('ArrowRight');
@@ -131,7 +133,7 @@ test.describe('keyboard card workflows', () => {
     const final = await settledCardPoint(firstCard);
     expect(distance(start, final)).toBeGreaterThan(20);
 
-    await page.getByRole('button', { name: 'End sorting →', exact: true }).click();
+    await page.getByRole('button', { name: 'Finish sorting', exact: true }).click();
     await expect(page.getByText('1 recorded action', { exact: true })).toBeVisible();
     await seekReplayToEnd(page);
     await expectCardNear(firstCard, final);
@@ -143,11 +145,11 @@ test.describe('keyboard card workflows', () => {
     const categorySetupSurface = page.locator('[data-testid^="surface-sink-"]').first();
     await categorySetupSurface.click();
     await page.getByLabel('Allowed tags', { exact: true }).fill('required-tag');
-    await page.getByRole('button', { name: 'Start sorting →', exact: true }).click();
+    await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
 
     const source = page.locator('[data-testid^="surface-work-area-"]');
     const category = page.locator('[data-testid^="surface-sink-"]').first();
-    const endButton = page.getByRole('button', { name: 'End sorting →', exact: true });
+    const endButton = page.getByRole('button', { name: 'Finish sorting', exact: true });
     await expect(source.locator('.boardSurface__count')).toHaveText('2');
     await expect(category.locator('.boardSurface__count')).toHaveText('0');
     await expect(endButton).toBeDisabled();
@@ -162,13 +164,13 @@ test.describe('keyboard card workflows', () => {
     await expect(page.locator('.boardCanvas > [role="status"]')).toContainText('cannot move to Category 1');
 
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: '← Setup', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Start sorting →', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Leave sorting', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Start sorting', exact: true })).toBeVisible();
     await page.locator('[data-testid^="surface-sink-"]').first().click();
     const allowedTags = page.getByLabel('Allowed tags', { exact: true });
     await expect(allowedTags).toBeVisible();
     await allowedTags.fill('');
-    await page.getByRole('button', { name: 'Start sorting →', exact: true }).click();
+    await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
     await expect(source.locator('.boardSurface__count')).toHaveText('2');
 
     await firstCard.focus();
@@ -195,11 +197,11 @@ test.describe('keyboard card workflows', () => {
     await expect(category.locator('.boardSurface__count')).toHaveText('2');
   });
 
-  test('completes both Q-Sort stages by keyboard at 900px and follows cards into buckets', async ({ page }) => {
+  test('completes both Q-Sort stages by keyboard at 900px with every destination visible', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 720 });
     const cardTestIds = await createTextCardProject(page, 4);
     await page.getByRole('button', { name: 'Q-Sort', exact: true }).click();
-    await page.getByRole('button', { name: 'Start sorting →', exact: true }).click();
+    await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
 
     const source = page.locator('[data-testid^="surface-work-area-"]');
     const preSortTargets = page.locator('[data-testid^="surface-sink-"]');
@@ -209,7 +211,7 @@ test.describe('keyboard card workflows', () => {
       await expect.poll(() => surfaceCountSum(preSortTargets)).toBe(index + 1);
     }
 
-    const nextStage = page.getByRole('button', { name: 'Next stage →', exact: true });
+    const nextStage = page.getByRole('button', { name: 'Continue to Q-Sort', exact: true });
     await expect(nextStage).toBeEnabled();
     await nextStage.focus();
     await page.keyboard.press('Enter');
@@ -217,12 +219,11 @@ test.describe('keyboard card workflows', () => {
     const board = page.getByTestId('board-root');
     const lanes = page.locator('[data-testid^="qsort-lane-"]');
     const buckets = page.locator('[data-testid^="qsort-bucket-"]');
-    const endButton = page.getByRole('button', { name: 'End sorting →', exact: true });
+    const endButton = page.getByRole('button', { name: 'Finish sorting', exact: true });
     await expect(lanes).toHaveCount(2);
     await expect.poll(() => surfaceCountSum(lanes)).toBe(4);
     await expect(endButton).toBeDisabled();
 
-    let observedHorizontalFollow = false;
     for (const [index, testId] of cardTestIds.entries()) {
       const card = page.getByTestId(testId);
       await board.evaluate((element) => {
@@ -249,9 +250,10 @@ test.describe('keyboard card workflows', () => {
           )}, announcement=${JSON.stringify(announcement)}, buckets=${JSON.stringify(bucketLabels)}`
         );
       }
-      if ((await board.evaluate((element) => element.scrollLeft)) > 0) observedHorizontalFollow = true;
+      await expect(card).toBeInViewport();
+      await expect(card).toBeFocused();
     }
-    expect(observedHorizontalFollow).toBe(true);
+    await expect.poll(() => board.evaluate(element => element.scrollWidth - element.clientWidth)).toBe(0);
 
     const finalBucketLabels = await buckets.locator('.widgetBucket__meta').allTextContents();
     expect(finalBucketLabels.some((label) => /^[1-9]\d*\s*\/\s*[1-9]\d*$/.test(label.trim()))).toBe(true);

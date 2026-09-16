@@ -15,6 +15,7 @@ vi.mock('framer-motion', () => ({
         dragConstraints: _dragConstraints,
         dragMomentum: _dragMomentum,
         dragElastic: _dragElastic,
+        initial: _initial,
         animate: _animate,
         transition: _transition,
         whileDrag: _whileDrag,
@@ -94,9 +95,9 @@ describe('DraggableCard keyboard interaction', () => {
     expect(onSelectCard).toHaveBeenCalledTimes(2);
   });
 
-  it('does not nest a preview button inside a setup card button', () => {
+  it.each(['video', 'image'] as const)('does not nest a %s preview button inside a setup card button', (kind) => {
     renderCard('setup', {
-      card: { ...card, kind: 'video', meta: { ...card.meta, name: 'Interview clip' } },
+      card: { ...card, kind, meta: { ...card.meta, name: 'Interview clip' } },
       onSelectCard: vi.fn(),
       onOpenPreview: vi.fn(),
     });

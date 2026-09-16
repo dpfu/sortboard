@@ -13,6 +13,7 @@ import {
   findStageSurfaceDropTarget,
   getQSortCardDisplayDimensions,
   reflowCardsForStage,
+  getSurfaceCardDimensions,
 } from './stageSurface';
 
 function makeCard(id: string): CardData {
@@ -66,6 +67,17 @@ function assignToZone(cards: CardData[], stageId: string, widgetId: string, zone
 }
 
 describe('stageSurface layout', () => {
+  it('retains the original vertical targets and card sizes for older recordings', () => {
+    let workflow = createWorkflowForTemplate('closed', 1280, 720, 15);
+    const stageId = getDefaultActiveStageId(workflow)!;
+    workflow = addClosedCategoryWidget(workflow, stageId, 1280, 720);
+    const card = makeCard('legacy');
+    const scene = buildStageSurfaceScene(workflow, stageId, [card], null, 'sort', { width: 1280, height: 720 }, null, 1);
+    const targets = scene.surfaces.filter(surface => surface.kind === 'sink');
+    expect(targets[0].x).toBe(targets[1].x);
+    expect(targets[0].y + targets[0].h).toBeLessThan(targets[1].y);
+    expect(getSurfaceCardDimensions(card, scene, getCardBounds)).toEqual({ w: 180, h: 120 });
+  });
   it('reflows closed-sort source cards below the work-area header band', () => {
     const workflow = createWorkflowForTemplate('closed', 1200, 800, 3);
     const stageId = getDefaultActiveStageId(workflow)!;
@@ -183,9 +195,9 @@ describe('stageSurface layout', () => {
     const reflowed = reflowCardsForStage(cards, workflow, stageId, getDemoCardBounds, { width, height }, 'setup');
     for (const card of reflowed) {
       expect(card.x).toBeGreaterThanOrEqual(workArea.x + 18);
-      expect(card.x + 240).toBeLessThanOrEqual(workArea.x + workArea.w - 18);
+      expect(card.x + getSurfaceCardDimensions(card, scene, getDemoCardBounds).w).toBeLessThanOrEqual(workArea.x + workArea.w - 18);
       expect(card.y).toBeGreaterThanOrEqual(workArea.y + 72);
-      expect(card.y + 135).toBeLessThanOrEqual(workArea.y + workArea.h - 18);
+      expect(card.y + getSurfaceCardDimensions(card, scene, getDemoCardBounds).h).toBeLessThanOrEqual(workArea.y + workArea.h - 18);
     }
 
     const cardsByColumn = new Map<number, CardData[]>();
@@ -200,7 +212,7 @@ describe('stageSurface layout', () => {
     }
   });
 
-  it('keeps 24 q-sort pre-sort source cards inside the visible work area', () => {
+  it('keeps 24 q-sort pre-sort source cards inside the scrollable work area', () => {
     const workflow = createWorkflowForTemplate('qsort', 1280, 720, 24);
     const stageId = workflow.stages.find((stage) => stage.kind === 'presort')!.id;
     const source = getSourceWidget(workflow, stageId)!;
@@ -217,11 +229,11 @@ describe('stageSurface layout', () => {
 
     const reflowed = reflowCardsForStage(cards, workflow, stageId, getDemoCardBounds, { width: 1280, height: 720 }, 'sort');
     expect(reflowed).toHaveLength(24);
-    expect(reflowed.every((card) => card.y + 135 <= workArea.y + workArea.h - 18)).toBe(true);
+    expect(reflowed.every((card) => card.y + getSurfaceCardDimensions(card, scene, getDemoCardBounds).h <= workArea.y + workArea.h - 18)).toBe(true);
     expect(scene.surfaces.filter((surface) => surface.kind === 'sink')).toHaveLength(2);
   });
 
-  it.each([900, 1280])('keeps every source card and five closed targets reachable in one %d px sort viewport', (width) => {
+  it.each([900, 1280])('keeps every source card and five closed targets reachable on a %d px wide board', (width) => {
     const height = 720;
     let workflow = createWorkflowForTemplate('closed', width, height, 24);
     const stageId = getDefaultActiveStageId(workflow)!;
@@ -240,9 +252,9 @@ describe('stageSurface layout', () => {
     const reflowed = reflowCardsForStage(cards, workflow, stageId, getDemoCardBounds, { width, height }, 'sort');
 
     expect(sinks).toHaveLength(5);
-    expect(reflowed.every((card) => card.y >= 0 && card.y + 135 <= height)).toBe(true);
+    expect(reflowed.every((card) => card.y >= 0 && card.y + getSurfaceCardDimensions(card, scene, getDemoCardBounds).h <= scene.canvasH)).toBe(true);
     for (const sink of sinks) {
-      expect(sink.y + sink.h).toBeLessThanOrEqual(height);
+      expect(sink.y + sink.h).toBeLessThanOrEqual(scene.canvasH);
       const dropBounds = {
         x: sink.x + sink.w / 2 - 120,
         y: sink.y + sink.h / 2 - 67.5,
@@ -271,7 +283,7 @@ describe('stageSurface layout', () => {
     const reflowed = reflowCardsForStage(cards, workflow, stageId, getCardBounds, { width: 1280, height: 720 }, 'sort');
     const ordered = reflowed.slice().sort((a, b) => a.widgetAssignments![stageId]!.order - b.widgetAssignments![stageId]!.order);
     expect(ordered[0]!.x).toBeGreaterThanOrEqual(sink.x + 18);
-    expect(ordered.at(-1)!.x + 180).toBeLessThanOrEqual(sink.x + sink.w - 18);
+    expect(ordered.at(-1)!.x + getSurfaceCardDimensions(ordered.at(-1)!, scene, getCardBounds).w).toBeLessThanOrEqual(sink.x + sink.w - 18);
     expect(ordered[1]!.x - ordered[0]!.x).toBeGreaterThan(0);
     expect(ordered[1]!.x - ordered[0]!.x).toBeLessThan(28);
 

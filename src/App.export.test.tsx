@@ -24,11 +24,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -100,6 +102,7 @@ describe('App project export', () => {
     fireEvent.change(nameInput, { target: { value: 'Exported Name' } });
     expect(nameInput.value).toBe('Exported Name');
 
+    await userEvent.click(screen.getByRole('button', { name: 'Project menu' }));
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
 
     await waitFor(() => {

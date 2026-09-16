@@ -1,3 +1,4 @@
+import { openProjectMenu } from './helpers/app';
 import fs from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import {
@@ -176,19 +177,21 @@ test('@smoke uploads an image and replays a recorded sort', async ({ page }, tes
   await expect(cards(page)).toHaveCount(beforeCount + 1);
   await expect(cards(page).last().locator('img.cardPreview__img')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByTestId('recording-status')).toBeVisible();
   if (testInfo.project.name === 'webkit') {
     await seedOpenReplaySession(page);
     await page.reload();
     await waitForAppReady(page);
-    await page.getByRole('button', { name: 'Start sorting →' }).click();
+    await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByTestId('recording-status')).toBeVisible();
   } else {
     await dragLocatorBy(page, await cardFromTop(page), { x: 220, y: 120 });
     await expect(page.getByText('Recording · 1 action')).toBeVisible();
   }
 
-  await page.getByRole('button', { name: 'End sorting →' }).click();
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await page.getByRole('button', { name: 'Finish sorting' }).click();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   const replaySessions = page.getByTestId('replay-sessions').getByRole('button');
   if (testInfo.project.name === 'webkit') {
     await expect(replaySessions).toHaveCount(2);
@@ -196,12 +199,13 @@ test('@smoke uploads an image and replays a recorded sort', async ({ page }, tes
   } else {
     await expect(replaySessions).toHaveCount(1);
   }
-  await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Play recording' })).toBeEnabled();
 });
 
 test('@smoke exports and re-imports a project zip', async ({ page }, testInfo) => {
   await openFreshApp(page);
 
+  await openProjectMenu(page);
   await handleDialog(page, () => page.getByRole('button', { name: 'Rename' }).click(), {
     messageIncludes: 'Rename project',
     promptText: 'Roundtrip Project',

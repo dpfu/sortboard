@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Play, ZoomIn } from 'lucide-react';
 import type { CardData } from './types';
 import { formatDurationLabel } from './media';
 
@@ -20,6 +21,12 @@ export function CardPreview({ card, className = '', onOpenPreview, showPreviewBu
     <div className={`cardPreview ${isText ? 'cardPreview--text' : ''} ${isVideo ? 'cardPreview--video' : ''} ${className}`.trim()}>
       {isImage && card.src ? <img className="cardPreview__img" src={card.src} alt="" decoding="async" draggable={false} /> : null}
 
+      {isImage && onOpenPreview && showPreviewButton ? <button className="cardPreview__imageInspect" type="button" aria-label={`Enlarge ${card.meta.name || 'image'}`} title="Enlarge image"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => { event.preventDefault(); event.stopPropagation(); onOpenPreview(card.id); }}>
+        <ZoomIn />
+      </button> : null}
+
       {isVideo ? (
         <>
           {card.posterSrc ? (
@@ -39,6 +46,7 @@ export function CardPreview({ card, className = '', onOpenPreview, showPreviewBu
               className="cardPreview__previewBtn"
               type="button"
               aria-label={`Preview ${previewLabel}`}
+              title="Preview video"
               onPointerDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -50,7 +58,7 @@ export function CardPreview({ card, className = '', onOpenPreview, showPreviewBu
               }}
             >
               <span className="cardPreview__previewGlyph" aria-hidden>
-                ▶
+                <Play />
               </span>
             </button>
           ) : null}

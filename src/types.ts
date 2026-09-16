@@ -31,6 +31,13 @@ export interface CardMetadataV1 {
 
 export interface SortConfig {
   type: SortTemplateId;
+  // Optional for compatibility with projects and recordings created before
+  // stacking became configurable. Missing means enabled.
+  stacksEnabled?: boolean;
+  // Missing means disabled so existing studies keep their original interaction
+  // model unless zoom is explicitly enabled in setup.
+  zoomEnabled?: boolean;
+  startInFullscreen?: boolean;
 }
 
 export interface SortStageData {
@@ -198,6 +205,24 @@ export type StageTransitionSegment = {
 
 export type RecordingSegment = DragSegment | StageTransitionSegment;
 
+export type CameraFrameSource = 'initial' | 'zoom' | 'pan' | 'resize';
+
+export interface CameraKeyframe {
+  tMs: number;
+  scale: number;
+  centerX: number;
+  centerY: number;
+  viewportW: number;
+  viewportH: number;
+  source: CameraFrameSource;
+}
+
+export interface StackKeyframe {
+  tMs: number;
+  stacks: StackData[];
+  cards: Array<Pick<CardData, 'id' | 'stackId' | 'stackOrder' | 'z'>>;
+}
+
 export interface RecordingSession {
   version: 5;
   createdAt: string; // ISO
@@ -209,6 +234,12 @@ export interface RecordingSession {
   cardLayoutModeAtStart: CardLayoutMode;
   workflowAtStart: SortWorkflowData;
   activeStageIdAtStart?: string;
+  // Missing on recordings made with the original stacked category layout.
+  surfaceLayoutVersion?: 2;
   cardsAtStart: CardData[];
   segments: RecordingSegment[];
+  // View-only interaction track. It is intentionally separate from segments so
+  // zooming and panning do not inflate the recorded card-action count.
+  cameraTrack?: CameraKeyframe[];
+  stackTrack?: StackKeyframe[];
 }

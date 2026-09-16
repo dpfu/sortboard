@@ -1,13 +1,15 @@
 import * as React from 'react';
+import { X } from 'lucide-react';
 import type { CardData } from './types';
 import { formatDurationLabel } from './media';
 
 export interface VideoPreviewDialogProps {
   card: CardData;
   onClose: () => void;
+  showMetadata?: boolean;
 }
 
-export function VideoPreviewDialog({ card, onClose }: VideoPreviewDialogProps) {
+export function VideoPreviewDialog({ card, onClose, showMetadata = true }: VideoPreviewDialogProps) {
   const panelRef = React.useRef<HTMLDivElement | null>(null);
   const closeButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const onCloseRef = React.useRef(onClose);
@@ -48,7 +50,8 @@ export function VideoPreviewDialog({ card, onClose }: VideoPreviewDialogProps) {
     };
   }, []);
 
-  if (card.kind !== 'video') return null;
+  if (card.kind === 'text') return null;
+  const isImage = card.kind === 'image';
 
   const durationLabel = formatDurationLabel(card.meta.durationSec);
   const aspectLabel =
@@ -59,7 +62,7 @@ export function VideoPreviewDialog({ card, onClose }: VideoPreviewDialogProps) {
   return (
     <div
       className="videoDialog"
-      data-testid="video-preview-dialog"
+      data-testid={isImage ? "image-preview-dialog" : "video-preview-dialog"}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -68,20 +71,20 @@ export function VideoPreviewDialog({ card, onClose }: VideoPreviewDialogProps) {
       <div className="videoDialog__panel" ref={panelRef}>
         <div className="videoDialog__header">
           <div>
-            <div className="videoDialog__title" id={titleId}>{card.meta.name || 'Untitled video'}</div>
+            <div className="videoDialog__title" id={titleId}>{card.meta.name || (isImage ? 'Image' : 'Video')}</div>
             <div className="videoDialog__sub">
-              <span className="pill pill--muted">Local video</span>
+              <span className="pill pill--muted">{isImage ? 'Image' : 'Local video'}</span>
               {durationLabel ? <span className="pill pill--muted">{durationLabel}</span> : null}
               {aspectLabel ? <span className="pill pill--muted">{aspectLabel}</span> : null}
             </div>
           </div>
-          <button ref={closeButtonRef} className="btn btn--ghost btn--tiny" type="button" onClick={onClose}>
-            Close
+          <button ref={closeButtonRef} className="btn btn--ghost btn--icon" type="button" aria-label="Close" title="Close" onClick={onClose}>
+            <X />
           </button>
         </div>
 
         <div className="videoDialog__body">
-          {card.src ? (
+          {isImage && card.src ? <img className="imageDialog__image" src={card.src} alt={card.meta.name || 'Image preview'} /> : card.src ? (
             <video
               className="videoDialog__player"
               data-testid="video-preview-player"
@@ -93,11 +96,11 @@ export function VideoPreviewDialog({ card, onClose }: VideoPreviewDialogProps) {
               preload="metadata"
             />
           ) : (
-            <div className="videoDialog__empty">This video file is unavailable.</div>
+            <div className="videoDialog__empty">This media file is unavailable.</div>
           )}
         </div>
 
-        {card.meta.notes || card.meta.tags.length > 0 || card.meta.originalFileName ? (
+        {showMetadata && (card.meta.notes || card.meta.tags.length > 0 || card.meta.originalFileName) ? (
           <div className="videoDialog__footer">
             {card.meta.originalFileName ? (
               <div className="videoDialog__metaRow">

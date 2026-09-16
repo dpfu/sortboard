@@ -44,9 +44,11 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) throw new Error('start sorting still disabled');
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -123,9 +125,12 @@ describe('App pending persistence', () => {
 
     await userEvent.click(card);
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Saved in original project' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Project menu' }));
     await userEvent.click(screen.getByRole('button', { name: 'New' }));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Project menu' }) as HTMLButtonElement).disabled).toBe(false));
 
-    const projectSelect = screen.getByLabelText('Select project') as HTMLSelectElement;
+    await userEvent.click(screen.getByRole('button', { name: 'Project menu' }));
+    const projectSelect = await screen.findByLabelText('Select project') as HTMLSelectElement;
     await waitFor(() => expect(projectSelect.value).not.toBe(originalProjectId));
     const newProjectId = projectSelect.value;
     const originalBoard = await persist.persistGetBoard(originalProjectId!);
@@ -135,7 +140,7 @@ describe('App pending persistence', () => {
 
     await userEvent.selectOptions(projectSelect, originalProjectId!);
     await waitFor(() => {
-      expect(projectSelect.value).toBe(originalProjectId);
+      expect(screen.getByRole('button', { name: 'Project menu' }).getAttribute('title')).toBe('Demo Project');
       expect(view.container.querySelector(`[data-testid="${testId}"]`)).toBeTruthy();
     });
     await userEvent.click(view.container.querySelector(`[data-testid="${testId}"]`) as HTMLElement);
@@ -150,8 +155,8 @@ describe('App pending persistence', () => {
 
     await userEvent.click(card);
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Sorting start snapshot' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await screen.findByRole('button', { name: 'End sorting →' });
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Finish sorting' });
 
     const board = await persist.persistGetBoard(projectId!);
     expect(boardCardName(board!, cardId)).toBe('Sorting start snapshot');
@@ -256,6 +261,7 @@ describe('App pending persistence', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Stale snapshot' } });
     await staleStarted;
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Latest snapshot' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Project menu' }));
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
 
     const latestStartedBeforeRelease = await Promise.race([

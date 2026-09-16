@@ -23,11 +23,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -84,10 +86,10 @@ describe('App sorting workflow', () => {
     await userEvent.click(firstSetupCard);
     expect(container.querySelector('.card.isSelected')).toBeTruthy();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
 
-    await screen.findByRole('button', { name: '← Setup' });
-    expect(screen.getByText('Recording · 0 actions')).toBeTruthy();
+    await screen.findByRole('button', { name: 'Leave sorting' });
+    expect(screen.getByTestId('recording-status').textContent).toBe('Recording · 0 actions');
     expect(screen.queryByLabelText('Select project')).toBeNull();
     expect(screen.queryByRole('button', { name: 'New' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
@@ -102,10 +104,10 @@ describe('App sorting workflow', () => {
 
   it('hides project controls in replay mode', async () => {
     const { container } = await renderAppReady();
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'End sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Finish sorting' }));
 
-    await screen.findByText('Replay');
+    await screen.findByText('Result');
     expect(screen.queryByLabelText('Select project')).toBeNull();
     expect(screen.queryByRole('button', { name: 'New' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
@@ -118,22 +120,22 @@ describe('App sorting workflow', () => {
 
   it('asks confirmation before leaving sorting and respects cancel/confirm', async () => {
     await renderAppReady();
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
 
     const confirmSpy = vi.spyOn(window, 'confirm');
     confirmSpy.mockReturnValueOnce(false);
-    await userEvent.click(await screen.findByRole('button', { name: '← Setup' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave sorting' }));
     expect(confirmSpy).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'End sorting →' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Finish sorting' })).toBeTruthy();
 
     confirmSpy.mockReturnValueOnce(true);
-    await userEvent.click(screen.getByRole('button', { name: '← Setup' }));
-    await screen.findByRole('button', { name: 'Start sorting →' });
+    await userEvent.click(screen.getByRole('button', { name: 'Leave sorting' }));
+    await screen.findByRole('button', { name: 'Start sorting' });
   });
 
   it('deletes discarded in-progress session from persistence', async () => {
     await renderAppReady();
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
 
     const persist = await import('./persist');
     const projectId = await persist.persistGetActiveProjectId();
@@ -145,8 +147,8 @@ describe('App sorting workflow', () => {
     }, { timeout: 3000 });
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    await userEvent.click(await screen.findByRole('button', { name: '← Setup' }));
-    await screen.findByRole('button', { name: 'Start sorting →' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave sorting' }));
+    await screen.findByRole('button', { name: 'Start sorting' });
 
     await waitFor(async () => {
       const rows = await persist.persistListSessions(projectId!);
@@ -196,8 +198,8 @@ describe('App sorting workflow', () => {
 
     firstRender.unmount();
     const secondRender = await renderAppReady();
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await screen.findByRole('button', { name: '← Setup' });
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Leave sorting' });
 
     const sortCardA = secondRender.container.querySelector(`[data-testid="card-${imageA.id}"]`) as HTMLElement;
     const sortCardB = secondRender.container.querySelector(`[data-testid="card-${imageB.id}"]`) as HTMLElement;
@@ -207,8 +209,8 @@ describe('App sorting workflow', () => {
       expect(sortCardA.style.height).not.toBe(sortCardB.style.height);
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'End sorting →' }));
-    await screen.findByText('Replay');
+    await userEvent.click(screen.getByRole('button', { name: 'Finish sorting' }));
+    await screen.findByText('Result');
 
     const replayCardA = secondRender.container.querySelector(`[data-testid="card-${imageA.id}"]`) as HTMLElement;
     const replayCardB = secondRender.container.querySelector(`[data-testid="card-${imageB.id}"]`) as HTMLElement;
@@ -253,8 +255,8 @@ describe('App sorting workflow', () => {
 
     firstRender.unmount();
     const secondRender = await renderAppReady();
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await screen.findByRole('button', { name: '← Setup' });
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Leave sorting' });
 
     const sortCard = secondRender.container.querySelector('[data-testid="card-img-portrait-1"]') as HTMLElement;
     expect(sortCard).toBeTruthy();
@@ -262,8 +264,8 @@ describe('App sorting workflow', () => {
       expect(sortCard.style.height).toBe('427px');
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'End sorting →' }));
-    await screen.findByText('Replay');
+    await userEvent.click(screen.getByRole('button', { name: 'Finish sorting' }));
+    await screen.findByText('Result');
 
     const replayCard = secondRender.container.querySelector('[data-testid="card-img-portrait-1"]') as HTMLElement;
     await waitFor(() => {

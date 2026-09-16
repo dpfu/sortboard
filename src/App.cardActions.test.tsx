@@ -23,11 +23,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -111,14 +113,14 @@ describe('App setup card actions', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stack' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await screen.findByRole('button', { name: 'End sorting →' });
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Finish sorting' });
     expect(screen.queryByRole('button', { name: 'Shuffle' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stack' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'End sorting →' }));
-    await screen.findByText('Replay');
+    await userEvent.click(screen.getByRole('button', { name: 'Finish sorting' }));
+    await screen.findByText('Result');
     expect(screen.queryByRole('button', { name: 'Shuffle' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stack' })).toBeNull();
@@ -154,6 +156,75 @@ describe('App setup card actions', () => {
     }, { timeout: 3000 });
   });
 
+  it('turns stacking off from setup, dissolves stacks, and restores them with undo', async () => {
+    const { container } = await renderAppReady();
+    const stackSwitch = screen.getByRole('switch', { name: 'Allow stacks' }) as HTMLInputElement;
+
+    expect(stackSwitch.checked).toBe(true);
+    expect(screen.getByText(/Drop cards together to group them/)).toBeTruthy();
+    await createStackFromFirstTwoCards(container);
+    expect(screen.getByRole('button', { name: 'Stack with 2 cards' })).toBeTruthy();
+
+    await userEvent.click(stackSwitch);
+
+    await waitFor(async () => {
+      const board = await getActiveBoard();
+      expect(board.sortConfig.stacksEnabled).toBe(false);
+      expect(board.stacks).toHaveLength(0);
+      expect(board.cards.every((card) => !card.stackId && card.stackOrder == null)).toBe(true);
+    });
+    expect(stackSwitch.checked).toBe(false);
+    expect(screen.queryByRole('button', { name: /Stack with/ })).toBeNull();
+
+    const cards = Array.from(container.querySelectorAll('.card')) as HTMLElement[];
+    fireEvent.pointerDown(cards[0], { button: 0 });
+    fireEvent.pointerDown(cards[1], { button: 0, shiftKey: true });
+    await waitFor(() => expect(screen.getByText('2 cards selected.')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Create stack' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => {
+      const board = await getActiveBoard();
+      expect(board.sortConfig.stacksEnabled).toBe(true);
+      expect(board.stacks).toHaveLength(1);
+    });
+    expect(stackSwitch.checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Stack with 2 cards' })).toBeTruthy();
+  });
+
+  it('enables board zoom from setup and records camera changes separately from card actions', async () => {
+    await renderAppReady();
+    const zoomSwitch = screen.getByRole('switch', { name: 'Allow board zoom' }) as HTMLInputElement;
+
+    expect(zoomSwitch.checked).toBe(false);
+    expect(screen.getByText(/Let participants change the board zoom/)).toBeTruthy();
+    await userEvent.click(zoomSwitch);
+
+    await waitFor(async () => {
+      const board = await getActiveBoard();
+      expect(board.sortConfig.zoomEnabled).toBe(true);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    expect(await screen.findByRole('group', { name: 'Board zoom' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(screen.getByRole('button', { name: /Reset zoom to 100%/ }).textContent).toBe('125%');
+    expect(screen.getByTestId('recording-status').textContent).toBe('Recording · 0 actions');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Finish sorting' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'View' }));
+    expect(await screen.findByRole('button', { name: 'Follow recording' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Free view' })).toBeTruthy();
+
+    const persist = await import('./persist');
+    const projectId = await persist.persistGetActiveProjectId();
+    await waitFor(async () => {
+      const sessions = await persist.persistListSessions(projectId!);
+      expect((sessions[0]?.recording.cameraTrack?.length || 0)).toBeGreaterThan(1);
+      expect(sessions[0]?.recording.segments).toHaveLength(0);
+    });
+  });
+
   it('adds a single selected card to an existing stack from the details panel', async () => {
     const { container } = await renderAppReady();
     await createStackFromFirstTwoCards(container);
@@ -179,7 +250,7 @@ describe('App setup card actions', () => {
     const { container } = await renderAppReady();
     await createStackFromFirstTwoCards(container);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
     const badge = await screen.findByRole('button', { name: 'Stack with 2 cards' });
 
     fireEvent.pointerDown(badge, { pointerId: 41, button: 0, clientX: 180, clientY: 120 });
@@ -187,10 +258,10 @@ describe('App setup card actions', () => {
     fireEvent.pointerUp(badge, { pointerId: 41, clientX: 260, clientY: 200 });
 
     await waitFor(() => {
-      expect(screen.getByText('Recording · 1 action')).toBeTruthy();
+      expect(screen.getByTestId('recording-status').textContent).toBe('Recording · 1 action');
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'End sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finish sorting' }));
 
     const persist = await import('./persist');
     const projectId = await persist.persistGetActiveProjectId();

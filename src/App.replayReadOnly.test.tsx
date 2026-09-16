@@ -257,18 +257,20 @@ async function renderAppReady() {
   const view = render(<App />);
   await waitFor(
     () => {
-      const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+      const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
       if (button.disabled) throw new Error('start sorting still disabled');
     },
     { timeout: 5000 }
   );
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
 async function enterReplay() {
-  await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-  await userEvent.click(await screen.findByRole('button', { name: 'End sorting →' }));
-  await screen.findByText('Replay');
+  await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Finish sorting' }));
+  await screen.findByText('Result');
 }
 
 function displayedCardPosition(cardId: string) {
@@ -376,13 +378,13 @@ describe('App replay read-only behavior', () => {
     const sessionBaseline = sessionContent(await persistListSessions(PROJECT_ID));
 
     await userEvent.click(screen.getByTitle(olderId));
-    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Play recording' }));
     await scrubReplay(0.5);
     await waitFor(() => expect(displayedCardPosition('card-alpha').x).toBe(410));
-    await userEvent.click(screen.getByRole('button', { name: 'Reset to start' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Go to start' }));
 
     await userEvent.click(screen.getByTitle(newerId));
-    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Play recording' }));
     await scrubReplay(0.75);
     await waitFor(() => expect(displayedCardPosition('card-alpha').x).toBe(760));
 
@@ -401,7 +403,7 @@ describe('App replay read-only behavior', () => {
     expect(screen.getAllByText('Live alpha').length).toBeGreaterThan(0);
   });
 
-  it('shows each selected session at its start snapshot immediately', async () => {
+  it('shows each selected session at its final result immediately', async () => {
     const olderId = '2026-01-02T00:00:01.000Z';
     const newerId = '2026-01-02T00:00:02.000Z';
     await seedProject([
@@ -413,13 +415,13 @@ describe('App replay read-only behavior', () => {
 
     await userEvent.click(screen.getByTitle(olderId));
     await waitFor(() => {
-      expect(displayedCardPosition('card-alpha')).toEqual({ x: 330, y: 90 });
+      expect(displayedCardPosition('card-alpha')).toEqual({ x: 530, y: 250 });
       expect(screen.getByText('Older start')).toBeTruthy();
-      expect(document.querySelector('.replayTimeLabel')?.textContent).toBe('00:00.000');
+      expect(document.querySelector('.replayTimeLabel')?.textContent).toBe('00:30.000');
     });
 
     const timeline = screen.getByRole('slider', { name: 'Replay timeline' });
-    expect(timeline.getAttribute('aria-valuetext')).toBe('00:00.000');
+    expect(timeline.getAttribute('aria-valuetext')).toBe('00:30.000');
     fireEvent.keyDown(timeline, { key: 'End' });
     await waitFor(() => {
       expect(displayedCardPosition('card-alpha')).toEqual({ x: 530, y: 250 });
@@ -431,14 +433,14 @@ describe('App replay read-only behavior', () => {
       expect(document.querySelector('.replayTimeLabel')?.textContent).toBe('00:00.000');
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Play recording' }));
     await screen.findByRole('button', { name: 'Pause' });
     await userEvent.click(screen.getByTitle(newerId));
     await new Promise((resolve) => window.setTimeout(resolve, 30));
     await waitFor(() => {
-      expect(displayedCardPosition('card-alpha')).toEqual({ x: 630, y: 90 });
+      expect(displayedCardPosition('card-alpha')).toEqual({ x: 830, y: 250 });
       expect(screen.getByText('Newer start')).toBeTruthy();
-      expect(document.querySelector('.replayTimeLabel')?.textContent).toBe('00:00.000');
+      expect(document.querySelector('.replayTimeLabel')?.textContent).toBe('00:30.000');
     });
   });
 
@@ -455,7 +457,7 @@ describe('App replay read-only behavior', () => {
     const sessionBaseline = sessionContent(await persistListSessions(PROJECT_ID));
 
     await userEvent.click(screen.getByTitle(sessionId));
-    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Play recording' }));
     await scrubReplay(1);
 
     await waitFor(() => {
@@ -467,9 +469,9 @@ describe('App replay read-only behavior', () => {
       expect(document.querySelector('.replayTimeLabel')?.textContent).toBe('00:30.000');
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Play' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Play recording' }));
     await screen.findByRole('button', { name: 'Pause' });
-    await userEvent.click(screen.getByRole('button', { name: 'Reset to start' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Go to start' }));
     await new Promise((resolve) => window.setTimeout(resolve, 30));
 
     await waitFor(() => {
@@ -497,6 +499,7 @@ describe('App replay read-only behavior', () => {
     await enterReplay();
 
     await userEvent.click(screen.getByTitle(seeded.recording.createdAt));
+    await userEvent.click(screen.getByRole('button', { name: 'Go to start' }));
     await waitFor(() => {
       expect(displayedCardPosition('card-alpha')).toEqual({
         x: seeded.recording.cardsAtStart[0]!.x,
@@ -516,8 +519,8 @@ describe('App replay read-only behavior', () => {
     await userEvent.click(qStageTab);
     await waitFor(() => expect(document.querySelector('[data-testid^="surface-qsort-"]')).toBeTruthy());
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await screen.findByRole('button', { name: 'Next stage →' });
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Continue to Q-Sort' });
 
     await waitFor(async () => {
       const sessions = await persistListSessions(PROJECT_ID);

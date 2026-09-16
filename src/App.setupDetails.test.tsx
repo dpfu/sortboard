@@ -25,11 +25,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -105,7 +107,7 @@ describe('App setup details panel', () => {
 
   it('shows selected card details and clears selection on board background click', async () => {
     const { container } = await renderAppReady();
-    expect(screen.getByText('Select an item on the board to edit its details.')).toBeTruthy();
+    expect(container.querySelector('.detailsPanel')).toBeNull();
     const board = container.querySelector('.board') as HTMLElement;
     expect(board.classList.contains('board--hasSelection')).toBe(false);
 
@@ -119,7 +121,7 @@ describe('App setup details panel', () => {
 
     fireEvent.pointerDown(board, { pointerId: 1, button: 0, clientX: 900, clientY: 700 });
     fireEvent.pointerUp(board, { pointerId: 1, button: 0, clientX: 900, clientY: 700 });
-    expect(screen.getByText('Select an item on the board to edit its details.')).toBeTruthy();
+    expect(container.querySelector('.detailsPanel')).toBeNull();
     expect(board.classList.contains('board--hasSelection')).toBe(false);
   });
 
@@ -256,7 +258,7 @@ describe('App setup details panel', () => {
     expect((screen.getByLabelText('Tags') as HTMLInputElement).value).toBe('alpha, beta');
   });
 
-  it('keeps the docked details panel at medium setup widths', async () => {
+  it('opens a closable floating panel at medium setup widths', async () => {
     mockViewportWidth = 1200;
     const view = await renderAppReady();
 
@@ -265,7 +267,9 @@ describe('App setup details panel', () => {
 
     expect(screen.getByLabelText('Name')).toBeTruthy();
     expect(view.container.querySelector('.detailsPanel--drawer')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(view.container.querySelector('.detailsPanel--floating')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(view.container.querySelector('.detailsPanel')).toBeNull();
   });
 
   it('shows a closable drawer with backdrop at narrow setup widths', async () => {
@@ -304,7 +308,7 @@ describe('App setup details panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Delete card' }));
     await waitFor(() => {
       expect(container.querySelectorAll('.card').length).toBe(initialCount - 1);
-      expect(screen.getByText('Select an item on the board to edit its details.')).toBeTruthy();
+      expect(container.querySelector('.detailsPanel')).toBeNull();
     });
   });
 
@@ -327,7 +331,7 @@ describe('App setup details panel', () => {
   it('creates text cards and persists front text/color edits with undo', async () => {
     const { container } = await renderAppReady();
 
-    await userEvent.click(screen.getByRole('button', { name: '+ Text card' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Text card' }));
 
     const createdCard = await waitFor(async () => {
       const board = await getActiveBoard();
@@ -391,7 +395,7 @@ describe('App setup details panel', () => {
       toJSON: () => ({}),
     } as DOMRect);
 
-    fireEvent.pointerDown(board, { pointerId: 21, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerDown(board, { pointerId: 21, button: 0, shiftKey: true, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(board, { pointerId: 21, clientX: 280, clientY: 240 });
     fireEvent.pointerUp(board, { pointerId: 21, button: 0, clientX: 280, clientY: 240 });
 

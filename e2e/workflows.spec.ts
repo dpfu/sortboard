@@ -1,3 +1,4 @@
+import { openProjectMenu } from './helpers/app';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import {
   cardFromTop,
@@ -11,12 +12,13 @@ import {
 
 async function createEmptyProjectWithTextCards(page: Page, count: number) {
   await openFreshApp(page);
+  await openProjectMenu(page);
   await page.getByRole('button', { name: 'New' }).click();
   await expect(cards(page)).toHaveCount(0);
 
   const cardTestIds: string[] = [];
   for (let index = 0; index < count; index += 1) {
-    await page.getByRole('button', { name: '+ Text card' }).click();
+    await page.getByRole('button', { name: 'Text card' }).click();
     await expect(cards(page)).toHaveCount(index + 1);
     const testId = await cards(page).nth(index).getAttribute('data-testid');
     if (!testId) {
@@ -51,8 +53,7 @@ async function dragCardTo(page: Page, cardTestId: string, targetTestId: string) 
     }, { message: `wait for ${cardTestId} to finish reflowing` })
     .toBe(true);
 
-  // Both cards and surfaces reflow after every assignment, so resolve fresh
-  // viewport bounds immediately before each physical mouse drag.
+  // Q-Sort slots reflow after assignments; resolve fresh viewport bounds.
   const cardBox = await card.boundingBox();
   const targetBox = await target.boundingBox();
   if (!cardBox || !targetBox) {
@@ -99,8 +100,8 @@ test('@smoke completes a closed sort through the UI and replays it', async ({ pa
   await expect(categorySurfaces.nth(0)).toContainText('Category 1');
   await expect(categorySurfaces.nth(1)).toContainText('Category 2');
 
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
-  const endButton = page.getByRole('button', { name: 'End sorting →' });
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  const endButton = page.getByRole('button', { name: 'Finish sorting' });
   const sourceSurface = page.locator('[data-testid^="surface-work-area-"]');
   await expect(sourceSurface.locator('.boardSurface__count')).toHaveText('4');
   await expect(endButton).toBeDisabled();
@@ -120,20 +121,18 @@ test('@smoke completes a closed sort through the UI and replays it', async ({ pa
     }
   }
 
-  await expect(page.getByText('All cards placed', { exact: true })).toBeVisible();
   await expect(page.getByText('Recording · 4 actions')).toBeVisible();
   await expect(endButton).toBeEnabled();
   const closedCompletion = page.getByTestId('sort-completion');
-  await expect(closedCompletion).toContainText('Done!');
   await expect(closedCompletion).toContainText('All cards placed.');
-  await closedCompletion.getByRole('button', { name: 'View replay →' }).click();
+  await endButton.click();
 
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(1);
   await expect(page.getByText('4 recorded actions')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Play recording' })).toBeEnabled();
 
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play recording' }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect(sourceSurface.locator('.boardSurface__count')).toHaveText('4');
   await seekReplay(page, 1);
@@ -146,9 +145,9 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   const cardTestIds = await createEmptyProjectWithTextCards(page, 4);
 
   await page.getByRole('button', { name: 'Q-Sort' }).click();
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
 
-  const nextStageButton = page.getByRole('button', { name: 'Next stage →' });
+  const nextStageButton = page.getByRole('button', { name: 'Continue to Q-Sort' });
   const sourceSurface = page.locator('[data-testid^="surface-work-area-"]');
   const preSortSurfaces = page.locator('[data-testid^="surface-sink-"]');
   await expect(preSortSurfaces).toHaveCount(2);
@@ -156,6 +155,14 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   await expect(nextStageButton).toBeDisabled();
 
   const preSortTestIds = [await testIdOf(preSortSurfaces.nth(0)), await testIdOf(preSortSurfaces.nth(1))];
+  // Starting a session during a Setup reflow (including full-screen entry)
+  // must show the sorting grid, without retaining an interrupted animation.
+  await expect.poll(() => cards(page).evaluateAll(nodes => {
+    const boxes = nodes.map(node => node.getBoundingClientRect());
+    return boxes.every((a, i) => boxes.slice(i + 1).every(b =>
+      a.right < b.left || b.right < a.left || a.bottom < b.top || b.bottom < a.top
+    ));
+  })).toBe(true);
   const laneCardIds: string[][] = [[], []];
   const preSortCounts = [0, 0];
   for (const [index, cardTestId] of cardTestIds.slice().reverse().entries()) {
@@ -174,14 +181,13 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
 
   await expect(nextStageButton).toBeEnabled();
   const preSortCompletion = page.getByTestId('sort-completion');
-  await expect(preSortCompletion).toContainText('Done!');
   await expect(preSortCompletion).toContainText('First impressions sorted.');
-  await preSortCompletion.getByRole('button', { name: 'Continue to Q-Sort →' }).click();
+  await nextStageButton.click();
 
   const qSortSurface = page.locator('[data-testid^="surface-qsort-"]');
   const qSortLanes = page.locator('[data-testid^="qsort-lane-"]');
   const qSortBuckets = page.locator('[data-testid^="qsort-bucket-"]');
-  const endButton = page.getByRole('button', { name: 'End sorting →' });
+  const endButton = page.getByRole('button', { name: 'Finish sorting' });
   await expect(qSortSurface).toHaveCount(1);
   await expect(qSortLanes).toHaveCount(2);
   await expect(qSortSurface.locator(':scope > .boardSurface__header')).toHaveCount(0);
@@ -233,16 +239,15 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   await expect(endButton).toBeEnabled();
   await expect(page.getByText('Recording · 9 actions')).toBeVisible();
   const qSortCompletion = page.getByTestId('sort-completion');
-  await expect(qSortCompletion).toContainText('Done!');
   await expect(qSortCompletion).toContainText('Distribution complete.');
-  await qSortCompletion.getByRole('button', { name: 'View replay →' }).click();
+  await endButton.click();
 
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(1);
   await expect(page.getByText('9 recorded actions')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Play recording' })).toBeEnabled();
 
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play recording' }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await expect(preSortSurfaces).toHaveCount(2);
   await expect(sourceSurface.locator('.boardSurface__count')).toHaveText('4');
@@ -590,13 +595,13 @@ async function seedOpenReplaySessions(page: Page) {
 test('handles leave-sort confirmation and replay session controls', async ({ page }) => {
   await openFreshApp(page);
 
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
-  await handleDialog(page, () => page.getByRole('button', { name: '← Setup' }).click(), {
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await handleDialog(page, () => page.getByRole('button', { name: 'Leave sorting' }).click(), {
     accept: false,
     messageIncludes: 'This unfinished session will not be available for replay.',
   });
-  await expect(page.getByRole('button', { name: 'End sorting →' })).toBeVisible();
-  await handleDialog(page, () => page.getByRole('button', { name: '← Setup' }).click(), {
+  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeVisible();
+  await handleDialog(page, () => page.getByRole('button', { name: 'Leave sorting' }).click(), {
     accept: true,
     messageIncludes: 'This unfinished session will not be available for replay.',
   });
@@ -606,9 +611,9 @@ test('handles leave-sort confirmation and replay session controls', async ({ pag
   await page.reload();
   await waitForAppReady(page);
 
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
-  await page.getByRole('button', { name: 'End sorting →' }).click();
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await page.getByRole('button', { name: 'Finish sorting' }).click();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(3);
 
   const seededCurrent = page.getByTestId('replay-sessions').getByRole('button').nth(1);
@@ -616,7 +621,7 @@ test('handles leave-sort confirmation and replay session controls', async ({ pag
   await expect(seededCurrent).toHaveClass(/isActive/);
   await expect(page.getByText('2 recorded actions')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play recording' }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
 
   const timeline = page.getByTestId('replay-timeline');
@@ -631,7 +636,7 @@ test('handles leave-sort confirmation and replay session controls', async ({ pag
   await page.mouse.up();
   await expect(page.locator('.replayTimeLabel')).not.toHaveText('00:00.000');
 
-  await page.getByRole('button', { name: 'Reset to start' }).click();
+  await page.getByRole('button', { name: 'Go to start' }).click();
   await expect(page.locator('.replayTimeLabel')).toHaveText('00:00.000');
 
   const olderSession = page.getByTestId('replay-sessions').getByRole('button').nth(2);
@@ -650,6 +655,7 @@ test('adds and removes a closed-sort category and renders closed surfaces in rep
   await page.getByRole('button', { name: 'Add category' }).click();
   await expect(closedSurfaces).toHaveCount(2);
 
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
   await closedSurfaces.last().click();
   await page.getByRole('button', { name: 'Remove category' }).click();
   await expect(closedSurfaces).toHaveCount(1);
@@ -659,13 +665,13 @@ test('adds and removes a closed-sort category and renders closed surfaces in rep
   await page.reload();
   await waitForAppReady(page);
 
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
   await expect(page.locator('[data-testid^="surface-work-area-"]')).toHaveCount(1);
   await expect(page.locator('[data-testid^="surface-sink-"]')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'End sorting →' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeEnabled();
 
-  await page.getByRole('button', { name: 'End sorting →' }).click();
-  await expect(page.getByRole('button', { name: '← Start another sort' })).toBeVisible();
+  await page.getByRole('button', { name: 'Finish sorting' }).click();
+  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   await expect(page.locator('[data-testid^="surface-work-area-"]')).toHaveCount(1);
   await expect(page.locator('[data-testid^="surface-sink-"]')).toHaveCount(1);
 });
@@ -678,14 +684,15 @@ test('advances from pre-sort into q-sort distribution surfaces', async ({ page }
   await seedQSortPreSortCompleteState(page);
   await page.reload();
   await waitForAppReady(page);
-  await page.getByRole('button', { name: 'Start sorting →' }).click();
-  await expect(page.getByRole('button', { name: 'Next stage →' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Start sorting' }).click();
+  await expect(page.getByRole('button', { name: 'Continue to Q-Sort' })).toBeEnabled();
   await expect(page.locator('[data-testid^="surface-sink-"]')).toHaveCount(2);
 
-  await page.getByRole('button', { name: 'Next stage →' }).click();
+  await page.getByRole('button', { name: 'Continue to Q-Sort' }).click();
   await expect(page.locator('[data-testid^="surface-qsort-"]')).toHaveCount(1);
   await expect(page.locator('[data-testid^="qsort-distribution-"]')).toHaveCount(1);
   await expect(page.locator('[data-testid^="qsort-slot-"]').first()).toBeVisible();
-  await expect.poll(() => page.getByTestId('board-root').evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  await expect(page.getByRole('button', { name: 'End sorting →' })).toBeVisible();
+  await expect.poll(() => page.getByTestId('board-root').evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
+  await expect(page.locator('[data-testid^="qsort-bucket-"]').last()).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeVisible();
 });

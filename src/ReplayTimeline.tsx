@@ -42,6 +42,8 @@ export function ReplayTimeline({ recordingSession, durationMs, timeMs, clusterMa
     if (!el) return;
     const ctx = el.getContext('2d');
     if (!ctx) return;
+    const theme = getComputedStyle(el);
+    const color = (token: string, fallback: string) => theme.getPropertyValue(token).trim() || fallback;
 
     const cssW = el.clientWidth || 1;
     const cssH = 40;
@@ -57,7 +59,7 @@ export function ReplayTimeline({ recordingSession, durationMs, timeMs, clusterMa
     ctx.clearRect(0, 0, cssW, cssH);
 
     // Background
-    ctx.fillStyle = 'rgba(0,0,0,0.04)';
+    ctx.fillStyle = color('--bg', '#f3f5f2');
     ctx.fillRect(0, 0, cssW, cssH);
 
     const dur = Math.max(1, durationMs);
@@ -72,8 +74,20 @@ export function ReplayTimeline({ recordingSession, durationMs, timeMs, clusterMa
       const dist = segmentWeight(seg);
       const h = Math.min(cssH - 6, 7 + dist / 30);
 
-      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fillStyle = color('--line-strong', '#bbc7bd');
       ctx.fillRect(x0, cssH - h, Math.max(2, x1 - x0), h);
+    }
+
+    // Camera changes live on their own track so they remain visible without
+    // being mistaken for card actions.
+    for (const frame of recordingSession.cameraTrack?.slice(1) || []) {
+      const x = (frame.tMs / dur) * cssW;
+      ctx.strokeStyle = color('--muted', '#637066');
+      ctx.lineWidth = frame.source === 'zoom' ? 2 : 1;
+      ctx.beginPath();
+      ctx.moveTo(x, 4);
+      ctx.lineTo(x, frame.source === 'zoom' ? 18 : 13);
+      ctx.stroke();
     }
 
     // Cluster markers (spikes)
@@ -82,7 +96,7 @@ export function ReplayTimeline({ recordingSession, durationMs, timeMs, clusterMa
       for (const m of clusterMarkers) {
         const x = (m.t / dur) * cssW;
         const h = Math.min(cssH - 4, 4 + (m.score / maxScore) * (cssH - 8));
-        ctx.strokeStyle = 'rgba(67, 152, 224, 0.85)';
+        ctx.strokeStyle = color('--accent', '#365e49');
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(x, cssH);
@@ -93,13 +107,13 @@ export function ReplayTimeline({ recordingSession, durationMs, timeMs, clusterMa
 
     // Playhead
     const px = (timeMs / dur) * cssW;
-    ctx.strokeStyle = 'rgba(0,0,0,0.74)';
+    ctx.strokeStyle = color('--ink', '#202822');
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(px, 0);
     ctx.lineTo(px, cssH);
     ctx.stroke();
-  }, [clusterMarkers, durationMs, recordingSession.segments, timeMs]);
+  }, [clusterMarkers, durationMs, recordingSession.cameraTrack, recordingSession.segments, timeMs]);
 
   React.useEffect(() => {
     draw();
@@ -122,7 +136,9 @@ export function ReplayTimeline({ recordingSession, durationMs, timeMs, clusterMa
       const el = canvasRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      const u = clamp01((clientX - r.left) / Math.max(1, r.width));
+      const x = clientX - r.left;
+      // Make the exact start and result reachable without subpixel precision.
+      const u = x <= 4 ? 0 : x >= r.width - 4 ? 1 : clamp01(x / Math.max(1, r.width));
       onTimeChange(Math.round(u * durationMs));
     },
     [durationMs, onTimeChange]

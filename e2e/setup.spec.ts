@@ -1,9 +1,11 @@
+import { openDisplay, openProjectMenu } from './helpers/app';
 import { test, expect } from '@playwright/test';
 import { cardFromTop, cards, openFreshApp, resizeCardFromEast } from './helpers/app';
 
 test('persists setup layout mode and card size across reload', async ({ page }) => {
   await openFreshApp(page);
 
+  await openDisplay(page);
   await page.getByRole('button', { name: 'Fixed 9:16' }).click();
   const slider = page.getByLabel('Card size');
   await slider.focus();
@@ -14,7 +16,8 @@ test('persists setup layout mode and card size across reload', async ({ page }) 
   await page.waitForTimeout(700);
 
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Start sorting →' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Start sorting' })).toBeEnabled();
+  await openDisplay(page);
   await expect(page.getByRole('button', { name: 'Fixed 9:16' })).toHaveClass(/isActive/);
   await expect(slider).toHaveValue('320');
 
@@ -26,9 +29,10 @@ test('persists setup layout mode and card size across reload', async ({ page }) 
 test('resizes a card from the east edge and undo restores the prior size', async ({ page }) => {
   await openFreshApp(page);
 
+  await openProjectMenu(page);
   await page.getByRole('button', { name: 'New' }).click();
   await expect(cards(page)).toHaveCount(0);
-  await page.getByRole('button', { name: '+ Text card' }).click();
+  await page.getByRole('button', { name: 'Text card' }).click();
   await expect(cards(page)).toHaveCount(1);
 
   const firstCard = await cardFromTop(page);

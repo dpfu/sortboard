@@ -48,6 +48,7 @@ export interface DraggableCardProps {
   mode: Mode;
   isSelected?: boolean;
   dragEnabled: boolean;
+  coordinateScale?: number;
   dragConstraintsRef: React.RefObject<HTMLElement>;
   onBringToFront: (id: string) => void;
   onMoveEnd: (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => void;
@@ -71,6 +72,7 @@ function DraggableCardComponent({
   mode,
   isSelected,
   dragEnabled,
+  coordinateScale = 1,
   dragConstraintsRef,
   onBringToFront,
   onMoveEnd,
@@ -164,6 +166,10 @@ function DraggableCardComponent({
       // Let nested controls, such as the video preview button, handle their own keys.
       if (event.target !== event.currentTarget) return;
 
+      if (event.key === 'Enter' && card.kind !== 'text' && (mode !== 'setup' || event.altKey)) {
+        event.preventDefault(); onOpenPreview?.(card.id); return;
+      }
+
       if (mode === 'setup' && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault();
         onSelectCard?.(card.id, { toggle: event.shiftKey });
@@ -186,7 +192,7 @@ function DraggableCardComponent({
       event.preventDefault();
       onKeyboardMove(card.id, direction);
     },
-    [card.id, mode, onBringToFront, onKeyboardMove, onSelectCard]
+    [card.id, card.kind, mode, onBringToFront, onKeyboardMove, onOpenPreview, onSelectCard]
   );
 
   const handleClick = React.useCallback(
@@ -223,6 +229,8 @@ function DraggableCardComponent({
       dragMomentum={false}
       dragElastic={0.10}
       // State-driven position. While dragging, Framer temporarily takes over.
+      // Give drag controls a starting position before the first motion value exists.
+      initial={{ x: card.x, y: card.y }}
       animate={{ x: card.x, y: card.y }}
       transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.7 }}
       whileDrag={{ scale: liftScale * 1.03, boxShadow: 'var(--shadow-lift)' }}
@@ -239,8 +247,8 @@ function DraggableCardComponent({
         const next = prefersReducedMotion ? 0 : clamp(info.delta.x * 0.35, -ROTATION_MAX, ROTATION_MAX);
         rawRotate.set(next);
 
-        const nextX = card.x + info.offset.x;
-        const nextY = card.y + info.offset.y;
+        const nextX = card.x + info.offset.x / coordinateScale;
+        const nextY = card.y + info.offset.y / coordinateScale;
         onDragTraceSample?.(card.id, nextX, nextY, {
           x: nextX + cardW / 2,
           y: nextY + cardH / 2,
@@ -253,15 +261,15 @@ function DraggableCardComponent({
       onDragEnd={(e, info) => {
         void e;
         rawRotate.set(0);
-        const nextX = card.x + info.offset.x;
-        const nextY = card.y + info.offset.y;
+        const nextX = card.x + info.offset.x / coordinateScale;
+        const nextY = card.y + info.offset.y / coordinateScale;
         onMoveEnd(card.id, nextX, nextY, {
           x: nextX + cardW / 2,
           y: nextY + cardH / 2,
         });
       }}
       onDoubleClick={() => {
-        if (card.kind === 'video') {
+        if (card.kind !== 'text') {
           onOpenPreview?.(card.id);
         }
       }}

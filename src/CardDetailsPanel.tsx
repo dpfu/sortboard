@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { ArrowDownAZ, ArrowUpToLine, Layers, Play, Shuffle, Trash2, Ungroup, X, ZoomIn } from 'lucide-react';
 import {
   TEXT_CARD_COLOR_KEYS,
   type CardData,
@@ -98,6 +99,7 @@ export type DetailsPanelContext =
 export interface CardDetailsPanelProps {
   context: DetailsPanelContext;
   isDrawer?: boolean;
+  floating?: boolean;
   onClose?: () => void;
 }
 
@@ -123,7 +125,7 @@ const TEXT_CARD_COLOR_LABELS: Record<TextCardColorKey, string> = {
   amber: 'Amber',
 };
 
-export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDetailsPanelProps) {
+export function CardDetailsPanel({ context, isDrawer = false, floating = false, onClose }: CardDetailsPanelProps) {
   const addableStacks =
     context.kind === 'multi' ? context.stackOptions : context.kind === 'card' ? context.stackOptions || [] : [];
   const [targetStackId, setTargetStackId] = React.useState(addableStacks[0]?.id || '');
@@ -134,12 +136,12 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
   onCloseRef.current = onClose;
 
   React.useEffect(() => {
-    if (!isDrawer) return;
+    if (!isDrawer && !floating) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const panel = panelRef.current;
     const focusableSelector =
       'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-    const focusTimer = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const focusTimer = window.requestAnimationFrame(() => { if (isDrawer) closeButtonRef.current?.focus(); });
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!panel?.contains(document.activeElement)) return;
       if (event.key === 'Escape') {
@@ -147,7 +149,7 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
         onCloseRef.current?.();
         return;
       }
-      if (event.key !== 'Tab' || !panel) return;
+      if (!isDrawer || event.key !== 'Tab' || !panel) return;
       const focusable = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector));
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -164,9 +166,9 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
     return () => {
       window.cancelAnimationFrame(focusTimer);
       window.removeEventListener('keydown', handleKeyDown);
-      previouslyFocused?.focus();
+      if (isDrawer || panel?.contains(document.activeElement)) previouslyFocused?.focus();
     };
-  }, [isDrawer]);
+  }, [isDrawer, floating]);
 
   React.useEffect(() => {
     if (context.kind !== 'multi' && context.kind !== 'card') {
@@ -197,7 +199,7 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
   return (
     <aside
       ref={panelRef}
-      className={`detailsPanel ${isDrawer ? 'detailsPanel--drawer' : ''}`}
+      className={`detailsPanel ${isDrawer ? 'detailsPanel--drawer' : ''} ${floating ? 'detailsPanel--floating' : ''}`}
       aria-label={isDrawer ? undefined : title}
       aria-labelledby={isDrawer ? titleId : undefined}
       aria-modal={isDrawer ? true : undefined}
@@ -205,9 +207,9 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
     >
       <div className="detailsPanel__headerRow">
         <div className="sectionTitle" id={titleId}>{title}</div>
-        {isDrawer ? (
-          <button ref={closeButtonRef} className="btn btn--ghost btn--tiny" type="button" onClick={onClose}>
-            Close
+        {isDrawer || floating ? (
+          <button ref={closeButtonRef} className="btn btn--ghost btn--icon" type="button" aria-label="Close" title="Close details" onClick={onClose}>
+            <X />
           </button>
         ) : null}
       </div>
@@ -220,7 +222,6 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
         <>
           <div className="detailsPanel__empty">
             <div>{context.selectedCount} cards selected.</div>
-            <div className="hint">Shift-click cards or drag a selection box to select more.</div>
           </div>
 
           {context.onCreateStack || context.onRemoveFromStack || (context.onAddToStack && context.stackOptions.length > 0) ? (
@@ -230,12 +231,12 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
                 <div className="detailsPanel__inlineActions">
                   {context.onCreateStack ? (
                     <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onCreateStack}>
-                      Create stack
+                      <Layers />Create stack
                     </button>
                   ) : null}
                   {context.onRemoveFromStack && context.sharedStackId ? (
                     <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onRemoveFromStack}>
-                      Remove from stack
+                      <Ungroup />Remove from stack
                     </button>
                   ) : null}
                 </div>
@@ -276,7 +277,7 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
               type="button"
               onClick={context.onDeleteSelectedCards}
             >
-              Delete selected
+              <Trash2 />Delete selected
             </button>
           </div>
         </>
@@ -314,13 +315,13 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
 
           <div className="detailsPanel__actions">
             <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onSort}>
-              Sort
+              <ArrowDownAZ />Sort
             </button>
             <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onShuffle}>
-              Shuffle
+              <Shuffle />Shuffle
             </button>
             <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onSplit}>
-              Split in half
+              <Ungroup />Split in half
             </button>
           </div>
         </>
@@ -354,7 +355,7 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
             </div>
 
             <div className="detailsPanel__field">
-              <label htmlFor="closed-target-layout">Layout</label>
+              <label htmlFor="closed-target-layout">Initial layout</label>
               <select
                 id="closed-target-layout"
                 value={context.widget.layout}
@@ -405,7 +406,7 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
 
           <div className="detailsPanel__actions">
             <button className="btn btn--ghost btn--tiny btn--dangerSoft" type="button" onClick={context.onDelete}>
-              Remove category
+              <Trash2 />Remove category
             </button>
           </div>
         </>
@@ -520,6 +521,10 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
             </div>
           </div>
 
+          {context.card.kind === 'image' && context.onOpenPreview ? (
+            <div className="detailsPanel__section"><button className="btn btn--ghost btn--tiny" type="button" onClick={context.onOpenPreview}><ZoomIn />Enlarge image</button></div>
+          ) : null}
+
           {context.card.kind === 'video' ? (
             <div className="detailsPanel__section">
               <div className="detailsPanel__field">
@@ -541,7 +546,7 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
                 {context.onOpenPreview ? (
                   <div className="detailsPanel__inlineActions">
                     <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onOpenPreview}>
-                      Open video
+                      <Play />Open video
                     </button>
                   </div>
                 ) : null}
@@ -669,15 +674,15 @@ export function CardDetailsPanel({ context, isDrawer = false, onClose }: CardDet
 
           <div className="detailsPanel__actions">
             <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onBringToFront}>
-              Bring to front
+              <ArrowUpToLine />Bring to front
             </button>
             {context.onRemoveFromStack ? (
               <button className="btn btn--ghost btn--tiny" type="button" onClick={context.onRemoveFromStack}>
-                Remove from stack
+                <Ungroup />Remove from stack
               </button>
             ) : null}
             <button className="btn btn--ghost btn--tiny btn--dangerSoft" type="button" onClick={context.onDeleteCard}>
-              Delete card
+              <Trash2 />Delete card
             </button>
           </div>
         </>

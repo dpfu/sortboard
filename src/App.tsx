@@ -1,11 +1,17 @@
+import { ProjectMenu } from './ProjectMenu';
+import { ControlsDialog } from './ControlsDialog';
+import { buildStackBadges, stackFrame, stackFrameAt } from './stackRecording';
 import * as React from 'react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCheck, CircleAlert, Download, FilePlus2, FolderOpen, HelpCircle, History, ImagePlus, LayoutDashboard, Maximize, Minimize, Minus, PanelRightOpen, PanelsTopLeft, Pause, Pencil, Play, Plus, Scan, Settings2, SkipBack, SkipForward, Trash2, Type, Undo2, Upload, X } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { Board } from './Board';
 import type { ResizeEdge } from './DraggableCard';
 import { CardDetailsPanel, type DetailsPanelContext, type StackOption } from './CardDetailsPanel';
 import { VideoPreviewDialog } from './VideoPreviewDialog';
+const DemoProjectDialog = React.lazy(() => import('./DemoProjectDialog').then(module => ({ default: module.DemoProjectDialog })));
 import type {
   BoardWidgetData,
+  CameraFrameSource,
   CardData,
   CardLayoutMode,
   CardMetadataV1,
@@ -19,9 +25,22 @@ import type {
   SortType,
   TraceSample,
 } from './types';
+import {
+  BOARD_ZOOM_MAX,
+  BOARD_ZOOM_MIN,
+  boardPanGutter,
+  cameraAt,
+  cameraFrame,
+  cameraFramesEqual,
+  clampBoardZoom,
+  defaultCameraView,
+  nextBoardZoom,
+  type CameraView,
+} from './camera';
 import { SUPPORTED_MEDIA_ACCEPT, clamp, detectMediaKind, isSupportedMediaFile } from './utils';
 import { clampToBoard as clampToBoardPure } from './positioning';
 import { useElementSize } from './useElementSize';
+import { useFullscreen } from './useFullscreen';
 import {
   CARD_SIZE_SCALE_MAX,
   CARD_SIZE_SCALE_MIN,
@@ -99,6 +118,7 @@ import {
 import {
   buildStageSurfaceScene,
   findStageSurfaceDropTarget,
+  getSurfaceCardDimensions,
   reflowCardsForStage as reflowStageSurfaceCards,
   type StageSurfaceScene,
 } from './stageSurface';
@@ -122,7 +142,7 @@ const DEFAULT_CARD_W = 240;
 const CARD_W_MIN = 160;
 const CARD_W_MAX = 360;
 const CARD_W_STEP = 8;
-const DEFAULT_SORT_CONFIG: SortConfig = { type: 'open' };
+const DEFAULT_SORT_CONFIG: SortConfig = { type: 'open', stacksEnabled: true, zoomEnabled: false, startInFullscreen: true };
 const DEFAULT_PROJECT_NAME = 'Demo Project';
 const DEMO_CARD_COUNT = 24;
 const DEFAULT_CARD_LAYOUT_MODE: CardLayoutMode = 'as-is';
@@ -187,6 +207,7 @@ function clearPendingCardMetaEdit(serialized: string) {
 type ProjectBootstrapResult = {
   projects: PersistedProjectV1[];
   activeProjectId: string | null;
+  firstVisit: boolean;
 };
 
 let projectBootstrapPromise: Promise<ProjectBootstrapResult> | null = null;
@@ -231,7 +252,7 @@ type WidgetDropIndicator = {
   state: WidgetDropState;
 };
 
-type WidgetSetupSnapshot = {
+type SessionSetupSnapshot = {
   cards: CardData[];
   stacks: StackData[];
   workflow: SortWorkflowData;
@@ -362,10 +383,79 @@ function countLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+function countRecordedViewChanges(track: RecordingSession['cameraTrack']) {
+  if (!track || track.length <= 1) return 0;
+  let count = 0;
+  let previous = track[0];
+  for (const frame of track.slice(1)) {
+    const continuesViewGesture =
+      (frame.source === 'pan' || frame.source === 'resize') &&
+      frame.source === previous.source &&
+      frame.tMs - previous.tMs <= 300;
+    if (!continuesViewGesture) count += 1;
+    previous = frame;
+  }
+  return count;
+}
+
 function sortTypeDescription(type: SortType) {
   if (type === 'closed') return 'Sort cards into named categories.';
   if (type === 'qsort') return 'Split cards into two groups, then place them on a scale.';
-  return 'Arrange cards freely and create stacks.';
+  return 'Arrange cards freely on the board.';
+}
+
+type ZoomControlsProps = {
+  scale: number;
+  onChange: (scale: number) => void;
+  onFit: () => void;
+  label?: string;
+  disabled?: boolean;
+};
+
+function ZoomControls({ scale, onChange, onFit, label = 'Board zoom', disabled = false }: ZoomControlsProps) {
+  const percent = Math.round(scale * 100);
+  return (
+    <div className="boardZoomControls" role="group" aria-label={label}>
+      <button
+        className="boardZoomControls__button"
+        type="button"
+        aria-label="Zoom out"
+        disabled={disabled || scale <= BOARD_ZOOM_MIN + 0.001}
+        onClick={() => onChange(nextBoardZoom(scale, -1))}
+      >
+        <Minus />
+      </button>
+      <button
+        className="boardZoomControls__value"
+        disabled={disabled}
+        type="button"
+        aria-label={`Reset zoom to 100%. Current zoom ${percent}%`}
+        onClick={() => onChange(1)}
+      >
+        {percent}%
+      </button>
+      <button
+        className="boardZoomControls__button"
+        type="button"
+        aria-label="Zoom in"
+        disabled={disabled || scale >= BOARD_ZOOM_MAX - 0.001}
+        onClick={() => onChange(nextBoardZoom(scale, 1))}
+      >
+        <Plus />
+      </button>
+      <button className="boardZoomControls__fit" disabled={disabled} type="button" onClick={onFit}>
+        <Scan />Fit
+      </button>
+    </div>
+  );
+}
+
+function currentBrowserViewport() {
+  if (typeof window === 'undefined') return { width: 1200, height: 800 };
+  return {
+    width: Math.max(1, Math.round(document.documentElement.clientWidth || window.innerWidth || 1200)),
+    height: Math.max(1, Math.round(document.documentElement.clientHeight || window.innerHeight || 800)),
+  };
 }
 
 function nextCreatedAt(index = 0) {
@@ -427,6 +517,7 @@ function sanitizeRecording(recording: RecordingSession): RecordingSession {
     ...recording,
     version: 5,
     workflowAtStart: toPersistedWorkflow(recording.workflowAtStart),
+    cameraTrack: recording.cameraTrack?.map((frame) => ({ ...frame })),
     cardsAtStart: toPersistedCards(recording.cardsAtStart).map((card) => ({
       ...card,
       src: undefined,
@@ -514,8 +605,8 @@ function createLocalDemoImageBlob(index: number) {
 <circle cx="${160 + (index % 4) * 120}" cy="${140 + (index % 3) * 48}" r="92" fill="${accent}" opacity="0.9"/>
 <path d="M96 388 C 226 298, 326 458, 456 360 S 692 258, 864 352" fill="none" stroke="${ink}" stroke-width="24" stroke-linecap="round"/>
 <path d="M108 430 L 840 430" stroke="${ink}" stroke-width="4" stroke-linecap="round" opacity="0.35"/>
-<text x="72" y="104" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="700" fill="${ink}">${label}</text>
-<text x="76" y="162" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="600" letter-spacing="6" fill="${ink}" opacity="0.62">LOCAL DEMO CARD</text>
+<text x="72" y="104" font-family="system-ui, sans-serif" font-size="54" font-weight="700" fill="${ink}">${label}</text>
+<text x="76" y="162" font-family="system-ui, sans-serif" font-size="24" font-weight="600" letter-spacing="6" fill="${ink}" opacity="0.62">LOCAL DEMO CARD</text>
 </svg>`;
   return new Blob([svg], { type: 'image/svg+xml' });
 }
@@ -524,6 +615,7 @@ function bootstrapProjectsOnce(createDemoProjectCards: (count?: number) => Promi
   if (!projectBootstrapPromise) {
     projectBootstrapPromise = (async () => {
       let listed = await persistListProjects();
+      const firstVisit = listed.length === 0;
 
       if (listed.length === 0) {
         const projectId = nanoid();
@@ -561,7 +653,7 @@ function bootstrapProjectsOnce(createDemoProjectCards: (count?: number) => Promi
         }
       }
 
-      return { projects: listed, activeProjectId: active };
+      return { projects: listed, activeProjectId: active, firstVisit };
     })().finally(() => {
       projectBootstrapPromise = null;
     });
@@ -571,11 +663,17 @@ function bootstrapProjectsOnce(createDemoProjectCards: (count?: number) => Promi
 }
 
 export default function App() {
+  const appFullscreenRef = React.useRef<HTMLDivElement>(null);
+  const fullscreen = useFullscreen();
+  const isSortFullscreen = !!fullscreen.element && fullscreen.element === appFullscreenRef.current;
   const boardRef = React.useRef<HTMLDivElement>(null);
   const boardSize = useElementSize(boardRef);
 
   const [mode, setMode] = React.useState<Mode>('setup');
   const [sortConfig, setSortConfig] = React.useState<SortConfig>(DEFAULT_SORT_CONFIG);
+  const stacksEnabled = sortConfig.stacksEnabled !== false;
+  const zoomEnabled = sortConfig.zoomEnabled === true;
+  const startInFullscreen = sortConfig.startInFullscreen === true;
   const [cards, setCards] = React.useState<CardData[]>(() => createInitialCards());
   const [stacks, setStacks] = React.useState<StackData[]>([]);
   const [workflow, setWorkflow] = React.useState<SortWorkflowData>(() => createWorkflowForTemplate('open', 1200, 800, 0));
@@ -587,6 +685,9 @@ export default function App() {
   const [isProjectHydrated, setIsProjectHydrated] = React.useState(false);
   const [projectStatus, setProjectStatus] = React.useState<string>('');
   const [isProjectBusy, setIsProjectBusy] = React.useState(false);
+  const [isFirstVisit, setIsFirstVisit] = React.useState(false);
+  const [showControls, setShowControls] = React.useState(false);
+  const [showDemoProjects, setShowDemoProjects] = React.useState(false);
   const setupUndoPastByProjectRef = React.useRef<Map<string, SetupSnapshotV1[]>>(new Map());
   const [setupUndoPast, setSetupUndoPast] = React.useState<SetupSnapshotV1[]>([]);
   const [selectedCardIds, setSelectedCardIds] = React.useState<string[]>([]);
@@ -595,7 +696,7 @@ export default function App() {
   const [stackSortKey, setStackSortKey] = React.useState<StackSortKey>(DEFAULT_STACK_SORT_KEY);
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = React.useState(false);
   const [isResizingCard, setIsResizingCard] = React.useState(false);
-  const [previewCardId, setPreviewCardId] = React.useState<string | null>(null);
+  const [previewCard, setPreviewCard] = React.useState<CardData | null>(null);
   const [isNarrowSetupLayout, setIsNarrowSetupLayout] = React.useState(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
     return window.matchMedia(SETUP_DETAILS_DRAWER_MEDIA_QUERY).matches;
@@ -611,10 +712,6 @@ export default function App() {
   }, [cards, selectedCardIds]);
   const selectedCard = selectedCards.length === 1 ? selectedCards[0] : null;
   const selectedCardCount = selectedCards.length;
-  const previewCard = React.useMemo(
-    () => (previewCardId ? cards.find((card) => card.id === previewCardId && card.kind === 'video') || null : null),
-    [cards, previewCardId]
-  );
   const selectedStack = React.useMemo(
     () => stacks.find((stack) => stack.id === selectedStackId) || null,
     [selectedStackId, stacks]
@@ -794,6 +891,18 @@ export default function App() {
   const [isRecording, setIsRecording] = React.useState(false);
   const [isReplaying, setIsReplaying] = React.useState(false);
   const [replayTimeMs, setReplayTimeMs] = React.useState(0);
+  const [sortViewScale, setSortViewScale] = React.useState(1);
+  const lastSortCameraRef = React.useRef<CameraView>(defaultCameraView(1200, 800));
+  const [replayViewMode, setReplayViewMode] = React.useState<'recorded' | 'free'>('recorded');
+  const [replayPresentationMode, setReplayPresentationMode] = React.useState<'fit' | 'actual'>('fit');
+  const [replayFreeCamera, setReplayFreeCamera] = React.useState<CameraView>(defaultCameraView(1200, 800));
+  const [replayWindowChanged, setReplayWindowChanged] = React.useState(false);
+  const [replayResizeWarningDismissed, setReplayResizeWarningDismissed] = React.useState(false);
+  const replayWindowAtOpenRef = React.useRef(currentBrowserViewport());
+  const replayFullscreenRef = React.useRef<HTMLDivElement>(null);
+  const isReplayFullscreen = !!fullscreen.element && fullscreen.element === replayFullscreenRef.current;
+  const replayBoardHostRef = React.useRef<HTMLDivElement>(null);
+  const replayBoardHostSize = useElementSize(replayBoardHostRef);
 
   const recordingRef = React.useRef<{
     startPerf: number;
@@ -813,7 +922,13 @@ export default function App() {
   const widgetDragRef = React.useRef<WidgetDragState | null>(null);
   const widgetResizeRef = React.useRef<WidgetResizeState | null>(null);
   const widgetInteractionCleanupRef = React.useRef<(() => void) | null>(null);
-  const widgetSetupSnapshotRef = React.useRef<WidgetSetupSnapshot | null>(null);
+  const sessionSetupSnapshotRef = React.useRef<SessionSetupSnapshot | null>(null);
+  const [stackDropPreview, setStackDropPreview] = React.useState<{ x: number; y: number; w: number; h: number; label: string } | null>(null);
+  React.useEffect(() => {
+    const clear = () => setStackDropPreview(null);
+    window.addEventListener('pointerup', clear); window.addEventListener('pointercancel', clear); window.addEventListener('blur', clear);
+    return () => { window.removeEventListener('pointerup', clear); window.removeEventListener('pointercancel', clear); window.removeEventListener('blur', clear); };
+  }, []);
   const [activeWidgetDropIndicator, setActiveWidgetDropIndicator] = React.useState<WidgetDropIndicator | null>(null);
 
   const isRecordingRef = React.useRef(isRecording);
@@ -826,6 +941,36 @@ export default function App() {
   }, [isReplaying]);
 
   const nowRecMs = React.useCallback(() => Math.round(performance.now() - recordingRef.current.startPerf), []);
+
+  const appendCameraKeyframe = React.useCallback(
+    (view: CameraView, source: CameraFrameSource) => {
+      if (!isRecordingRef.current || isReplayingRef.current || modeRef.current !== 'sort') return;
+      const frame = cameraFrame(view, nowRecMs(), source);
+      setRecordingSession((current) => {
+        if (!current) return current;
+        const previous = current.cameraTrack?.at(-1);
+        if (cameraFramesEqual(previous, frame)) return current;
+        return { ...current, cameraTrack: [...(current.cameraTrack || []), frame] };
+      });
+    },
+    [nowRecMs]
+  );
+
+  const handleSortBoardViewChange = React.useCallback(
+    (view: CameraView, source: CameraFrameSource) => {
+      lastSortCameraRef.current = view;
+      appendCameraKeyframe(view, source);
+    },
+    [appendCameraKeyframe]
+  );
+
+  const handleReplayFreeCameraChange = React.useCallback((view: CameraView) => {
+    setReplayFreeCamera((current) => {
+      const previous = cameraFrame(current, 0, 'pan');
+      const next = cameraFrame(view, 0, 'pan');
+      return cameraFramesEqual(previous, next) ? current : view;
+    });
+  }, []);
 
   const stopSampler = React.useCallback(() => {
     if (samplerRafRef.current != null) {
@@ -957,8 +1102,7 @@ export default function App() {
 
   const currentBoardSnapshot = React.useMemo<PersistedBoardV1 | null>(() => {
     if (!boardId || !isProjectHydrated) return null;
-    if (mode === 'end') return null;
-    if (sortConfig.type !== 'open' && mode !== 'setup') return null;
+    if (mode !== 'setup') return null;
 
     return {
       version: 2,
@@ -1027,9 +1171,8 @@ export default function App() {
 
   const buildImmediateBoardSnapshot = React.useCallback((): PersistedBoardV1 | null => {
     if (!boardId || !isProjectHydrated) return null;
-    if (modeRef.current === 'end') return null;
+    if (modeRef.current !== 'setup') return null;
     const latest = latestBoardStateRef.current;
-    if (latest.sortConfig.type !== 'open' && modeRef.current !== 'setup') return null;
     return {
       version: 2,
       id: boardId,
@@ -1298,19 +1441,23 @@ export default function App() {
     [boardSize.height, boardSize.width]
   );
 
+  const surfaceViewport = React.useMemo(() => mode === 'sort' && recordingSession
+    ? { width: recordingSession.boardW, height: recordingSession.boardH }
+    : boardViewport, [mode, recordingSession?.boardW, recordingSession?.boardH, boardViewport]);
+
   const reflowCardsForStage = React.useCallback(
-    (nextCards: CardData[], nextWorkflow: SortWorkflowData, stageId: string, nextMode = modeRef.current) => {
+    (nextCards: CardData[], nextWorkflow: SortWorkflowData, stageId: string, nextMode = modeRef.current, viewport = surfaceViewport) => {
       const isQSortStage = nextWorkflow.stages.find((stage) => stage.id === stageId)?.kind === 'qsort';
       return reflowStageSurfaceCards(
         nextCards,
         nextWorkflow,
         stageId,
         isQSortStage ? getQSortCardBounds : getClosedCardBounds,
-        boardViewport,
+        viewport,
         nextMode
       );
     },
-    [boardViewport, getClosedCardBounds, getQSortCardBounds]
+    [surfaceViewport, getClosedCardBounds, getQSortCardBounds]
   );
 
   const commitBoardState = React.useCallback((nextCards: CardData[], nextStacks: StackData[]) => {
@@ -1428,6 +1575,10 @@ export default function App() {
     replayRef.current.index = null;
     replayViewRef.current = null;
     setReplayView(null);
+    setReplayViewMode('recorded');
+    setReplayPresentationMode('fit');
+    setReplayWindowChanged(false);
+    setReplayResizeWarningDismissed(false);
   }, [cancelReplayFrame]);
 
   const createDemoProjectCards = React.useCallback(async (count = DEMO_CARD_COUNT) => {
@@ -1481,11 +1632,12 @@ export default function App() {
     let cancelled = false;
 
     (async () => {
-      const { projects: listed, activeProjectId: active } = await bootstrapProjectsOnce(createDemoProjectCards);
+      const { projects: listed, activeProjectId: active, firstVisit } = await bootstrapProjectsOnce(createDemoProjectCards);
 
       if (!cancelled) {
         setProjects(listed);
         activateProject(active);
+        if (firstVisit) { setIsFirstVisit(true); setShowDemoProjects(true); }
       }
     })();
 
@@ -1624,6 +1776,7 @@ export default function App() {
         setRecordingSession(null);
       }
 
+      isRecordingRef.current = false;
       setIsRecording(false);
       recordingRef.current.activeSeg = null;
       stopSampler();
@@ -1656,22 +1809,21 @@ export default function App() {
 
   const bringToFront = React.useCallback((id: string) => {
     zTop.current += 1;
-    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, z: zTop.current } : c)));
-  }, []);
+    const nextCards = cardsRef.current.map(card => card.id === id ? { ...card, z: zTop.current } : card);
+    cardsRef.current = nextCards;
+    setCards(nextCards);
+    if (modeRef.current === 'sort' && isRecordingRef.current) {
+      const frame = stackFrame(nextCards, stacksRef.current, nowRecMs());
+      setRecordingSession(previous => previous ? { ...previous, stackTrack: [...(previous.stackTrack || []), frame] } : previous);
+    }
+  }, [nowRecMs]);
 
-  const openVideoPreview = React.useCallback(
-    (cardId: string) => {
-      const card = cardsRef.current.find((entry) => entry.id === cardId && entry.kind === 'video');
-      if (!card) return;
-      bringToFront(cardId);
-      setPreviewCardId(cardId);
-    },
-    [bringToFront]
-  );
-
-  const closeVideoPreview = React.useCallback(() => {
-    setPreviewCardId(null);
+  const openMediaPreview = React.useCallback((cardId: string) => {
+    const source = modeRef.current === 'end' ? replayViewRef.current?.recording.cardsAtStart : cardsRef.current;
+    const card = source?.find(entry => entry.id === cardId && entry.kind !== 'text');
+    if (card) setPreviewCard(card);
   }, []);
+  const closeMediaPreview = React.useCallback(() => setPreviewCard(null), []);
 
   const bringStackToFront = React.useCallback((stackId: string) => {
     setCards((prev) => {
@@ -1781,6 +1933,11 @@ export default function App() {
         fallbackCardNameForKind(current.kind, idx),
         current.kind
       );
+      // Preserve spaces while typing; normalization must not eat the separator
+      // before the user has entered the next word.
+      if (patch.name !== undefined) nextMeta.name = patch.name;
+      if (patch.notes !== undefined) nextMeta.notes = patch.notes;
+      if (patch.frontText !== undefined) nextMeta.frontText = patch.frontText;
       const unchanged =
         current.meta.name === nextMeta.name &&
         current.meta.notes === nextMeta.notes &&
@@ -1824,21 +1981,26 @@ export default function App() {
   );
 
   const createFreshSortingSession = React.useCallback(
-    (startCards: CardData[], startWorkflow: SortWorkflowData, startStageId: string | null) => {
+    (startCards: CardData[], startWorkflow: SortWorkflowData, startStageId: string | null, startStacks: StackData[]) => {
       const createdAt = new Date().toISOString();
+      const viewport = currentBrowserViewport();
+      const initialCamera = defaultCameraView(viewport.width, viewport.height);
       const session: RecordingSession = {
         version: 5,
         createdAt,
         cardW: cardWidth,
         cardH: cardHeight,
-        boardW: boardSize.width,
-        boardH: boardSize.height,
+        boardW: viewport.width,
+        boardH: viewport.height,
         sortConfig,
         cardLayoutModeAtStart: cardLayoutMode,
         workflowAtStart: toPersistedWorkflow(startWorkflow),
         activeStageIdAtStart: startStageId || undefined,
+        surfaceLayoutVersion: 2,
         cardsAtStart: startCards.map((card) => ({ ...card })),
         segments: [],
+        cameraTrack: [cameraFrame(initialCamera, 0, 'initial')],
+        stackTrack: [stackFrame(startCards, startStacks, 0)],
       };
       const sessionItem: SessionItem = {
         id: createdAt,
@@ -1850,44 +2012,59 @@ export default function App() {
       };
       return { session, sessionItem };
     },
-    [boardSize.height, boardSize.width, cardHeight, cardLayoutMode, cardWidth, sortConfig]
+    [cardHeight, cardLayoutMode, cardWidth, sortConfig]
   );
 
   const beginSortingWorkflow = React.useCallback(() => {
     stopReplayImmediate();
     stopSampler();
 
-    const startWorkflow = toPersistedWorkflow(workflow);
-    let startStageId = activeStageId;
-    let startCards = cards;
-    if (sortConfig.type !== 'open' && workflow.templateId === sortConfig.type) {
-      if (mode === 'setup') {
-        widgetSetupSnapshotRef.current = {
-          cards: cards.map((card) => ({ ...card })),
-          stacks: stacks.map((stack) => ({ ...stack })),
-          workflow: toPersistedWorkflow(workflow),
-          activeStageId: activeStageId,
-        };
-      }
-      const firstStageId = getDefaultActiveStageId(workflow);
+    if (mode === 'setup') {
+      sessionSetupSnapshotRef.current = {
+        cards: cards.map(card => ({ ...card })),
+        stacks: stacks.map(stack => ({ ...stack })),
+        workflow: toPersistedWorkflow(workflow),
+        activeStageId,
+      };
+    }
+    const setup = sessionSetupSnapshotRef.current;
+    const sourceCards = setup?.cards || cards;
+    const sourceWorkflow = setup?.workflow || workflow;
+    const startWorkflow = toPersistedWorkflow(sourceWorkflow);
+    let startStageId = setup?.activeStageId || activeStageId;
+    let startCards = sourceCards.map(card => ({ ...card }));
+    let startStacks = (setup?.stacks || stacks).map(stack => ({ ...stack }));
+    if (sortConfig.type !== 'open' && sourceWorkflow.templateId === sortConfig.type) {
+      const firstStageId = getDefaultActiveStageId(startWorkflow);
       if (firstStageId) {
         startStageId = firstStageId;
         setActiveStageId(firstStageId);
-        const sourceWidget = getSourceWidget(workflow, firstStageId);
+        const sourceWidget = getSourceWidget(startWorkflow, firstStageId);
         const seededCards = sourceWidget
           ? assignUnassignedCardsToWidgetZone(
-              cards.map((card) => ({ ...card, stackId: undefined, stackOrder: undefined })),
+              sourceCards.map((card) => ({ ...card, stackId: undefined, stackOrder: undefined })),
               firstStageId,
               sourceWidget.id,
               WIDGET_ZONE_CONTENT
             )
-          : cards.map((card) => ({ ...card, stackId: undefined, stackOrder: undefined }));
-        startCards = reflowCardsForStage(seededCards, startWorkflow, firstStageId, 'sort');
-        commitBoardState(startCards, []);
+          : sourceCards.map((card) => ({ ...card, stackId: undefined, stackOrder: undefined }));
+        startCards = reflowCardsForStage(seededCards, startWorkflow, firstStageId, 'sort', currentBrowserViewport());
+        startStacks = [];
       }
     }
 
-    const { session, sessionItem } = createFreshSortingSession(startCards, startWorkflow, startStageId);
+    commitBoardState(startCards, startStacks);
+    setWorkflow(startWorkflow);
+    setActiveStageId(startStageId);
+
+    const { session, sessionItem } = createFreshSortingSession(startCards, startWorkflow, startStageId, startStacks);
+    const initialCamera = cameraAt(
+      session.cameraTrack,
+      0,
+      defaultCameraView(session.boardW, session.boardH)
+    );
+    lastSortCameraRef.current = initialCamera;
+    setSortViewScale(initialCamera.scale);
     recordingRef.current.startPerf = performance.now();
     recordingRef.current.lastSampleMs = -1;
     recordingRef.current.activeSeg = null;
@@ -1920,10 +2097,17 @@ export default function App() {
 
     sortStartInFlightRef.current = true;
     setIsProjectBusy(true);
+    fullscreen.clearMessage();
+    const alreadyFullscreen = document.fullscreenElement === appFullscreenRef.current;
+    const fullscreenRequest = startInFullscreen ? fullscreen.enter(appFullscreenRef.current) : Promise.resolve(false);
     void (async () => {
       try {
-        const flushed = await flushCurrentBoardSnapshot('board save before sorting', activeProjectId);
+        const [flushed, enteredFullscreen] = await Promise.all([
+          flushCurrentBoardSnapshot('board save before sorting', activeProjectId),
+          fullscreenRequest,
+        ]);
         if (!flushed) {
+          if (enteredFullscreen && !alreadyFullscreen) await fullscreen.exit(appFullscreenRef.current);
           setProjectStatus('Could not save the latest board changes before sorting.');
           return;
         }
@@ -1933,11 +2117,12 @@ export default function App() {
         setIsProjectBusy(false);
       }
     })();
-  }, [activeProjectId, beginSortingWorkflow, flushCurrentBoardSnapshot, isProjectHydrated, isReplaying]);
+  }, [activeProjectId, beginSortingWorkflow, flushCurrentBoardSnapshot, fullscreen.clearMessage, fullscreen.enter, fullscreen.exit, isProjectHydrated, isReplaying, startInFullscreen]);
 
   const discardInProgressSortingSession = React.useCallback(async () => {
     const current = recordingSession;
     if (!current) {
+      isRecordingRef.current = false;
       setIsRecording(false);
       recordingRef.current.activeSeg = null;
       stopSampler();
@@ -1946,6 +2131,7 @@ export default function App() {
     }
 
     discardedSessionIdsRef.current.add(current.createdAt);
+    isRecordingRef.current = false;
 
     setIsRecording(false);
     recordingRef.current.activeSeg = null;
@@ -1955,6 +2141,7 @@ export default function App() {
     setRecordingSession(null);
 
     try {
+      await sessionSaveInFlightRef.current;
       await persistDeleteSession(current.createdAt);
     } catch (err) {
       console.error('[sorting] failed to delete discarded session', { sessionId: current.createdAt, err });
@@ -1965,33 +2152,53 @@ export default function App() {
     const ok = window.confirm('Leave sorting? This unfinished session will not be available for replay.');
     if (!ok) return;
     void (async () => {
+      setIsProjectBusy(true);
       await discardInProgressSortingSession();
-      if (sortConfig.type !== 'open' && widgetSetupSnapshotRef.current) {
+      await fullscreen.exit(appFullscreenRef.current);
+      if (sessionSetupSnapshotRef.current) {
         commitBoardState(
-          widgetSetupSnapshotRef.current.cards.map((card) => ({ ...card })),
-          widgetSetupSnapshotRef.current.stacks.map((stack) => ({ ...stack }))
+          sessionSetupSnapshotRef.current.cards.map((card) => ({ ...card })),
+          sessionSetupSnapshotRef.current.stacks.map((stack) => ({ ...stack }))
         );
-        setWorkflow(toPersistedWorkflow(widgetSetupSnapshotRef.current.workflow));
-        setActiveStageId(widgetSetupSnapshotRef.current.activeStageId);
+        setWorkflow(toPersistedWorkflow(sessionSetupSnapshotRef.current.workflow));
+        setActiveStageId(sessionSetupSnapshotRef.current.activeStageId);
       }
       setMode('setup');
+      setIsProjectBusy(false);
     })();
-  }, [commitBoardState, discardInProgressSortingSession, sortConfig.type]);
+  }, [commitBoardState, discardInProgressSortingSession, fullscreen.exit, sortConfig.type]);
 
-  const showReplaySessionAtStart = React.useCallback((recording: RecordingSession) => {
-    cancelReplayFrame();
-    const index = buildReplayIndex(recording);
-    replayRef.current.startPerf = performance.now();
-    replayRef.current.index = index;
-    const nextView = { recording, index };
-    replayViewRef.current = nextView;
-    setReplayView(nextView);
-    setReplayTimeMs(0);
-    setIsReplaying(false);
-  }, [cancelReplayFrame]);
+  const showReplaySession = React.useCallback(
+    (recording: RecordingSession) => {
+      cancelReplayFrame();
+      const index = buildReplayIndex(recording);
+      const initialCamera = cameraAt(
+        index.cameraTrack,
+        index.durationMs,
+        defaultCameraView(recording.boardW, recording.boardH)
+      );
+      replayRef.current.startPerf = performance.now();
+      replayRef.current.index = index;
+      replayWindowAtOpenRef.current = currentBrowserViewport();
+      const nextView = { recording, index };
+      replayViewRef.current = nextView;
+      setReplayView(nextView);
+      setReplayTimeMs(index.durationMs);
+      setReplayFreeCamera(initialCamera);
+      setReplayViewMode('recorded');
+      setReplayPresentationMode('fit');
+      setReplayWindowChanged(false);
+      setReplayResizeWarningDismissed(false);
+      setIsReplaying(false);
+    },
+    [cancelReplayFrame]
+  );
 
   const startReplay = React.useCallback(() => {
-    if (!replayView || replayView.recording.segments.length === 0) return;
+    if (
+      !replayView ||
+      (replayView.recording.segments.length === 0 && (replayView.recording.cameraTrack?.length || 0) <= 1 && (replayView.recording.stackTrack?.length || 0) <= 1)
+    ) return;
 
     cancelReplayFrame();
     const startTime = replayTimeMs >= replayView.index.durationMs ? 0 : replayTimeMs;
@@ -2014,24 +2221,70 @@ export default function App() {
     setIsReplaying(false);
   }, [cancelReplayFrame]);
 
-  const endSorting = React.useCallback(() => {
-    setIsRecording(false);
-    recordingRef.current.activeSeg = null;
-    stopSampler();
-    stopReplay();
-    setSelectedCardIds([]);
-    setSelectedStackId(null);
-    setSelectedWidgetId(null);
-    setActiveWidgetDropIndicator(null);
-    if (recordingSession) {
-      showReplaySessionAtStart(recordingSession);
-    } else {
-      replayViewRef.current = null;
-      setReplayView(null);
-      replayRef.current.index = null;
+  React.useEffect(() => {
+    const onWindowResize = () => {
+      const viewport = currentBrowserViewport();
+      if (modeRef.current === 'sort' && isRecordingRef.current && !isReplayingRef.current) {
+        const nextView: CameraView = {
+          ...lastSortCameraRef.current,
+          viewportW: viewport.width,
+          viewportH: viewport.height,
+        };
+        lastSortCameraRef.current = nextView;
+        appendCameraKeyframe(nextView, 'resize');
+      }
+
+      if (modeRef.current !== 'end' || !replayViewRef.current) return;
+      const openedAt = replayWindowAtOpenRef.current;
+      if (Math.abs(openedAt.width - viewport.width) > 2 || Math.abs(openedAt.height - viewport.height) > 2) {
+        setReplayWindowChanged(true);
+      }
+    };
+
+    window.addEventListener('resize', onWindowResize);
+    return () => window.removeEventListener('resize', onWindowResize);
+  }, [appendCameraKeyframe]);
+
+  const finishInFlightRef = React.useRef(false);
+  const endSorting = React.useCallback(async () => {
+    if (finishInFlightRef.current) return;
+    finishInFlightRef.current = true;
+    setIsProjectBusy(true);
+    try {
+      if (!(await flushCurrentRecordingSession('save finished recording'))) {
+        setProjectStatus('Could not save the recording. Please try finishing again.');
+        return;
+      }
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      recordingRef.current.activeSeg = null;
+      stopSampler();
+      stopReplay();
+      setSelectedCardIds([]);
+      setSelectedStackId(null);
+      setSelectedWidgetId(null);
+      setActiveWidgetDropIndicator(null);
+      await fullscreen.exit(appFullscreenRef.current);
+      if (recordingSession) showReplaySession(recordingSession);
+      setProjectStatus('Saved in this browser.');
+      setMode('end');
+    } finally {
+      finishInFlightRef.current = false;
+      setIsProjectBusy(false);
     }
-    setMode('end');
-  }, [recordingSession, showReplaySessionAtStart, stopReplay, stopSampler]);
+  }, [flushCurrentRecordingSession, fullscreen.exit, recordingSession, showReplaySession, stopReplay, stopSampler]);
+
+  const returnToSetupFromReplay = React.useCallback(() => {
+    stopReplayImmediate();
+    const snapshot = sessionSetupSnapshotRef.current;
+    if (snapshot) {
+      commitBoardState(snapshot.cards.map(card => ({ ...card })), snapshot.stacks.map(stack => ({ ...stack })));
+      setWorkflow(toPersistedWorkflow(snapshot.workflow));
+      setActiveStageId(snapshot.activeStageId);
+    }
+    setMode('setup');
+    setProjectStatus('Your recording is saved in this browser.');
+  }, [commitBoardState, sortConfig.type, stopReplayImmediate]);
 
   const handleAdvanceSortStage = React.useCallback(() => {
     if (sortConfig.type !== 'qsort') {
@@ -2099,7 +2352,7 @@ export default function App() {
       const rec = recordingSession?.createdAt === sessionId ? recordingSession : s.recording;
       const requestId = replaySelectionRequestRef.current + 1;
       replaySelectionRequestRef.current = requestId;
-      showReplaySessionAtStart(rec);
+      showReplaySession(rec);
 
       // Text cards render immediately; persisted media URLs are filled in-place
       // once IndexedDB hydration completes. A later selection wins the race.
@@ -2114,8 +2367,24 @@ export default function App() {
       replayRef.current.index = nextView.index;
       setReplayView(nextView);
     },
-    [hydrateCardsFromPersisted, recordingSession, sessions, showReplaySessionAtStart]
+    [hydrateCardsFromPersisted, recordingSession, sessions, showReplaySession]
   );
+
+  const openRecordings = React.useCallback(async () => {
+    if (isProjectBusy || mode !== 'setup') return;
+    setIsProjectBusy(true);
+    try {
+      if (!(await flushCurrentBoardSnapshot('save setup before recordings', activeProjectId))) return;
+      sessionSetupSnapshotRef.current = {
+        cards: cards.map(card => ({ ...card })), stacks: stacks.map(stack => ({ ...stack })),
+        workflow: toPersistedWorkflow(workflow), activeStageId,
+      };
+      if (sessions[0]) await selectSession(sessions[0].id);
+      else stopReplayImmediate();
+      setProjectStatus('');
+      setMode('end');
+    } finally { setIsProjectBusy(false); }
+  }, [activeProjectId, activeStageId, cards, flushCurrentBoardSnapshot, isProjectBusy, mode, selectSession, sessions, stacks, stopReplayImmediate, workflow]);
 
   const addTextCard = React.useCallback(() => {
     if (mode !== 'setup' || !activeProjectId) return;
@@ -2335,7 +2604,7 @@ export default function App() {
       nextStacks = normalized.stacks;
     }
     setSelectedCardIds((prev) => prev.filter((id) => !idSet.has(id)));
-    setPreviewCardId((prev) => (prev && idSet.has(prev) ? null : prev));
+    setPreviewCard(prev => prev && idSet.has(prev.id) ? null : prev);
     if (selectedStackIdRef.current && !nextStacks.some((stack) => stack.id === selectedStackIdRef.current)) {
       setSelectedStackId(null);
     }
@@ -2574,39 +2843,39 @@ export default function App() {
     projectImportInputRef.current?.click();
   }, [isProjectBusy]);
 
-  const handleImportProjectFile = React.useCallback(
-    (file: File) => {
-      if (isProjectBusy) return;
+  const importProjectArchive = React.useCallback(
+    async (file: Blob) => {
+      if (isProjectBusy) throw new Error('Another project action is in progress. Please try again.');
       setIsProjectBusy(true);
       setProjectStatus('Importing project...');
-      void (async () => {
-        try {
-          const flushed = await flushCurrentBoardSnapshot('board save before project import', activeProjectId);
-          if (!flushed) {
-            throw new Error('Could not save the latest board changes');
-          }
-          const { projectId } = await persistImportProjectZip(file);
-          await refreshProjects();
-          await persistSetActiveProjectId(projectId);
-          activateProject(projectId);
-          setMode('setup');
-          setProjectStatus('Project imported.');
-        } catch (err) {
-          setProjectStatus(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        } finally {
-          setIsProjectBusy(false);
-        }
-      })();
+      try {
+        const flushed = await flushCurrentBoardSnapshot('board save before project import', activeProjectId);
+        if (!flushed) throw new Error('Could not save the latest board changes');
+        const { projectId } = await persistImportProjectZip(file);
+        await refreshProjects();
+        await persistSetActiveProjectId(projectId);
+        activateProject(projectId);
+        setMode('setup');
+        setProjectStatus('Project imported.');
+      } catch (err) {
+        setProjectStatus(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        throw err;
+      } finally {
+        setIsProjectBusy(false);
+      }
     },
     [activateProject, activeProjectId, flushCurrentBoardSnapshot, isProjectBusy, refreshProjects]
   );
+
+  const handleImportProjectFile = React.useCallback((file: File) => {
+    void importProjectArchive(file).catch(() => { /* The project status contains the error. */ });
+  }, [importProjectArchive]);
 
   // Start IndexedDB writes as part of the commit. A page navigation cannot
   // reliably wait for asynchronous work first started from pagehide.
   React.useLayoutEffect(() => {
     if (!boardId || !isProjectHydrated) return;
-    if (mode === 'end') return;
-    if (sortConfig.type !== 'open' && mode !== 'setup') return;
+    if (mode !== 'setup') return;
     const immediateSave = immediateCardSaveRef.current;
     if (immediateSave?.cards === cards) {
       immediateCardSaveRef.current = null;
@@ -2658,19 +2927,35 @@ export default function App() {
 
   const clampToBoardWithDims = React.useCallback(
     (x: number, y: number, w: number, h: number) => {
+      const recordedOpenWorld =
+        modeRef.current === 'sort' &&
+        sortConfig.type === 'open' &&
+        recordingSession
+          ? { width: recordingSession.boardW, height: recordingSession.boardH }
+          : null;
       const viewport = {
-        width: boardSize.width || 1200,
-        height: boardSize.height || 800,
+        width: recordedOpenWorld?.width || boardSize.width || 1200,
+        height: recordedOpenWorld?.height || boardSize.height || 800,
       };
+      if (sortConfig.type === 'open') {
+        const gutter = boardPanGutter(viewport.width, viewport.height);
+        const placed = clampToBoardPure(x + gutter.x, y + gutter.y, {
+          boardW: viewport.width + gutter.x * 2,
+          boardH: viewport.height + gutter.y * 2,
+          cardW: w,
+          cardH: h,
+        });
+        return { x: placed.x - gutter.x, y: placed.y - gutter.y };
+      }
       const scene =
-        sortConfig.type !== 'open' && workflowRef.current.templateId === sortConfig.type && activeStageIdRef.current
+        workflowRef.current.templateId === sortConfig.type && activeStageIdRef.current
           ? buildStageSurfaceScene(
               workflowRef.current,
               activeStageIdRef.current,
               cardsRef.current,
               selectedWidgetId,
               modeRef.current,
-              viewport
+              modeRef.current === 'sort' && recordingSession ? { width: recordingSession.boardW, height: recordingSession.boardH } : viewport
             )
           : null;
       return clampToBoardPure(x, y, {
@@ -2680,7 +2965,7 @@ export default function App() {
         cardH: h,
       });
     },
-    [boardSize.height, boardSize.width, selectedWidgetId, sortConfig.type]
+    [boardSize.height, boardSize.width, recordingSession, selectedWidgetId, sortConfig.type]
   );
 
   const resolveCardPlacement = React.useCallback(
@@ -2696,11 +2981,14 @@ export default function App() {
     ) => {
       const baseWidth = options?.baseWidth ?? cardWidth;
       const layoutMode = options?.layoutMode ?? cardLayoutMode;
-      const dims = getCardDimensions(card, layoutMode, baseWidth);
+      const raw = getCardDimensions(card, layoutMode, baseWidth);
+      const stageId = activeStageIdRef.current;
+      const scene = sortConfig.type !== 'open' && stageId ? buildStageSurfaceScene(workflowRef.current, stageId, cardsRef.current, null, modeRef.current, surfaceViewport) : null;
+      const dims = getSurfaceCardDimensions(card, scene, () => ({ x: card.x, y: card.y, ...raw }));
       const clamped = clampToBoardWithDims(x, y, dims.w, dims.h);
-      return { x: clamped.x, y: clamped.y, w: dims.w, h: dims.h };
+      return { x: clamped.x, y: scene?.cardFrame && modeRef.current === 'sort' ? Math.max(76, clamped.y) : clamped.y, w: dims.w, h: dims.h };
     },
-    [cardLayoutMode, cardWidth, clampToBoardWithDims]
+    [cardLayoutMode, cardWidth, clampToBoardWithDims, sortConfig.type, surfaceViewport]
   );
 
   const getBoardFitScaleMax = React.useCallback(
@@ -2741,10 +3029,10 @@ export default function App() {
         nextCards,
         selectedWidgetIdArg,
         nextMode,
-        boardViewport,
+        surfaceViewport,
         activeDrop
       ),
-    [boardViewport, selectedWidgetId]
+    [surfaceViewport, selectedWidgetId]
   );
 
   const reflowActiveWidgetStageCards = React.useCallback(
@@ -2757,7 +3045,7 @@ export default function App() {
 
   React.useEffect(() => {
     if (!isProjectHydrated) return;
-    if (mode === 'end') return;
+    if (mode !== 'setup') return;
     if (!hasWidgetWorkflow || !activeStageIdRef.current) return;
     if (boardViewport.width <= 0 || boardViewport.height <= 0) return;
 
@@ -3022,6 +3310,9 @@ export default function App() {
 
   const reconcileStacksAfterDrop = React.useCallback(
     (sourceCards: CardData[], sourceStacks: StackData[], movedIds: string[], placedCards: CardData[]) => {
+      if (!stacksEnabled) {
+        return { cards: placedCards, stacks: sourceStacks };
+      }
       if (movedIds.length === 0) {
         return { cards: placedCards, stacks: sourceStacks };
       }
@@ -3071,7 +3362,7 @@ export default function App() {
         zBase: zTop.current,
       });
     },
-    [getCardBounds, resolveCardPlacement, sortConfig.type]
+    [getCardBounds, resolveCardPlacement, sortConfig.type, stacksEnabled]
   );
 
   const handleStackDragStart = React.useCallback(
@@ -3130,8 +3421,12 @@ export default function App() {
     (stackId: string, clientX: number, clientY: number) => {
       const drag = stackDragRef.current;
       if (!drag || drag.stackId !== stackId) return;
-      const deltaX = clientX - drag.pointerStart.x;
-      const deltaY = clientY - drag.pointerStart.y;
+      const interactionScale =
+        modeRef.current === 'sort' && sortConfig.type === 'open' && zoomEnabled
+          ? Math.max(0.01, sortViewScale)
+          : 1;
+      const deltaX = (clientX - drag.pointerStart.x) / interactionScale;
+      const deltaY = (clientY - drag.pointerStart.y) / interactionScale;
 
       setCards((prev) => {
         let changed = false;
@@ -3154,7 +3449,7 @@ export default function App() {
         };
       }
     },
-    [resolveCardPlacement]
+    [resolveCardPlacement, sortConfig.type, sortViewScale, zoomEnabled]
   );
 
   const handleStackDragEnd = React.useCallback(
@@ -3167,8 +3462,12 @@ export default function App() {
       const leader = currentCards.find((card) => card.id === drag.leaderId);
       if (!leader) return;
 
-      const deltaX = clientX - drag.pointerStart.x;
-      const deltaY = clientY - drag.pointerStart.y;
+      const interactionScale =
+        modeRef.current === 'sort' && sortConfig.type === 'open' && zoomEnabled
+          ? Math.max(0.01, sortViewScale)
+          : 1;
+      const deltaX = (clientX - drag.pointerStart.x) / interactionScale;
+      const deltaY = (clientY - drag.pointerStart.y) / interactionScale;
       const dropPos = resolveCardPlacement(leader, drag.leaderStart.x + deltaX, drag.leaderStart.y + deltaY, { snap: false });
       const finalPos = resolveCardPlacement(leader, drag.leaderStart.x + deltaX, drag.leaderStart.y + deltaY, {
         snap: sortConfig.type === 'closed',
@@ -3186,6 +3485,11 @@ export default function App() {
         pushSetupUndoSnapshotIfNeeded(activeProjectIdRef.current);
       }
 
+      if (!didMove) {
+        recordingRef.current.activeSeg = null;
+        stopSampler();
+        return;
+      }
       commitBoardState(nextCards, stacksRef.current);
 
       if (isRecordingRef.current && !isReplayingRef.current && recordingSession) {
@@ -3210,13 +3514,23 @@ export default function App() {
           if (!last || last[0] !== t) {
             seg.path.push([t, Math.round(seg.drop.x), Math.round(seg.drop.y)]);
           }
-          setRecordingSession((prev) => (prev ? { ...prev, segments: [...prev.segments, seg] } : prev));
+          setRecordingSession((prev) => (prev ? { ...prev, segments: [...prev.segments, seg], stackTrack: prev.stackTrack ? [...prev.stackTrack, stackFrame(cardsRef.current, stacksRef.current, seg.t1)] : undefined } : prev));
           recordingRef.current.activeSeg = null;
           stopSampler();
         }
       }
     },
-    [commitBoardState, nowRecMs, pushSetupUndoSnapshotIfNeeded, recordingSession, resolveCardPlacement, sortConfig.type, stopSampler]
+    [
+      commitBoardState,
+      nowRecMs,
+      pushSetupUndoSnapshotIfNeeded,
+      recordingSession,
+      resolveCardPlacement,
+      sortConfig.type,
+      sortViewScale,
+      stopSampler,
+      zoomEnabled,
+    ]
   );
 
   const applyWorkflowWidgetRect = React.useCallback(
@@ -3588,6 +3902,24 @@ export default function App() {
         }
       }
 
+      if (!hasWidgetWorkflow && stacksEnabled) {
+        const movedIds = setupGroupDragRef.current?.selectedIds || [id];
+        let placed = cardsRef.current.map(card => card.id === id ? { ...card, x, y } : card);
+        placed = removeCardsFromStack(placed, stacksRef.current, movedIds).cards;
+        const target = findDropStackTarget(placed, movedIds, getCardBounds);
+        const targets = target ? placed.filter(card => target.type === 'card' ? card.id === target.cardId : card.stackId === target.stackId) : [];
+        if (targets.length) {
+          const bounds = targets.map(getCardBounds);
+          const left = Math.min(...bounds.map(rect => rect.x));
+          const top = Math.min(...bounds.map(rect => rect.y));
+          setStackDropPreview({ x: left, y: top,
+            w: Math.max(...bounds.map(rect => rect.x + rect.w)) - left,
+            h: Math.max(...bounds.map(rect => rect.y + rect.h)) - top,
+            label: target?.type === 'stack' ? `Add to ${stacksRef.current.find(stack => stack.id === target.stackId)?.name || 'stack'}` : 'Create stack',
+          });
+        } else setStackDropPreview(null);
+      }
+
       if (hasWidgetWorkflow && modeRef.current === 'sort') {
         const stageId = activeStageIdRef.current;
         const card = cardsRef.current.find((entry) => entry.id === id);
@@ -3625,7 +3957,7 @@ export default function App() {
       // rAF sampler will pick this up.
       latestDragRef.current = { cardId: id, x, y };
     },
-    [buildSurfaceScene, getCardDims, hasWidgetWorkflow, isRecording, isReplaying, resolveCardPlacement]
+    [buildSurfaceScene, getCardBounds, getCardDims, hasWidgetWorkflow, isRecording, isReplaying, resolveCardPlacement, stacksEnabled]
   );
 
   const handleMoveEnd = React.useCallback(
@@ -3662,13 +3994,25 @@ export default function App() {
         let accepted = false;
         if (stageId) {
           const scene = buildSurfaceScene(stageId, sourceCards, workflowRef.current, mode === 'setup' ? 'setup' : 'sort', null);
-          const target = dropPoint
+          const hit = dropPoint
             ? findStageSurfaceDropTarget(scene, { x: dropPoint.x, y: dropPoint.y, w: 0, h: 0 })
             : findStageSurfaceDropTarget(scene, { x: dropPos.x, y: dropPos.y, w: finalPos.w, h: finalPos.h });
+          const isLooseStage = scene.stageKind !== 'qsort';
+          const source = getSourceWidget(workflowRef.current, stageId);
+          const target = hit || (isLooseStage && source ? { widgetId: source.id, widgetKind: 'source' as const, zoneId: WIDGET_ZONE_CONTENT, zoneKind: 'content' as const } : null);
           if (target) {
             const validation = validateWidgetDrop(workflowRef.current, stageId, target, card, sourceCards);
             if (validation.accepted) {
-              nextCards = reflowCardsForStage(
+              if (isLooseStage) {
+                const previous = card.widgetAssignments?.[stageId];
+                const assignment = previous?.widgetId === target.widgetId && previous.zoneId === target.zoneId
+                  ? previous
+                  : { widgetId: target.widgetId, zoneId: target.zoneId, order: Math.max(-1, ...sourceCards.map(entry => entry.widgetAssignments?.[stageId]?.order ?? -1)) + 1 };
+                nextCards = sourceCards.map(entry => entry.id === id ? {
+                  ...entry, x: finalPos.x, y: finalPos.y,
+                  widgetAssignments: { ...entry.widgetAssignments, [stageId]: assignment },
+                } : entry);
+              } else nextCards = reflowCardsForStage(
                 assignCardsToWidgetZone(sourceCards, stageId, target.widgetId, target.zoneId, [id], { insertAt: 'front' }),
                 workflowRef.current,
                 stageId
@@ -3754,6 +4098,10 @@ export default function App() {
           seg.drop = { x: dropPos.x, y: dropPos.y };
           // final: snapped+clamped end position
           seg.final = finalCard ? { x: finalCard.x, y: finalCard.y } : { x: finalPos.x, y: finalPos.y };
+          // Free placement has no post-drop snap to animate in the replay.
+          if (hasWidgetWorkflow && workflowRef.current.stages.find(stage => stage.id === activeStageIdRef.current)?.kind !== 'qsort') {
+            seg.settleMs = 0;
+          }
 
           // Ensure last keyframe exists at drop moment (use drop as the last path point).
           const last = seg.path[seg.path.length - 1];
@@ -3790,13 +4138,13 @@ export default function App() {
                 ];
               }
             }
-            const movedIdsExcludingLeader = new Set([id, ...(seg.groupMembers || []).map((member) => member.cardId)]);
-            seg.settleMembers = collectStaticMoveMembers(sourceCards, nextState.cards).filter(
-              (member) => !movedIdsExcludingLeader.has(member.cardId)
-            );
           }
+          const movedIdsExcludingLeader = new Set([id, ...(seg.groupMembers || []).map((member) => member.cardId)]);
+          seg.settleMembers = collectStaticMoveMembers(sourceCards, nextState.cards).filter(
+            member => !movedIdsExcludingLeader.has(member.cardId)
+          );
 
-          setRecordingSession((prev) => (prev ? { ...prev, segments: [...prev.segments, seg] } : prev));
+          setRecordingSession((prev) => (prev ? { ...prev, segments: [...prev.segments, seg], stackTrack: prev.stackTrack ? [...prev.stackTrack, stackFrame(cardsRef.current, stacksRef.current, seg.t1)] : undefined } : prev));
           recordingRef.current.activeSeg = null;
           stopSampler();
         }
@@ -3828,7 +4176,7 @@ export default function App() {
     (type: SortType) => {
       if (type === sortConfig.type) return;
       if (mode !== 'setup') {
-        setSortConfig({ type });
+        setSortConfig((current) => ({ ...current, type }));
         return;
       }
 
@@ -3898,7 +4246,7 @@ export default function App() {
         setSelectedWidgetId(null);
       }
 
-      setSortConfig({ type });
+      setSortConfig((current) => ({ ...current, type }));
     },
     [
       activeProjectId,
@@ -3910,6 +4258,41 @@ export default function App() {
       reflowCardsForStage,
       sortConfig.type,
     ]
+  );
+
+  const handleStartInFullscreenChange = React.useCallback((enabled: boolean) => {
+    if (mode !== 'setup' || enabled === startInFullscreen) return;
+    if (activeProjectId) pushSetupUndoSnapshotIfNeeded(activeProjectId);
+    setSortConfig(current => ({ ...current, startInFullscreen: enabled }));
+  }, [activeProjectId, mode, pushSetupUndoSnapshotIfNeeded, startInFullscreen]);
+
+  const handleStacksEnabledChange = React.useCallback(
+    (enabled: boolean) => {
+      if (mode !== 'setup' || sortConfig.type !== 'open' || enabled === stacksEnabled) return;
+      if (activeProjectId) pushSetupUndoSnapshotIfNeeded(activeProjectId);
+
+      if (!enabled) {
+        const looseCards = cardsRef.current.map((card) => ({
+          ...card,
+          stackId: undefined,
+          stackOrder: undefined,
+        }));
+        commitBoardState(looseCards, []);
+        setSelectedStackId(null);
+      }
+
+      setSortConfig((current) => ({ ...current, stacksEnabled: enabled }));
+    },
+    [activeProjectId, commitBoardState, mode, pushSetupUndoSnapshotIfNeeded, sortConfig.type, stacksEnabled]
+  );
+
+  const handleZoomEnabledChange = React.useCallback(
+    (enabled: boolean) => {
+      if (mode !== 'setup' || sortConfig.type !== 'open' || enabled === zoomEnabled) return;
+      if (activeProjectId) pushSetupUndoSnapshotIfNeeded(activeProjectId);
+      setSortConfig((current) => ({ ...current, zoomEnabled: enabled }));
+    },
+    [activeProjectId, mode, pushSetupUndoSnapshotIfNeeded, sortConfig.type, zoomEnabled]
   );
 
   React.useEffect(() => {
@@ -3951,7 +4334,7 @@ export default function App() {
   }, [selectedCards]);
 
   const handleCreateStackFromSelection = React.useCallback(() => {
-    if (mode !== 'setup' || !activeProjectId || sortConfig.type !== 'open') return;
+    if (mode !== 'setup' || !activeProjectId || sortConfig.type !== 'open' || !stacksEnabled) return;
     if (selectedCardIds.length < 2) return;
     const stack = createStackRecord();
     const result = createStack(cards, stacks, selectedCardIds, stack, resolveCardPlacement, {
@@ -3973,12 +4356,13 @@ export default function App() {
     resolveCardPlacement,
     selectedCardIds,
     sortConfig.type,
+    stacksEnabled,
     stacks,
   ]);
 
   const handleAddSelectionToStack = React.useCallback(
     (stackId: string) => {
-      if (mode !== 'setup' || !activeProjectId || sortConfig.type !== 'open') return;
+      if (mode !== 'setup' || !activeProjectId || sortConfig.type !== 'open' || !stacksEnabled) return;
       if (selectedCardIds.length === 0) return;
       const result = addCardsToStack(cards, stacks, stackId, selectedCardIds, resolveCardPlacement, {
         snap: false,
@@ -3999,18 +4383,34 @@ export default function App() {
       resolveCardPlacement,
       selectedCardIds,
       sortConfig.type,
+      stacksEnabled,
       stacks,
     ]
   );
 
   const handleRemoveSelectionFromStack = React.useCallback(() => {
-    if (mode !== 'setup' || !activeProjectId || sortConfig.type !== 'open') return;
+    if (mode !== 'setup' || !activeProjectId || sortConfig.type !== 'open' || !stacksEnabled) return;
     if (selectedCardIds.length === 0) return;
     const result = removeCardsFromStack(cards, stacks, selectedCardIds);
     pushSetupUndoSnapshotIfNeeded(activeProjectId);
     commitBoardState(result.cards, result.stacks);
     setSelectedStackId(null);
-  }, [activeProjectId, cards, commitBoardState, mode, pushSetupUndoSnapshotIfNeeded, selectedCardIds, sortConfig.type, stacks]);
+  }, [activeProjectId, cards, commitBoardState, mode, pushSetupUndoSnapshotIfNeeded, selectedCardIds, sortConfig.type, stacks, stacksEnabled]);
+
+  const handleRenameStack = React.useCallback((stackId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || mode === 'end' || sortConfig.type !== 'open') return;
+    const target = stacksRef.current.find(stack => stack.id === stackId);
+    if (!target || target.name === trimmed) return;
+    if (mode === 'setup' && activeProjectId) pushSetupUndoSnapshotIfNeeded(activeProjectId);
+    const next = stacksRef.current.map(stack => stack.id === stackId ? { ...stack, name: trimmed } : stack);
+    stacksRef.current = next;
+    setStacks(next);
+    if (mode === 'sort' && isRecordingRef.current) {
+      const frame = stackFrame(cardsRef.current, next, nowRecMs());
+      setRecordingSession(current => current ? { ...current, stackTrack: [...(current.stackTrack || []), frame] } : current);
+    }
+  }, [activeProjectId, mode, nowRecMs, pushSetupUndoSnapshotIfNeeded, sortConfig.type]);
 
   const handleRenameSelectedStack = React.useCallback(
     (name: string) => {
@@ -4087,8 +4487,109 @@ export default function App() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const projectInteractionDisabled = isProjectBusy || isRecording || isReplaying;
   const sortMoveCount = recordingSession?.segments.length ?? 0;
+  const sortCameraChangeCount = countRecordedViewChanges(recordingSession?.cameraTrack);
   const replayRecording = replayView?.recording || null;
+  const replayCameraChangeCount = countRecordedViewChanges(replayRecording?.cameraTrack);
   const replayIndex = replayView?.index || null;
+  const sortWorldSize = React.useMemo(
+    () =>
+      mode === 'sort' && sortConfig.type === 'open' && recordingSession
+        ? { width: recordingSession.boardW, height: recordingSession.boardH }
+        : undefined,
+    [mode, recordingSession?.boardH, recordingSession?.boardW, sortConfig.type]
+  );
+  const handleSortZoomChange = React.useCallback((scale: number) => {
+    setSortViewScale(clampBoardZoom(scale));
+  }, []);
+  const handleSortZoomFit = React.useCallback(() => {
+    if (!recordingSession) return;
+    const fitScale = Math.min(
+      1,
+      (boardSize.width || recordingSession.boardW) / Math.max(1, recordingSession.boardW),
+      (boardSize.height || recordingSession.boardH) / Math.max(1, recordingSession.boardH)
+    );
+    setSortViewScale(clampBoardZoom(fitScale));
+  }, [boardSize.height, boardSize.width, recordingSession]);
+  const replayFallbackCamera = React.useMemo(
+    () =>
+      replayRecording
+        ? defaultCameraView(replayRecording.boardW, replayRecording.boardH)
+        : defaultCameraView(1200, 800),
+    [replayRecording]
+  );
+  const replayRecordedCamera = React.useMemo(
+    () => cameraAt(replayIndex?.cameraTrack, replayTimeMs, replayFallbackCamera),
+    [replayFallbackCamera, replayIndex, replayTimeMs]
+  );
+  const replayCamera = replayViewMode === 'recorded' ? replayRecordedCamera : replayFreeCamera;
+  const replayViewport = React.useMemo(
+    () => ({
+      width: Math.max(1, Math.round(replayRecordedCamera.viewportW)),
+      height: Math.max(1, Math.round(replayRecordedCamera.viewportH)),
+    }),
+    [replayRecordedCamera.viewportH, replayRecordedCamera.viewportW]
+  );
+  const replayWorldSize = React.useMemo(
+    () =>
+      replayRecording?.sortConfig.type === 'open'
+        ? { width: replayRecording.boardW, height: replayRecording.boardH }
+        : undefined,
+    [replayRecording]
+  );
+  const replayPresentationScale = React.useMemo(() => {
+    if (replayPresentationMode === 'actual' || replayBoardHostSize.width <= 0 || replayBoardHostSize.height <= 0) {
+      return 1;
+    }
+    return Math.max(
+      0.1,
+      Math.min(
+        1,
+        Math.max(1, replayBoardHostSize.width - 32) / replayViewport.width,
+        Math.max(1, replayBoardHostSize.height - 32) / replayViewport.height
+      )
+    );
+  }, [replayBoardHostSize.height, replayBoardHostSize.width, replayPresentationMode, replayViewport]);
+  const replayFrameSize = React.useMemo(
+    () => ({
+      width: Math.round(replayViewport.width * replayPresentationScale),
+      height: Math.round(replayViewport.height * replayPresentationScale),
+    }),
+    [replayPresentationScale, replayViewport]
+  );
+  const hasReplayActivity =
+    !!replayRecording &&
+    (replayRecording.segments.length > 0 || (replayRecording.cameraTrack?.length || 0) > 1 || (replayRecording.stackTrack?.length || 0) > 1);
+  const handleReplayFreeZoomChange = React.useCallback((scale: number) => {
+    setReplayFreeCamera((current) => ({ ...current, scale: clampBoardZoom(scale) }));
+  }, []);
+  const handleReplayFreeZoomFit = React.useCallback(() => {
+    setReplayFreeCamera((current) => ({
+      ...current,
+      scale: replayWorldSize
+        ? clampBoardZoom(
+            Math.min(
+              1,
+              replayViewport.width / Math.max(1, replayWorldSize.width),
+              replayViewport.height / Math.max(1, replayWorldSize.height)
+            )
+          )
+        : 1,
+      centerX: replayWorldSize ? replayWorldSize.width / 2 : current.centerX,
+      centerY: replayWorldSize ? replayWorldSize.height / 2 : current.centerY,
+    }));
+  }, [replayViewport.height, replayViewport.width, replayWorldSize]);
+  const handleSortFullscreen = React.useCallback(() => {
+    const target = appFullscreenRef.current;
+    if (document.fullscreenElement === target) void fullscreen.exit(target);
+    else void fullscreen.enter(target);
+  }, [fullscreen.enter, fullscreen.exit]);
+  const handleReplayFullscreen = React.useCallback(() => {
+    const target = replayFullscreenRef.current;
+    replayWindowAtOpenRef.current = currentBrowserViewport();
+    setReplayResizeWarningDismissed(true);
+    if (document.fullscreenElement === target) void fullscreen.exit(target);
+    else void fullscreen.enter(target);
+  }, [fullscreen.enter, fullscreen.exit]);
   const replayWorkflow = React.useMemo(() => {
     if (!replayRecording) return null;
     return toPersistedWorkflow(replayRecording.workflowAtStart);
@@ -4125,11 +4626,12 @@ export default function App() {
             replayCards,
             null,
             'sort',
-            boardViewport,
-            null
+            replayViewport,
+            null,
+            replayRecording?.surfaceLayoutVersion || 1
           )
         : null,
-    [boardViewport, replayActiveStageId, replayCards, replayHasWidgetWorkflow, replayWorkflow]
+    [replayActiveStageId, replayCards, replayHasWidgetWorkflow, replayViewport, replayWorkflow, replayRecording?.surfaceLayoutVersion]
   );
   const replayClusterMarkers = React.useMemo(() => replayIndex?.markers || [], [replayIndex]);
   const replayActivityMarkers = React.useMemo(
@@ -4157,12 +4659,12 @@ export default function App() {
     sortConfig.type !== 'closed';
   const stackOptions = React.useMemo<StackOption[]>(
     () =>
-      sortConfig.type !== 'open'
+      sortConfig.type !== 'open' || !stacksEnabled
         ? []
         : stacks
         .map((stack) => ({ id: stack.id, name: stack.name, count: getStackCount(cards, stack.id) }))
         .filter((stack) => stack.count >= 2),
-    [cards, sortConfig.type, stacks]
+    [cards, sortConfig.type, stacks, stacksEnabled]
   );
   const activeWorkflowStageId = activeStageId || getDefaultActiveStageId(workflow);
   const stageVisibleCards = React.useMemo(
@@ -4181,72 +4683,23 @@ export default function App() {
             cards,
             selectedWidgetId,
             mode,
-            boardViewport,
+            surfaceViewport,
             activeWidgetDropIndicator
           )
         : null,
-    [activeWidgetDropIndicator, activeWorkflowStageId, boardViewport, cards, hasWidgetWorkflow, mode, selectedWidgetId, workflow]
-  );
-  const activeClosedSourceWidget = React.useMemo(
-    () => (sortConfig.type === 'closed' ? getSourceWidget(workflow, activeWorkflowStageId) : null),
-    [activeWorkflowStageId, sortConfig.type, workflow]
+    [activeWidgetDropIndicator, activeWorkflowStageId, surfaceViewport, cards, hasWidgetWorkflow, mode, selectedWidgetId, workflow]
   );
   const closedCategoryWidgets = React.useMemo(
     () => (sortConfig.type === 'closed' ? getClosedCategoryWidgets(workflow, activeWorkflowStageId) : []),
     [activeWorkflowStageId, sortConfig.type, workflow]
   );
-  const remainingClosedSourceCount = React.useMemo(
-    () =>
-      sortConfig.type === 'closed' && activeWorkflowStageId && activeClosedSourceWidget
-        ? countCardsInWidgetZone(cards, activeWorkflowStageId, activeClosedSourceWidget.id, WIDGET_ZONE_CONTENT)
-        : 0,
-    [activeClosedSourceWidget, activeWorkflowStageId, cards, sortConfig.type]
-  );
   const stackBadges = React.useMemo(
-    () =>
-      mode === 'end' || sortConfig.type !== 'open'
-        ? []
-        : stacks
-            .map((stack) => {
-              const members = getStackCards(cards, stack.id);
-              const count = members.length;
-              if (count < 2) return null;
-              let minX = Number.POSITIVE_INFINITY;
-              let minY = Number.POSITIVE_INFINITY;
-              let maxX = Number.NEGATIVE_INFINITY;
-              let maxY = Number.NEGATIVE_INFINITY;
-              let topZ = 0;
-
-              for (const member of members) {
-                const dims = getCardDims(member);
-                minX = Math.min(minX, member.x);
-                minY = Math.min(minY, member.y);
-                maxX = Math.max(maxX, member.x + dims.w);
-                maxY = Math.max(maxY, member.y + dims.h);
-                topZ = Math.max(topZ, member.z);
-              }
-
-              if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
-                return null;
-              }
-
-              const x = Math.max(0, minX - 14);
-              const y = Math.max(0, minY - 14);
-              return {
-                stackId: stack.id,
-                name: stack.name,
-                count,
-                x,
-                y,
-                width: Math.max(48, maxX - x + 14),
-                height: Math.max(48, maxY - y + 14),
-                z: topZ + 1,
-                isSelected: selectedStackId === stack.id,
-              };
-            })
-            .filter((badge): badge is NonNullable<typeof badge> => !!badge),
-    [cards, getCardDims, mode, selectedStackId, sortConfig.type, stacks]
+    () => mode === 'end' || sortConfig.type !== 'open' || !stacksEnabled ? [] : buildStackBadges(cards, stacks, cardWidth, cardLayoutMode, selectedStackId),
+    [cards, stacks, cardWidth, cardLayoutMode, mode, selectedStackId, sortConfig.type, stacksEnabled]
   );
+  const replayStackBadges = React.useMemo(() => replayRecording?.sortConfig.type === 'open'
+    ? buildStackBadges(replayCards, stackFrameAt(replayRecording.stackTrack, replayTimeMs)?.stacks || [], replayRecording.cardW, replayRecording.cardLayoutModeAtStart)
+    : [], [replayCards, replayRecording, replayTimeMs]);
   const detailsPanelContext = React.useMemo<DetailsPanelContext>(() => {
     if (sortConfig.type === 'closed' && selectedWidget) {
       if (selectedWidget.kind === 'category') {
@@ -4366,7 +4819,7 @@ export default function App() {
         kind: 'card',
         card: selectedCard,
         stack: selectedCard.stackId ? stackOptions.find((option) => option.id === selectedCard.stackId) || null : null,
-        stackOptions: sortConfig.type === 'open' ? availableStackOptions : [],
+        stackOptions: sortConfig.type === 'open' && stacksEnabled ? availableStackOptions : [],
         closedContainer:
           selectedCardWidget && (selectedCardWidget.kind === 'source' || selectedCardWidget.kind === 'category')
           ? {
@@ -4386,9 +4839,13 @@ export default function App() {
         onEndMetaEdit: handleEndSelectedCardMetaEdit,
         onDeleteCard: handleDeleteSelectedCard,
         onBringToFront: () => bringToFront(selectedCard.id),
-        onOpenPreview: selectedCard.kind === 'video' ? () => openVideoPreview(selectedCard.id) : undefined,
-        onAddToStack: sortConfig.type === 'open' && availableStackOptions.length > 0 ? handleAddSelectionToStack : undefined,
-        onRemoveFromStack: sortConfig.type === 'open' && selectedCard.stackId ? handleRemoveCardFromStack : undefined,
+        onOpenPreview: selectedCard.kind !== 'text' ? () => openMediaPreview(selectedCard.id) : undefined,
+        onAddToStack:
+          sortConfig.type === 'open' && stacksEnabled && availableStackOptions.length > 0
+            ? handleAddSelectionToStack
+            : undefined,
+        onRemoveFromStack:
+          sortConfig.type === 'open' && stacksEnabled && selectedCard.stackId ? handleRemoveCardFromStack : undefined,
       };
     }
 
@@ -4398,9 +4855,12 @@ export default function App() {
         selectedCount: selectedCardCount,
         stackOptions,
         sharedStackId: sharedSelectionStackId,
-        onCreateStack: sortConfig.type === 'open' ? handleCreateStackFromSelection : undefined,
-        onAddToStack: sortConfig.type === 'open' ? handleAddSelectionToStack : undefined,
-        onRemoveFromStack: sortConfig.type === 'open' && sharedSelectionStackId ? handleRemoveSelectionFromStack : undefined,
+        onCreateStack: sortConfig.type === 'open' && stacksEnabled ? handleCreateStackFromSelection : undefined,
+        onAddToStack: sortConfig.type === 'open' && stacksEnabled ? handleAddSelectionToStack : undefined,
+        onRemoveFromStack:
+          sortConfig.type === 'open' && stacksEnabled && sharedSelectionStackId
+            ? handleRemoveSelectionFromStack
+            : undefined,
         onDeleteSelectedCards: handleDeleteSelectedCards,
       };
     }
@@ -4426,7 +4886,7 @@ export default function App() {
     handleUpdateSelectedCardMeta,
     activeWorkflowStageId,
     cards,
-    openVideoPreview,
+    openMediaPreview,
     selectedCard,
     selectedCardCount,
     selectedStack,
@@ -4434,13 +4894,13 @@ export default function App() {
     selectedWidget,
     sharedSelectionStackId,
     sortConfig.type,
+    stacksEnabled,
     stackOptions,
     stackSortKey,
     workflow.widgets,
   ]);
   const showSetupDetailsDrawer =
     mode === 'setup' &&
-    isNarrowSetupLayout &&
     (selectedCardCount > 0 || selectedStackCount > 0 || !!selectedWidgetId) &&
     isDetailsDrawerOpen;
   const boardDragEnabled = !isReplaying && !isResizingCard;
@@ -4509,18 +4969,14 @@ export default function App() {
       ? workflow.stages.find((stage) => stage.id === activeWorkflowStageId)?.name || null
       : null;
   const showSortStagePill = !!activeSortStageLabel && activeSortStageLabel !== getTemplateLabel(sortConfig.type);
-  const showSortCompletion = mode === 'sort' && hasWidgetWorkflow && isCurrentWorkflowStageComplete;
   const sortCompletionMessage =
     sortConfig.type === 'qsort' && hasNextWorkflowStage
       ? 'First impressions sorted.'
       : sortConfig.type === 'qsort'
         ? 'Distribution complete.'
         : 'All cards placed.';
-  const sortCompletionActionLabel =
-    sortConfig.type === 'qsort' && hasNextWorkflowStage ? 'Continue to Q-Sort →' : 'View replay →';
-
   React.useEffect(() => {
-    if (mode !== 'setup') return;
+    if (mode !== 'setup' || showDemoProjects) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
@@ -4534,10 +4990,10 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [canUndoSetup, mode, undoSetup]);
+  }, [canUndoSetup, mode, showDemoProjects, undoSetup]);
 
-  const renderProjectControls = (compact = false) => (
-    <div className={`projectTools ${compact ? 'projectTools--compact' : ''}`}>
+  const renderProjectControls = () => (
+    <div className="projectTools projectTools--compact">
       <div className="projectTools__row projectTools__row--select">
         <select
           className="projectTools__select"
@@ -4555,7 +5011,7 @@ export default function App() {
       </div>
       <div className="projectTools__row projectTools__row--actions">
         <button className="btn btn--ghost btn--tiny" type="button" disabled={projectInteractionDisabled} onClick={handleCreateProject}>
-          New
+          <FilePlus2 />New
         </button>
         <button
           className="btn btn--ghost btn--tiny"
@@ -4563,7 +5019,7 @@ export default function App() {
           disabled={projectInteractionDisabled || !activeProject}
           onClick={handleRenameProject}
         >
-          Rename
+          <Pencil />Rename
         </button>
         <button
           className="btn btn--ghost btn--tiny btn--dangerSoft"
@@ -4571,12 +5027,12 @@ export default function App() {
           disabled={projectInteractionDisabled || !activeProject}
           onClick={handleDeleteProject}
         >
-          Delete
+          <Trash2 />Delete
         </button>
       </div>
       <div className="projectTools__row projectTools__row--actions projectTools__row--transfer">
         <button className="btn btn--ghost btn--tiny" type="button" disabled={projectInteractionDisabled} onClick={handleImportProject}>
-          Import
+          <Upload />Import
         </button>
         <button
           className="btn btn--ghost btn--tiny"
@@ -4584,19 +5040,23 @@ export default function App() {
           disabled={projectInteractionDisabled || !activeProject}
           onClick={handleExportProject}
         >
-          Export
+          <Download />Export
         </button>
       </div>
-      {!compact && projectStatus ? (
-        <div className="hint projectTools__status" data-testid="project-status" role="status">
-          {projectStatus}
-        </div>
-      ) : null}
+
     </div>
   );
 
   return (
-    <div className="app">
+    <div className={`app app--${mode}`} ref={appFullscreenRef}>
+      {showDemoProjects ? (
+        <React.Suspense fallback={<div className="demoLoading" role="status">Opening demo library...</div>}>
+          <DemoProjectDialog firstVisit={isFirstVisit}
+            onClose={() => { setShowDemoProjects(false); setIsFirstVisit(false); }} onImport={importProjectArchive}
+            onNewProject={() => { setShowDemoProjects(false); setIsFirstVisit(false); handleCreateProject(); }}
+            onImportProject={() => { setShowDemoProjects(false); setIsFirstVisit(false); handleImportProject(); }} />
+        </React.Suspense>
+      ) : null}
       <input
         ref={projectImportInputRef}
         data-testid="project-import-input"
@@ -4613,43 +5073,38 @@ export default function App() {
           e.currentTarget.value = '';
         }}
       />
+      {mode !== 'sort' ? <header className="appHeader">
+        <span className="appHeader__brand"><PanelsTopLeft /><span>SortBoard</span></span>
+        <ProjectMenu name={activeProject?.name || 'Loading project…'} disabled={projectInteractionDisabled}>
+          {renderProjectControls()}
+          <button className="btn btn--ghost" type="button" onClick={() => setShowDemoProjects(true)}><FolderOpen />Try a demo project</button>
+        </ProjectMenu>
+        <nav className="appHeader__nav" aria-label="Project views">
+          <button type="button" className={mode === 'setup' ? 'isActive' : ''} aria-current={mode === 'setup' ? 'page' : undefined} disabled={projectInteractionDisabled} onClick={() => { if (mode === 'end') returnToSetupFromReplay(); }}><LayoutDashboard />Setup</button>
+          <button type="button" className={mode === 'end' ? 'isActive' : ''} aria-label={`Recordings (${sessions.length})`} aria-current={mode === 'end' ? 'page' : undefined} disabled={projectInteractionDisabled} onClick={() => { if (mode === 'setup') void openRecordings(); }}><History />Recordings<span className="navCount">{sessions.length}</span></button>
+        </nav>
+        <div className="appHeader__tools">
+          {activeProject?.instructions ? <details className="projectInstructions"><summary aria-label="Instructions" title="Instructions"><BookOpen /><span className="toolbarLabel">Instructions</span></summary><p>{activeProject.instructions}</p></details> : null}
+          <button className="btn btn--ghost btn--tiny" type="button" aria-label="Controls" title="Controls" onClick={() => setShowControls(true)}><HelpCircle /><span className="toolbarLabel">Controls</span></button>
+          {mode === 'setup' ? <>
+            <button className="btn btn--ghost btn--icon" type="button" aria-label="Undo" title="Undo" onClick={undoSetup} disabled={!canUndoSetup}><Undo2 /></button>
+            <button className="btn appHeader__start" type="button" onClick={startSortingWorkflow} disabled={!canStartSorting} aria-describedby={sortingSetupIssue ? 'sorting-setup-issue' : undefined}>Start sorting<ArrowRight /></button>
+          </> : null}
+        </div>
+      </header> : null}
       {mode === 'setup' ? (
         <div className="layout layout--setupThreePane">
           <aside className="panel">
-            <div className="panel__top">
-              <div className="brand">
-                <div className="brand__name">SortBoard</div>
-                <div className="brand__sub">Stored in this browser</div>
-              </div>
-
-              <div className="panel__row">
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={startSortingWorkflow}
-                  disabled={!canStartSorting}
-                  aria-describedby={sortingSetupIssue ? 'sorting-setup-issue' : undefined}
-                >
-                  Start sorting →
-                </button>
-                <button className="btn btn--ghost" type="button" onClick={undoSetup} disabled={!canUndoSetup}>
-                  Undo
-                </button>
-              </div>
+            {sortingSetupIssue ? <div className="panel__top">
               {sortingSetupIssue ? (
                 <div className="actionHint" id="sorting-setup-issue" role="status">
                   {sortingSetupIssue}
                 </div>
               ) : null}
-            </div>
+            </div> : null}
 
             <div className="panel__section">
-              <div className="sectionTitle">Project</div>
-              {renderProjectControls()}
-            </div>
-
-            <div className="panel__section">
-              <div className="sectionTitle">Add</div>
+              <div className="sectionTitle">Cards<span className="sectionCount">{cards.length}</span></div>
 
               <div
                 className="dropzone"
@@ -4675,8 +5130,9 @@ export default function App() {
                   }
                 }}
               >
+                <ImagePlus className="dropzone__icon" />
                 <div className="dropzone__title">Add images or videos</div>
-                <div className="dropzone__sub">Choose files, or drop them onto the board.</div>
+                <div className="dropzone__sub">Choose files or drop them here.</div>
                 <input
                   ref={fileInputRef}
                   data-testid="media-input"
@@ -4697,7 +5153,7 @@ export default function App() {
 
               <div className="panel__row">
                 <button className="btn btn--ghost" type="button" onClick={addTextCard}>
-                  + Text card
+                  <Type />Text card
                 </button>
               </div>
             </div>
@@ -4732,12 +5188,66 @@ export default function App() {
               </div>
               <div className="sortTypeDescription">{sortTypeDescription(sortConfig.type)}</div>
 
+              {sortConfig.type === 'open' ? (
+                <div className="toggleSettingGroup">
+                  <div className="toggleSetting">
+                    <div className="toggleSetting__copy">
+                      <label className="toggleSetting__label" htmlFor="allow-stacks-switch">
+                        Allow stacks
+                      </label>
+                      <div className="toggleSetting__help" id="allow-stacks-help">
+                        Drop cards together to group them. Turning this off separates existing stacks.
+                      </div>
+                    </div>
+                    <label className="toggleSwitch">
+                      <input
+                        id="allow-stacks-switch"
+                        type="checkbox"
+                        role="switch"
+                        checked={stacksEnabled}
+                        disabled={projectInteractionDisabled}
+                        aria-describedby="allow-stacks-help"
+                        onChange={(event) => handleStacksEnabledChange(event.currentTarget.checked)}
+                      />
+                      <span className="toggleSwitch__track" aria-hidden>
+                        <span className="toggleSwitch__thumb" />
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="toggleSetting">
+                    <div className="toggleSetting__copy">
+                      <label className="toggleSetting__label" htmlFor="allow-board-zoom-switch">
+                        Allow board zoom
+                      </label>
+                      <div className="toggleSetting__help" id="allow-board-zoom-help">
+                        Let participants change the board zoom.
+                      </div>
+                    </div>
+                    <label className="toggleSwitch">
+                      <input
+                        id="allow-board-zoom-switch"
+                        type="checkbox"
+                        role="switch"
+                        checked={zoomEnabled}
+                        disabled={projectInteractionDisabled}
+                        aria-describedby="allow-board-zoom-help"
+                        onChange={(event) => handleZoomEnabledChange(event.currentTarget.checked)}
+                      />
+                      <span className="toggleSwitch__track" aria-hidden>
+                        <span className="toggleSwitch__thumb" />
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
               {sortConfig.type === 'closed' ? (
                 <div className="columns">
                   <div className="columns__label">Categories</div>
                   <div className="columns__controls">
-                    <button className="btn btn--tiny" type="button" onClick={handleCreateClosedTarget} disabled={!canAddClosedTarget}>
-                      Add category
+                    <button className="btn btn--ghost btn--tiny" type="button" onClick={handleCreateClosedTarget} disabled={!canAddClosedTarget}>
+                      <Plus />Add category
                     </button>
                     <div className="columns__value">{closedTargetCount} / 5</div>
                   </div>
@@ -4774,11 +5284,23 @@ export default function App() {
               ) : null}
             </div>
 
-            <div className="panel__section">
-              <div className="sectionTitle">Cards</div>
-              <div className="cardStats">
-                <div>{countLabel(cards.length, 'card')}</div>
+            <details className="panel__section displaySettings">
+              <summary><Settings2 />Display</summary>
+              <label className="fullscreenStartOption">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={startInFullscreen}
+                  disabled={projectInteractionDisabled || !fullscreen.supported}
+                  aria-describedby="start-fullscreen-help"
+                  onChange={event => handleStartInFullscreenChange(event.currentTarget.checked)}
+                />
+                Start in full screen
+              </label>
+              <div className="hint" id="start-fullscreen-help">
+                {fullscreen.supported ? 'Press Esc to leave full screen.' : 'Full screen is unavailable in this browser.'}
               </div>
+
               <div className="layoutModeControl">
                 <div className="layoutModeControl__label">Layout</div>
                 <div className="segmented segmented--compact segmented--layoutModes" role="group" aria-label="Card proportions">
@@ -4827,19 +5349,25 @@ export default function App() {
                   />
                 </div>
               ) : null}
-            </div>
+            </details>
+            <div className="panel__footer"><span className="saveStatus" data-testid="project-status" role="status">{!projectStatus || /saved|imported|exported|renamed|created|deleted/i.test(projectStatus) ? <Check /> : /failed|could not|cannot/i.test(projectStatus) ? <CircleAlert /> : null}{projectStatus || 'Saved in this browser'}</span></div>
           </aside>
 
-          <main className="main">
+          <main className="main" {...(isProjectBusy ? { inert: '' } : {})}>
             <Board
+              key={`${activeProjectId}:setup`}
               mode={mode}
               sortConfig={sortConfig}
               cards={hasWidgetWorkflow ? stageVisibleCards : cards}
               stackBadges={stackBadges}
+              onRenameStack={isProjectBusy ? undefined : handleRenameStack}
+              stackDropPreview={stackDropPreview}
               surfaceScene={boardSurfaceScene}
               baseCardWidth={cardWidth}
               cardLayoutMode={cardLayoutMode}
               selectedCardIds={selectedCardIds}
+              worldSize={sortConfig.type === 'open' ? boardViewport : undefined}
+              panEnabled={sortConfig.type === 'open'}
               boardRef={boardRef}
               dragEnabled={boardDragEnabled}
               onBringToFront={bringToFront}
@@ -4857,88 +5385,72 @@ export default function App() {
               onLassoSelect={handleLassoSelect}
               onDragTraceStart={handleDragTraceStart}
               onDragTraceSample={handleDragTraceSample}
-              onOpenPreview={openVideoPreview}
+              onOpenPreview={openMediaPreview}
               onFilesAdded={addLocalMedia}
             />
-            {showSetupDetailsDrawer ? (
-              <>
-                <button
-                  className="detailsDrawerBackdrop"
-                  type="button"
-                  tabIndex={-1}
-                  aria-label="Close details panel"
-                  onClick={() => setIsDetailsDrawerOpen(false)}
-                />
-                <CardDetailsPanel
-                  context={detailsPanelContext}
-                  isDrawer
-                  onClose={() => setIsDetailsDrawerOpen(false)}
-                />
-              </>
-            ) : null}
+            {showSetupDetailsDrawer ? <>
+              {isNarrowSetupLayout ? <button className="detailsDrawerBackdrop" type="button" tabIndex={-1} aria-label="Close details panel" onClick={() => setIsDetailsDrawerOpen(false)} /> : null}
+              <CardDetailsPanel context={detailsPanelContext} isDrawer={isNarrowSetupLayout} floating={!isNarrowSetupLayout} onClose={() => setIsDetailsDrawerOpen(false)} />
+            </> : null}
+            {!isDetailsDrawerOpen && (selectedCardCount > 0 || selectedStackCount > 0 || selectedWidgetId) ? <button className="btn btn--ghost detailsOpenButton" onClick={() => setIsDetailsDrawerOpen(true)}><PanelRightOpen />Details</button> : null}
           </main>
-          {!isNarrowSetupLayout ? (
-            <CardDetailsPanel
-              context={detailsPanelContext}
-            />
-          ) : null}
         </div>
       ) : mode === 'sort' ? (
         <div className="layout layout--sort">
           <div className="sortBar">
-            <button
-              className="btn btn--ghost"
-              type="button"
-              disabled={isReplaying}
-              onClick={handleBackToSetupFromSort}
-            >
-              ← Setup
+            <button className="btn btn--ghost sortBar__icon" type="button" aria-label="Leave sorting" title="Leave sorting"
+              disabled={isProjectBusy || isReplaying || fullscreen.pending} onClick={handleBackToSetupFromSort}>
+              <ArrowLeft />
             </button>
-
-            <div className="sortBar__meta">
-              <span className="pill">{getTemplateLabel(sortConfig.type)}</span>
-              {showSortStagePill ? <span className="pill pill--muted">{activeSortStageLabel}</span> : null}
-              {sortConfig.type === 'closed' ? (
-                <span className="pill pill--muted">
-                  {remainingClosedSourceCount === 0
-                    ? 'All cards placed'
-                    : `${remainingClosedSourceCount} of ${cards.length} cards left`}
-                </span>
-              ) : (
-                <span className="pill pill--muted">{countLabel(cards.length, 'card')}</span>
-              )}
-              <span className="pill pill--rec sortBar__recIndicator">Recording · {countLabel(sortMoveCount, 'action')}</span>
+            <div className="sortBar__identity">
+              <span className="sortProjectName" title={activeProject?.name}>{activeProject?.name}</span>
+              {hasWidgetWorkflow && isCurrentWorkflowStageComplete
+                ? <span className="sortReady" data-testid="sort-completion" role="status">{sortCompletionMessage}</span>
+                : showSortStagePill ? <span className="sortBar__stage">{activeSortStageLabel}</span> : null}
             </div>
-
-            <div className="sortBar__meta">
-              <button
-                className="btn btn--ghost btn--tiny"
-                type="button"
-                disabled={isReplaying || !canEndSorting}
-                aria-describedby={sortCompletionHint ? 'sort-completion-hint' : undefined}
-                onClick={sortConfig.type === 'qsort' && hasNextWorkflowStage ? handleAdvanceSortStage : endSorting}
-              >
-                {sortConfig.type === 'qsort' && hasNextWorkflowStage ? 'Next stage →' : 'End sorting →'}
-              </button>
-              {sortCompletionHint ? (
-                <span className="pill pill--muted" id="sort-completion-hint" role="status">
-                  {sortCompletionHint}
-                </span>
-              ) : null}
-            </div>
+            {activeProject?.instructions ? (
+              <details className="projectInstructions projectInstructions--sort"><summary><BookOpen />Instructions</summary><p>{activeProject.instructions}</p></details>
+            ) : null}
+            <button className="btn btn--ghost btn--tiny" type="button" onClick={() => setShowControls(true)}><HelpCircle /><HelpCircle />Controls</button>
+            <span className="sortBar__recIndicator" data-testid="recording-status" data-camera-changes={sortCameraChangeCount}
+              title={`Recording · ${countLabel(sortMoveCount, 'action')}`}>
+              Recording<span className="srOnly"> · {countLabel(sortMoveCount, 'action')}</span>
+            </span>
+            <button className="btn btn--ghost sortBar__icon" type="button"
+              disabled={isProjectBusy || !fullscreen.supported || fullscreen.pending}
+              aria-pressed={isSortFullscreen} aria-label={isSortFullscreen ? 'Exit full screen' : 'Full screen'}
+              title={isSortFullscreen ? 'Exit full screen (Esc)' : 'Full screen'} onClick={handleSortFullscreen}>
+              {isSortFullscreen ? <Minimize /> : <Maximize />}
+            </button>
+            <button className="btn btn--tiny sortBar__finish" type="button"
+              disabled={isProjectBusy || isReplaying || fullscreen.pending || !canEndSorting}
+              title={sortCompletionHint || undefined} aria-describedby={sortCompletionHint ? 'sort-completion-hint' : undefined}
+              onClick={sortConfig.type === 'qsort' && hasNextWorkflowStage ? handleAdvanceSortStage : endSorting}>
+              {sortConfig.type === 'qsort' && hasNextWorkflowStage ? 'Continue to Q-Sort' : 'Finish sorting'}<ArrowRight />
+            </button>
+            {sortCompletionHint ? <span className="srOnly" id="sort-completion-hint">{sortCompletionHint}</span> : null}
+            {projectStatus.startsWith('Could not save') ? <span className="fullscreenStatus" role="alert">{projectStatus}</span> : null}
+            {fullscreen.message ? <span className="fullscreenStatus" role="status">{fullscreen.message}</span> : null}
           </div>
 
-          <main className="main">
+          <main className="main" {...(isProjectBusy ? { inert: '' } : {})}>
             <Board
+              key={`${activeProjectId}:sort:${recordingSession?.createdAt}`}
               mode={mode}
               sortConfig={sortConfig}
               cards={hasWidgetWorkflow ? stageVisibleCards : cards}
               stackBadges={stackBadges}
+              onRenameStack={isProjectBusy ? undefined : handleRenameStack}
+              stackDropPreview={stackDropPreview}
               surfaceScene={boardSurfaceScene}
               baseCardWidth={cardWidth}
               cardLayoutMode={cardLayoutMode}
               boardRef={boardRef}
               dragEnabled={boardDragEnabled}
+              worldSize={sortWorldSize}
+              viewScale={sortWorldSize ? sortViewScale : 1}
+              panEnabled={!!sortWorldSize}
+              onViewChange={sortWorldSize ? handleSortBoardViewChange : undefined}
               onBringToFront={bringToFront}
               onMoveEnd={handleMoveEnd}
               onStackDragStart={handleStackDragStart}
@@ -4946,102 +5458,104 @@ export default function App() {
               onStackDragEnd={handleStackDragEnd}
               onDragTraceStart={handleDragTraceStart}
               onDragTraceSample={handleDragTraceSample}
-              onOpenPreview={openVideoPreview}
+              onOpenPreview={openMediaPreview}
               onFilesAdded={addLocalMedia}
             />
-            {showSortCompletion ? (
-              <section className="sortCompletion" data-testid="sort-completion" role="status" aria-live="polite">
-                <div className="sortCompletion__confetti" aria-hidden="true">
-                  {Array.from({ length: 10 }, (_, index) => (
-                    <span key={index} />
-                  ))}
-                </div>
-                <div className="sortCompletion__panel">
-                  <div>
-                    <div className="sortCompletion__title">Done!</div>
-                    <div className="sortCompletion__message">{sortCompletionMessage}</div>
-                  </div>
-                  <button
-                    className="btn sortCompletion__action"
-                    type="button"
-                    onClick={sortConfig.type === 'qsort' && hasNextWorkflowStage ? handleAdvanceSortStage : endSorting}
-                  >
-                    {sortCompletionActionLabel}
-                  </button>
-                </div>
-              </section>
+            {sortWorldSize && zoomEnabled ? (
+              <div className="sortZoomDock">
+                <ZoomControls disabled={isProjectBusy} scale={sortViewScale} onChange={handleSortZoomChange} onFit={handleSortZoomFit} />
+              </div>
             ) : null}
           </main>
         </div>
       ) : (
         <div className="layout layout--sort layout--replay">
-          <div className="sortBar">
-            <button className="btn btn--ghost" type="button" disabled={isReplaying} onClick={startSortingWorkflow}>
-              ← Start another sort
-            </button>
-
-            <div className="sortBar__meta">
-              <span className="pill">Replay</span>
-              {activeProject ? <span className="pill pill--muted">{activeProject.name}</span> : null}
-              {replayRecording ? <span className="pill pill--muted">{countLabel(replayRecording.segments.length, 'recorded action')}</span> : null}
-              {isReplaying ? <span className="pill pill--muted">Playing</span> : <span className="pill pill--muted">Paused</span>}
+          <div className="recordingsHeader">
+            <div><strong>{replayRecording ? 'Recording' : 'Recordings'}</strong>{replayRecording ? <span className="hint">{countLabel(replayRecording.segments.length, 'recorded action')}{replayCameraChangeCount ? ` · ${countLabel(replayCameraChangeCount, 'view change')}` : ''}</span> : null}</div>
+            <button className="btn btn--ghost" type="button" disabled={!canStartSorting || isReplaying} onClick={startSortingWorkflow}><Plus />New sorting session</button>
+            <div className="recordingsHeader__save">
+              <span className="hint" role="status" data-testid="project-status">{projectStatus || 'Saved in this browser.'}</span>
+              <button className="btn btn--ghost" type="button" disabled={projectInteractionDisabled} onClick={handleExportProject}><Download />Export project</button>
             </div>
-
-            <div className="sortBar__meta">
-              <button
-                className="btn btn--ghost"
-                type="button"
-                disabled={replayActivityMarkers.length === 0}
-                onClick={() => {
-                  const prev = replayActivityMarkers.filter((marker) => marker.t < replayTimeMs).at(-1) || replayActivityMarkers.at(-1);
-                  if (!prev) return;
-                  pauseReplay();
-                  setReplayTimeMs(prev.t);
-                }}
-                title="Previous activity peak"
-              >
-                ◀ Activity
-              </button>
-
-              <button
-                className="btn btn--ghost"
-                type="button"
-                disabled={replayActivityMarkers.length === 0}
-                onClick={() => {
-                  const next = replayActivityMarkers.find((marker) => marker.t > replayTimeMs) || replayActivityMarkers[0];
-                  if (!next) return;
-                  pauseReplay();
-                  setReplayTimeMs(next.t);
-                }}
-                title="Next activity peak"
-              >
-                Activity ▶
-              </button>
-
-              {isReplaying ? (
-                <button className="btn" type="button" onClick={pauseReplay}>
-                  Pause
-                </button>
-              ) : (
-                <button
-                  className="btn"
-                  type="button"
-                  disabled={!replayRecording || replayRecording.segments.length === 0}
-                  onClick={startReplay}
-                >
-                  Play
-                </button>
-              )}
-
-              <button className="btn btn--ghost" type="button" disabled={!replayRecording} onClick={stopReplay}>
-                Reset to start
-              </button>
-            </div>
-
           </div>
 
           <main className="main main--replay">
-            <section className="replayStage">
+            {!replayRecording ? <section className="recordingsEmpty"><h2>No recordings yet</h2><p>Finish a sort to create a replay.</p><button className="btn" onClick={returnToSetupFromReplay}>Prepare a sort</button></section> : <section className="replayStage">
+              <div className="replayPresentation" ref={replayFullscreenRef}>
+                <div className="replayPlayback">
+                  {isReplaying ? <button className="btn" onClick={pauseReplay}><Pause />Pause</button> : <button className="btn" disabled={!hasReplayActivity} onClick={startReplay}><Play />Play recording</button>}
+                  <button className="btn btn--ghost btn--tiny" disabled={!replayRecording} onClick={stopReplay}><SkipBack />Go to start</button>
+                  <button className="btn btn--ghost btn--tiny" disabled={!replayIndex} onClick={() => { pauseReplay(); if (replayIndex) setReplayTimeMs(replayIndex.durationMs); }}><CheckCheck />Show result</button>
+                  <span className="replayPlayback__state">{isReplaying ? 'Playing' : replayIndex && replayTimeMs >= replayIndex.durationMs ? 'Result' : 'Paused'}</span>
+                  <ProjectMenu name="View" label="View" disabled={!replayRecording}>
+                <div className="replayViewOptions">
+                  <div className="replayViewportToolbar__group" role="group" aria-label="Replay camera">
+                    <button
+                      type="button"
+                      className={`btn btn--ghost btn--tiny ${replayViewMode === 'recorded' ? 'isActive' : ''}`}
+                      aria-pressed={replayViewMode === 'recorded'}
+                      onClick={() => setReplayViewMode('recorded')}
+                    >
+                      Follow recording
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn--ghost btn--tiny ${replayViewMode === 'free' ? 'isActive' : ''}`}
+                      aria-pressed={replayViewMode === 'free'}
+                      onClick={() => {
+                        setReplayFreeCamera(replayRecordedCamera);
+                        setReplayViewMode('free');
+                      }}
+                    >
+                      Free view
+                    </button>
+                  </div>
+
+                  <div className="replayViewportToolbar__meta" aria-live="polite">
+                    Recorded viewport {replayViewport.width} × {replayViewport.height}
+                    {replayPresentationMode === 'fit' && replayPresentationScale < 0.999
+                      ? ` · fitted to ${Math.round(replayPresentationScale * 100)}%`
+                      : ''}
+                    {fullscreen.message ? <div className="fullscreenStatus" role="status">{fullscreen.message}</div> : null}
+                  </div>
+
+                  <div className="replayViewportToolbar__group" role="group" aria-label="Replay size">
+                    <button
+                      type="button"
+                      className={`btn btn--ghost btn--tiny ${replayPresentationMode === 'fit' ? 'isActive' : ''}`}
+                      aria-pressed={replayPresentationMode === 'fit'}
+                      onClick={() => setReplayPresentationMode('fit')}
+                    >
+                      Fit
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn--ghost btn--tiny ${replayPresentationMode === 'actual' ? 'isActive' : ''}`}
+                      aria-pressed={replayPresentationMode === 'actual'}
+                      onClick={() => setReplayPresentationMode('actual')}
+                    >
+                      1:1
+                    </button>
+
+                  </div>
+                </div>
+
+                    <div className="replayViewOptions__activity">
+                      <button className="btn btn--ghost btn--tiny" disabled={!replayActivityMarkers.length} onClick={() => { const previous = replayActivityMarkers.filter(marker => marker.t < replayTimeMs).at(-1) || replayActivityMarkers.at(-1); if (previous) { pauseReplay(); setReplayTimeMs(previous.t); } }}><SkipBack />Previous activity</button>
+                      <button className="btn btn--ghost btn--tiny" disabled={!replayActivityMarkers.length} onClick={() => { const next = replayActivityMarkers.find(marker => marker.t > replayTimeMs) || replayActivityMarkers[0]; if (next) { pauseReplay(); setReplayTimeMs(next.t); } }}><SkipForward />Next activity</button>
+                    </div>
+                    {isReplayFullscreen ? <button className="btn btn--ghost btn--tiny" onClick={() => setShowControls(true)}><HelpCircle />Controls</button> : null}
+                  </ProjectMenu>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--tiny"
+                      disabled={isProjectBusy || !fullscreen.supported || fullscreen.pending}
+                      aria-pressed={isReplayFullscreen}
+                      onClick={handleReplayFullscreen}
+                    >
+                      {isReplayFullscreen ? <Minimize /> : <Maximize />}{isReplayFullscreen ? 'Exit full screen' : 'Full screen'}
+                    </button>
+                </div>
               <div className="replayTimelineBar">
                 {replayRecording && replayIndex ? (
                   <ReplayTimeline
@@ -5060,28 +5574,88 @@ export default function App() {
 
                 <div className="replayTimeLabel">{formatTimeMs(replayTimeMs)}</div>
               </div>
-              <div className="replayBoard">
-                <Board
-                  mode="end"
-                  sortConfig={replayRecording?.sortConfig || sortConfig}
-                  cards={replayVisibleCards}
-                  surfaceScene={replaySurfaceScene}
-                  liftedCardIds={replayLiftedCardIds}
-                  baseCardWidth={replayRecording?.cardW || cardWidth}
-                  cardLayoutMode={replayRecording?.cardLayoutModeAtStart || cardLayoutMode}
-                  boardRef={boardRef}
-                  dragEnabled={false}
-                  onBringToFront={ignoreReplayInteraction}
-                  onMoveEnd={ignoreReplayInteraction}
-                  onFilesAdded={ignoreReplayInteraction}
-                />
-              </div>
-            </section>
+                {mode === 'end' && previewCard ? <VideoPreviewDialog card={previewCard} onClose={closeMediaPreview} showMetadata={false} /> : null}
+                {mode === 'end' && showControls ? <ControlsDialog mode={mode} stacksEnabled={replayRecording?.sortConfig.stacksEnabled !== false} sortType={replayRecording?.sortConfig.type || sortConfig.type} onClose={() => setShowControls(false)} /> : null}
+                <div className="replayBoard" ref={replayBoardHostRef}>
+                  {replayWindowChanged && !replayResizeWarningDismissed ? (
+                    <div className="replayResizeWarning" role="alert">
+                      <span>
+                        Replay fitted to the resized window.
+                      </span>
+                      <button
+                        type="button"
+                        className="replayResizeWarning__dismiss"
+                        aria-label="Dismiss window size warning"
+                        onClick={() => setReplayResizeWarningDismissed(true)}
+                      >
+                        <X />
+                      </button>
+                    </div>
+                  ) : null}
 
-            <aside className="panel panel--sessions" aria-label="Replay sessions">
+                  <div
+                    className="replayViewportLayout"
+                    style={{
+                      width: Math.max(replayBoardHostSize.width, replayFrameSize.width + 32),
+                      height: Math.max(replayBoardHostSize.height, replayFrameSize.height + 32),
+                    }}
+                  >
+                    <div
+                      className="replayViewportFrame"
+                      style={{ width: replayFrameSize.width, height: replayFrameSize.height }}
+                    >
+                      <div
+                        className="replayViewportPlane"
+                        style={{
+                          width: replayViewport.width,
+                          height: replayViewport.height,
+                          transform: `scale(${replayPresentationScale})`,
+                        }}
+                      >
+                        <Board
+                          mode="end"
+                          sortConfig={replayRecording?.sortConfig || sortConfig}
+                          cards={replayVisibleCards}
+                          stackBadges={replayStackBadges}
+                          surfaceScene={replaySurfaceScene}
+                          liftedCardIds={replayLiftedCardIds}
+                          baseCardWidth={replayRecording?.cardW || cardWidth}
+                          cardLayoutMode={replayRecording?.cardLayoutModeAtStart || cardLayoutMode}
+                          boardRef={boardRef}
+                          dragEnabled={false}
+                          worldSize={replayWorldSize}
+                          viewScale={replayWorldSize ? replayCamera.scale : 1}
+                          viewCenter={replayWorldSize ? { x: replayCamera.centerX, y: replayCamera.centerY } : undefined}
+                          panEnabled={!!replayWorldSize && replayViewMode === 'free'}
+                          onViewChange={
+                            replayWorldSize && replayViewMode === 'free' ? handleReplayFreeCameraChange : undefined
+                          }
+                          onBringToFront={ignoreReplayInteraction}
+                          onMoveEnd={ignoreReplayInteraction}
+                          onFilesAdded={ignoreReplayInteraction}
+                          onOpenPreview={openMediaPreview}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {replayWorldSize && replayViewMode === 'free' ? (
+                    <div className="replayZoomDock">
+                      <ZoomControls
+                        label="Replay zoom"
+                        scale={replayFreeCamera.scale}
+                        onChange={handleReplayFreeZoomChange}
+                        onFit={handleReplayFreeZoomFit}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </section>}
+
+            {sessions.length > 0 ? <aside className="panel panel--sessions" aria-label="Replay sessions">
               <div className="panel--sessions__header">
                 <div className="sectionTitle">Sessions</div>
-                <div className="hint">Select a session to view its replay.</div>
               </div>
               <div className="replaySessionList" data-testid="replay-sessions">
                 {sessions.length === 0 ? (
@@ -5096,19 +5670,23 @@ export default function App() {
                       onClick={() => void selectSession(s.id)}
                       title={s.id}
                     >
-                      <span className="replaySession__date">{new Date(s.id).toLocaleString()}</span>
+                      <span className="replaySession__date">{new Date(s.id).toLocaleString('en-GB')}</span>
                       <span className="replaySession__meta">
                         {getTemplateLabel(s.recording.sortConfig.type)} · {countLabel(s.recording.segments.length, 'action')}
+                        {countRecordedViewChanges(s.recording.cameraTrack) > 0
+                          ? ` · ${countLabel(countRecordedViewChanges(s.recording.cameraTrack), 'view change')}`
+                          : ''}
                       </span>
                     </button>
                   ))
                 )}
               </div>
-            </aside>
+            </aside> : null}
           </main>
         </div>
       )}
-      {previewCard ? <VideoPreviewDialog card={previewCard} onClose={closeVideoPreview} /> : null}
+      {showControls && (mode !== 'end' || !replayRecording) ? <ControlsDialog mode={mode} stacksEnabled={stacksEnabled} sortType={mode === 'end' ? replayRecording?.sortConfig.type || sortConfig.type : sortConfig.type} onClose={() => setShowControls(false)} /> : null}
+      {previewCard && mode !== 'end' ? <VideoPreviewDialog card={previewCard} onClose={closeMediaPreview} showMetadata={mode === 'setup'} /> : null}
     </div>
   );
 }

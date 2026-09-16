@@ -3,6 +3,8 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import {
   TEXT_CARD_COLOR_KEYS,
   type BoardWidgetData,
+  type CameraFrameSource,
+  type CameraKeyframe,
   type CardData,
   type CardLayoutMode,
   type CardMetadataV1,
@@ -16,6 +18,7 @@ import {
   type TextCardColorKey,
   type WidgetLayoutMode,
 } from './types';
+import { clampBoardZoom } from './camera';
 import { normalizeCardLayoutMode, normalizeCardSizeScale, normalizeImageAspectRatio } from './cardLayout';
 import {
   getDefaultActiveStageId,
@@ -82,6 +85,7 @@ export type PersistedProjectV1 = {
   version: 1;
   id: string;
   name: string;
+  instructions?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -233,7 +237,12 @@ function normalizeSortTemplateId(value: unknown): SortTemplateId {
 }
 
 function normalizePersistedSortConfig(value: SortConfig | undefined): SortConfig {
-  return { type: normalizeSortTemplateId(value?.type) };
+  return {
+    type: normalizeSortTemplateId(value?.type),
+    stacksEnabled: value?.stacksEnabled !== false,
+    zoomEnabled: value?.zoomEnabled === true,
+    startInFullscreen: value?.startInFullscreen === true,
+  };
 }
 
 function normalizeWidgetAssignments(value: unknown): CardWidgetAssignmentsByStage | undefined {
@@ -746,6 +755,58 @@ function normalizeRuntimeCards(cards: CardData[]) {
   return cards.map((card, index) => normalizeRuntimeCard(card, index));
 }
 
+function normalizeCameraTrack(value: unknown, boardW: number, boardH: number): CameraKeyframe[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const sources = new Set<CameraFrameSource>(['initial', 'zoom', 'pan', 'resize']);
+  const frames = value
+    .filter((frame) => frame && typeof frame === 'object')
+    .map((frame) => {
+      const raw = frame as Partial<CameraKeyframe>;
+      const tMs = Number(raw.tMs);
+      const scale = Number(raw.scale);
+      const centerX = Number(raw.centerX);
+      const centerY = Number(raw.centerY);
+      const viewportW = Number(raw.viewportW);
+      const viewportH = Number(raw.viewportH);
+      if (
+        !Number.isFinite(tMs) ||
+        !Number.isFinite(scale) ||
+        !Number.isFinite(centerX) ||
+        !Number.isFinite(centerY) ||
+        !Number.isFinite(viewportW) ||
+        !Number.isFinite(viewportH) ||
+        viewportW <= 0 ||
+        viewportH <= 0
+      ) {
+        return null;
+      }
+      return {
+        tMs: Math.max(0, Math.round(tMs)),
+        scale: clampBoardZoom(scale),
+        centerX,
+        centerY,
+        viewportW: Math.max(1, Math.round(viewportW)),
+        viewportH: Math.max(1, Math.round(viewportH)),
+        source: sources.has(raw.source as CameraFrameSource) ? (raw.source as CameraFrameSource) : 'pan',
+      } satisfies CameraKeyframe;
+    })
+    .filter((frame): frame is CameraKeyframe => !!frame)
+    .sort((a, b) => a.tMs - b.tMs);
+  if (frames.length === 0) return undefined;
+  if (frames[0].tMs > 0) {
+    frames.unshift({
+      tMs: 0,
+      scale: 1,
+      centerX: Math.max(1, boardW) / 2,
+      centerY: Math.max(1, boardH) / 2,
+      viewportW: Math.max(1, Math.round(boardW)),
+      viewportH: Math.max(1, Math.round(boardH)),
+      source: 'initial',
+    });
+  }
+  return frames;
+}
+
 function normalizeRecording(recording: RecordingSession): RecordingSession {
   if (!recording || recording.version !== 5) {
     throw new Error('Unsupported recording version');
@@ -862,8 +923,18 @@ function normalizeRecording(recording: RecordingSession): RecordingSession {
     cardLayoutModeAtStart: normalizeCurrentCardLayoutMode(recording.cardLayoutModeAtStart),
     workflowAtStart,
     activeStageIdAtStart: requestedStageId || getDefaultActiveStageId(workflowAtStart) || undefined,
+    surfaceLayoutVersion: recording.surfaceLayoutVersion === 2 ? 2 : undefined,
     cardsAtStart: normalizeRuntimeCards(recording.cardsAtStart),
     segments,
+    cameraTrack: normalizeCameraTrack(recording.cameraTrack, recording.boardW, recording.boardH),
+    stackTrack: Array.isArray(recording.stackTrack) ? recording.stackTrack
+      .filter(frame => frame && Number.isFinite(frame.tMs) && Array.isArray(frame.cards))
+      .map(frame => ({
+        tMs: Math.max(0, Math.round(frame.tMs)), stacks: normalizePersistedStacks(frame.stacks),
+        cards: frame.cards.filter(card => card && typeof card.id === 'string').map(card => ({
+          id: card.id, stackId: normalizeStackId(card.stackId), stackOrder: normalizeStackOrder(card.stackOrder), z: Number(card.z) || 0,
+        })),
+      })).sort((a, b) => a.tMs - b.tMs) : undefined,
   } as RecordingSession;
 }
 
@@ -1058,6 +1129,7 @@ function normalizeProject(value: unknown): PersistedProjectV1 {
     version: 1,
     id: value.id,
     name: value.name,
+    instructions: normalizeOptionalString(value.instructions),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
@@ -1499,6 +1571,7 @@ export async function persistImportProjectZip(file: Blob): Promise<{ projectId: 
     version: 1,
     id: projectId,
     name: projectName,
+    instructions: normalizeOptionalString(importedProject.instructions),
     createdAt: now,
     updatedAt: now,
   };

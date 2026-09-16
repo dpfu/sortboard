@@ -1,5 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stackFrame } from './stackRecording';
+import { buildReplayIndex, replayCardsAt } from './replayIndex';
 import { createWorkflowForTemplate, WIDGET_ZONE_CONTENT } from './workflow';
 import type { CardData, RecordingSession, SortWorkflowData } from './types';
 import type { PersistedBoardV1, PersistedCardV1, SetupSnapshotV1 } from './persist';
@@ -193,7 +195,7 @@ describe('current persistence schema', () => {
       id: '2026-02-02T00:00:00.000Z',
       boardId: 'closed-project',
       updatedAt: 1,
-      recording: recording(cards as CardData[], workflow),
+      recording: { ...recording(cards as CardData[], workflow), surfaceLayoutVersion: 2 },
     });
 
     const zipBlob = await persist.persistExportProjectZip('closed-project');
@@ -223,6 +225,7 @@ describe('current persistence schema', () => {
     expect(importedImage).not.toHaveProperty('closedContainerId');
     expect(importedSessions).toHaveLength(1);
     expect(importedSessions[0]!.recording.version).toBe(5);
+    expect(importedSessions[0]!.recording.surfaceLayoutVersion).toBe(2);
     expect(importedSessions[0]!.recording).not.toHaveProperty('closedContainersAtStart');
     expect(importedSessions[0]!.recording.workflowAtStart).toEqual(workflow);
     expect(importedSessions[0]!.recording.cardsAtStart[0]!.assetId).toBe(importedImage?.assetId);
@@ -432,6 +435,21 @@ describe('current persistence schema', () => {
     ).rejects.toThrow('Unsupported card kind');
   });
 
+  it('defaults legacy stacks on, zoom and full screen off, while preserving explicit settings', async () => {
+    await persist.persistPutBoard(board('legacy-stacks'));
+    await persist.persistPutBoard({
+      ...board('disabled-stacks'),
+      sortConfig: { type: 'open', stacksEnabled: false, zoomEnabled: true, startInFullscreen: true },
+    });
+
+    expect((await persist.persistGetBoard('legacy-stacks'))?.sortConfig.stacksEnabled).toBe(true);
+    expect((await persist.persistGetBoard('legacy-stacks'))?.sortConfig.zoomEnabled).toBe(false);
+    expect((await persist.persistGetBoard('legacy-stacks'))?.sortConfig.startInFullscreen).toBe(false);
+    expect((await persist.persistGetBoard('disabled-stacks'))?.sortConfig.stacksEnabled).toBe(false);
+    expect((await persist.persistGetBoard('disabled-stacks'))?.sortConfig.zoomEnabled).toBe(true);
+    expect((await persist.persistGetBoard('disabled-stacks'))?.sortConfig.startInFullscreen).toBe(true);
+  });
+
   it('seeds unassigned current Closed and Q-Sort cards into their source widgets', async () => {
     for (const templateId of ['closed', 'qsort'] as const) {
       const workflow = createWorkflowForTemplate(templateId, 1200, 800, 2);
@@ -445,6 +463,31 @@ describe('current persistence schema', () => {
       expect(stored?.cards.every((card) => card.widgetAssignments?.[source.stageId]?.widgetId === source.id)).toBe(true);
       expect(stored?.cards.every((card) => card.widgetAssignments?.[source.stageId]?.zoneId === WIDGET_ZONE_CONTENT)).toBe(true);
     }
+  });
+
+  it('round-trips group names and membership without changing the prepared board or older recordings', async () => {
+    const prepared = [textCard('first'), textCard('second', 1)];
+    const projectId = 'group-project';
+    await persist.persistPutProject({ version: 1, id: projectId, name: 'Groups', createdAt: 1, updatedAt: 1 });
+    await persist.persistPutBoard(board(projectId, prepared));
+    const current = recording(prepared as CardData[]);
+    const grouped = prepared.map((card, index) => ({ ...card, stackId: 'pair', stackOrder: index } as CardData));
+    current.stackTrack = [
+      stackFrame(prepared as CardData[], [], 0),
+      stackFrame(grouped, [{ id: 'pair', name: 'Shared meaning', createdAt: 1 }], 500),
+    ];
+    await persist.persistPutSession({ version: 1, id: current.createdAt, boardId: projectId, updatedAt: 2, recording: current });
+    const older = recording(prepared as CardData[], undefined, '2026-02-01T00:00:00.000Z');
+    await persist.persistPutSession({ version: 1, id: older.createdAt, boardId: projectId, updatedAt: 1, recording: older });
+    const zip = await persist.persistExportProjectZip(projectId);
+    const imported = await persist.persistImportProjectZip(zip);
+    const importedBoard = await persist.persistGetBoard(imported.projectId);
+    expect(importedBoard?.cards.every(card => !card.stackId)).toBe(true);
+    const rows = await persist.persistListSessions(imported.projectId);
+    const restored = rows.find(row => row.recording.stackTrack)?.recording;
+    expect(restored?.stackTrack).toEqual(current.stackTrack);
+    expect(replayCardsAt(restored!, buildReplayIndex(restored!), 500).map(card => card.stackId)).toEqual(['pair', 'pair']);
+    expect(rows.find(row => !row.recording.stackTrack)?.recording.cardsAtStart).toHaveLength(2);
   });
 
   it('deletes individual sessions and assets', async () => {
@@ -529,7 +572,12 @@ describe('current persistence schema', () => {
 
     const stored = await persist.persistGetSetupUndo('undo-project');
     expect(stored?.version).toBe(1);
-    expect(stored?.past).toEqual([snapshot]);
+    expect(stored?.past).toEqual([
+      {
+        ...snapshot,
+        sortConfig: { type: 'open', stacksEnabled: true, zoomEnabled: false, startInFullscreen: false },
+      },
+    ]);
 
     await persist.persistClearSetupUndo('undo-project');
     expect(await persist.persistGetSetupUndo('undo-project')).toBeUndefined();

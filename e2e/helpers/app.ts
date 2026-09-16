@@ -32,7 +32,10 @@ export async function gotoApp(page: Page) {
 
 export async function openFreshApp(page: Page) {
   await resetAppState(page);
-  await gotoApp(page);
+  await page.goto('/');
+  // The first-visit dialog is lazy-loaded and may appear after the board.
+  await page.getByRole('button', { name: 'Open starter board' }).click();
+  await waitForAppReady(page);
 }
 
 async function persistedBoardCardCount(page: Page) {
@@ -66,9 +69,11 @@ async function persistedBoardCardCount(page: Page) {
 }
 
 export async function waitForAppReady(page: Page) {
-  const startButton = page.getByRole('button', { name: 'Start sorting →' });
+  const startButton = page.getByRole('button', { name: 'Start sorting' });
   await expect(startButton).toBeVisible();
   await expect(startButton).toBeEnabled({ timeout: 10_000 });
+  const welcome = page.getByRole('button', { name: 'Open starter board' });
+  if (await welcome.isVisible()) await welcome.click();
   await expect.poll(() => selectedProjectName(page)).not.toBe('');
   await expect.poll(() => persistedBoardCardCount(page)).not.toBeNull();
   const expectedCardCount = await persistedBoardCardCount(page);
@@ -115,7 +120,11 @@ export async function dragMouseFromTo(page: Page, from: { x: number; y: number }
   await page.mouse.down();
   try {
     await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
+    // Motion samples pointer movement on animation frames. Give native WebKit
+    // input a frame before pointerup, as a real drag would have.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
     await page.mouse.move(to.x, to.y);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
   } finally {
     await page.mouse.up();
   }
@@ -250,6 +259,7 @@ export async function handleDialog(
 }
 
 export async function exportProjectZip(page: Page, outputDir: string, fileName = 'project.sortboard.zip') {
+  await openProjectMenu(page);
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   const download = await downloadPromise;
@@ -264,6 +274,18 @@ export async function importProjectZip(page: Page, filePath: string) {
 }
 
 export async function selectedProjectName(page: Page) {
-  const text = await page.locator('select[aria-label="Select project"] option:checked').textContent();
-  return text?.trim() || '';
+  return (await page.getByRole('button', { name: 'Project menu', exact: true }).getAttribute('title')) || '';
+}
+
+export async function openProjectMenu(page: Page) {
+  const trigger = page.getByRole('button', { name: 'Project menu', exact: true });
+  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+}
+export async function openDisplay(page: Page) {
+  const details = page.locator('.displaySettings');
+  if (await details.getAttribute('open') === null) await details.locator('summary').click();
+}
+export async function openReplayView(page: Page) {
+  const trigger = page.getByRole('button', { name: 'View', exact: true });
+  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
 }

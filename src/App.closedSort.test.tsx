@@ -23,11 +23,13 @@ async function renderAppReady() {
   const { default: App } = await import('./App');
   const view = render(<App />);
   await waitFor(() => {
-    const button = screen.getByRole('button', { name: 'Start sorting →' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
+  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
+  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -112,7 +114,7 @@ describe('App closed sort widgets', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Add category' })).toBeTruthy();
-    expect(screen.getByLabelText('Name')).toBeTruthy();
+    expect(screen.queryByLabelText('Name')).toBeNull();
   });
 
   it('adds a closed-sort category widget from setup', async () => {
@@ -133,7 +135,7 @@ describe('App closed sort widgets', () => {
     await renderAppReady();
 
     await userEvent.click(screen.getByRole('button', { name: 'Closed sort' }));
-    await userEvent.click(screen.getByRole('button', { name: '+ Text card' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Text card' }));
 
     await waitFor(async () => {
       const board = await getActiveBoard();
@@ -230,7 +232,7 @@ describe('App closed sort widgets', () => {
       expect(categoryId).toBeTruthy();
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
 
     expect(await screen.findByTestId(`surface-work-area-${sourceId}`)).toBeTruthy();
     expect(await screen.findByTestId(`surface-sink-${categoryId}-content`)).toBeTruthy();
@@ -280,10 +282,10 @@ describe('App closed sort widgets', () => {
     firstView.unmount();
     const view = await renderAppReady();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start sorting →' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'End sorting →' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Finish sorting' }));
 
-    expect(await screen.findByText('Replay')).toBeTruthy();
+    expect(await screen.findByText('Result')).toBeTruthy();
     expect(view.container.querySelector('.board')).toBeTruthy();
     expect(view.container.querySelector('.closedFixedBoard')).toBeNull();
     expect(view.container.querySelector('[data-testid^="closed-container-"]')).toBeNull();
