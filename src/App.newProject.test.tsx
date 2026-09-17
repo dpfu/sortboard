@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 import 'fake-indexeddb/auto';
 import * as React from 'react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('framer-motion', () => {
@@ -66,11 +66,21 @@ describe('App project creation', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it('creates and selects a new project from setup controls', async () => {
     const { default: App } = await import('./App');
     render(<App />);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open starter board' }));
+    // First-visit storage setup and the lazy dialog can exceed the default 1 s
+    // query timeout on CI. Wait for the open dialog, then the hydrated board.
+    const welcome = await screen.findByRole('dialog', { name: 'Try SortBoard' }, { timeout: 5000 });
+    await userEvent.click(within(welcome).getByRole('button', { name: 'Open starter board' }));
+    await waitFor(() => {
+      expect((screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement).disabled).toBe(false);
+    }, { timeout: 5000 });
     await userEvent.click(screen.getByRole('button', { name: 'Project menu' }));
     const select = screen.getByLabelText('Select project') as HTMLSelectElement;
     await waitFor(() => {
@@ -92,5 +102,5 @@ describe('App project creation', () => {
     await waitFor(() => {
       expect(console.info).toHaveBeenCalledWith('[projects] create success', expect.any(Object));
     });
-  });
+  }, 10000);
 });
