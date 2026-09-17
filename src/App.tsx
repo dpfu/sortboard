@@ -41,6 +41,7 @@ import { SUPPORTED_MEDIA_ACCEPT, clamp, detectMediaKind, isSupportedMediaFile } 
 import { clampToBoard as clampToBoardPure } from './positioning';
 import { useElementSize } from './useElementSize';
 import { useFullscreen } from './useFullscreen';
+import { acknowledgeCameraTrack, discardCameraJournal, journalCameraTrack, recoverCameraTrack } from './cameraJournal';
 import {
   CARD_SIZE_SCALE_MAX,
   CARD_SIZE_SCALE_MIN,
@@ -1081,6 +1082,45 @@ export default function App() {
   const completedBoardSaveRevisionRef = React.useRef<Map<string, number>>(new Map());
   const sessionSaveRevisionRef = React.useRef(0);
   const latestSessionSaveRevisionRef = React.useRef<Map<string, number>>(new Map());
+  const latestSessionSnapshotRef = React.useRef<Map<string, PersistedSessionV1>>(new Map());
+  const completedSessionSaveRevisionRef = React.useRef<Map<string, number>>(new Map());
+  const pendingCameraSaveRef = React.useRef<(() => Promise<boolean>) | null>(null);
+  const cameraSaveIdleRef = React.useRef<number | null>(null);
+  const cameraSaveDeadlineRef = React.useRef<number | null>(null);
+  const cameraSaveFrameRef = React.useRef<number | null>(null);
+  const previousAutosaveRecordingRef = React.useRef<RecordingSession | null>(null);
+
+  const cancelPendingCameraSave = React.useCallback(() => {
+    if (cameraSaveIdleRef.current !== null) window.clearTimeout(cameraSaveIdleRef.current);
+    if (cameraSaveDeadlineRef.current !== null) window.clearTimeout(cameraSaveDeadlineRef.current);
+    if (cameraSaveFrameRef.current !== null) window.cancelAnimationFrame(cameraSaveFrameRef.current);
+    cameraSaveIdleRef.current = cameraSaveDeadlineRef.current = cameraSaveFrameRef.current = null;
+    pendingCameraSaveRef.current = null;
+  }, []);
+
+  const flushPendingCameraSave = React.useCallback(() => {
+    const save = pendingCameraSaveRef.current;
+    cancelPendingCameraSave();
+    if (save) void save();
+  }, [cancelPendingCameraSave]);
+
+  React.useEffect(() => {
+    const finishCameraGesture = () => {
+      if (!pendingCameraSaveRef.current) return;
+      if (cameraSaveFrameRef.current !== null) window.cancelAnimationFrame(cameraSaveFrameRef.current);
+      // Let the final scroll event and its React commit join the checkpoint.
+      cameraSaveFrameRef.current = window.requestAnimationFrame(flushPendingCameraSave);
+    };
+    window.addEventListener('pointerup', finishCameraGesture, true);
+    window.addEventListener('pointercancel', finishCameraGesture, true);
+    window.addEventListener('blur', flushPendingCameraSave);
+    return () => {
+      window.removeEventListener('pointerup', finishCameraGesture, true);
+      window.removeEventListener('pointercancel', finishCameraGesture, true);
+      window.removeEventListener('blur', flushPendingCameraSave);
+      flushPendingCameraSave();
+    };
+  }, [flushPendingCameraSave]);
 
   const enqueuePersistenceTask = React.useCallback(
     (queueRef: React.MutableRefObject<Promise<boolean> | null>, task: () => Promise<boolean>) => {
@@ -1256,12 +1296,21 @@ export default function App() {
       const revision = sessionSaveRevisionRef.current + 1;
       sessionSaveRevisionRef.current = revision;
       latestSessionSaveRevisionRef.current.set(snapshot.id, revision);
+      latestSessionSnapshotRef.current.set(snapshot.id, snapshot);
       const task = () => {
         if (discardedSessionIdsRef.current.has(snapshot.id)) return Promise.resolve(true);
         if (latestSessionSaveRevisionRef.current.get(snapshot.id) !== revision) return Promise.resolve(true);
         return runSafePersistence(label, async () => {
           await persistPutSession(snapshot);
-          await persistTouchProject(snapshot.boardId, snapshot.updatedAt);
+          const completedRevision = completedSessionSaveRevisionRef.current.get(snapshot.id) || 0;
+          let authoritative = snapshot;
+          if (completedRevision > revision && !discardedSessionIdsRef.current.has(snapshot.id)) {
+            authoritative = latestSessionSnapshotRef.current.get(snapshot.id) || snapshot;
+            await persistPutSession(authoritative);
+          }
+          completedSessionSaveRevisionRef.current.set(snapshot.id, Math.max(completedRevision, revision));
+          acknowledgeCameraTrack(authoritative.boardId, authoritative.recording);
+          await persistTouchProject(authoritative.boardId, authoritative.updatedAt);
           if (discardedSessionIdsRef.current.has(snapshot.id)) return;
           if (latestSessionSaveRevisionRef.current.get(snapshot.id) !== revision) return;
           if (activeProjectIdRef.current !== snapshot.boardId) return;
@@ -1303,6 +1352,7 @@ export default function App() {
 
   const persistCurrentRecordingSessionImmediately = React.useCallback(
     async (label: string) => {
+      cancelPendingCameraSave();
       if (mode !== 'sort' || !isRecording) return true;
       if (!boardId || !isProjectHydrated || !recordingSession) return true;
       if (discardedSessionIdsRef.current.has(recordingSession.createdAt)) return true;
@@ -1314,14 +1364,15 @@ export default function App() {
         recording: sanitizeRecording(recordingSession),
       }, label, true);
     },
-    [boardId, isProjectHydrated, isRecording, mode, persistSessionSnapshot, recordingSession]
+    [boardId, cancelPendingCameraSave, isProjectHydrated, isRecording, mode, persistSessionSnapshot, recordingSession]
   );
 
   const flushCurrentRecordingSession = React.useCallback(
     async (label: string) => {
+      cancelPendingCameraSave();
       return persistCurrentRecordingSession(label);
     },
-    [persistCurrentRecordingSession]
+    [cancelPendingCameraSave, persistCurrentRecordingSession]
   );
 
   // Track a monotonically increasing z for predictable stacking.
@@ -1682,6 +1733,16 @@ export default function App() {
         persistListSessions(boardId),
       ]);
       if (cancelled) return;
+
+      for (const session of persistedSessions) {
+        const recovered = recoverCameraTrack(boardId, session.recording);
+        if (recovered !== session.recording) {
+          session.recording = recovered;
+          const saved = await runSafePersistence('pending camera recovery', () => persistPutSession(session));
+          if (saved) acknowledgeCameraTrack(boardId, recovered);
+          if (cancelled) return;
+        } else acknowledgeCameraTrack(boardId, session.recording);
+      }
 
       const pendingEdit = readPendingCardMetaEdit(boardId);
       const pendingCardIndex = pendingEdit && persisted
@@ -2121,6 +2182,7 @@ export default function App() {
   }, [activeProjectId, beginSortingWorkflow, flushCurrentBoardSnapshot, fullscreen.clearMessage, fullscreen.enter, fullscreen.exit, isProjectHydrated, isReplaying, startInFullscreen]);
 
   const discardInProgressSortingSession = React.useCallback(async () => {
+    cancelPendingCameraSave();
     const current = recordingSession;
     if (!current) {
       isRecordingRef.current = false;
@@ -2132,6 +2194,7 @@ export default function App() {
     }
 
     discardedSessionIdsRef.current.add(current.createdAt);
+    if (boardId) discardCameraJournal(boardId, current.createdAt);
     isRecordingRef.current = false;
 
     setIsRecording(false);
@@ -2147,7 +2210,7 @@ export default function App() {
     } catch (err) {
       console.error('[sorting] failed to delete discarded session', { sessionId: current.createdAt, err });
     }
-  }, [recordingSession, stopReplayImmediate, stopSampler]);
+  }, [boardId, cancelPendingCameraSave, recordingSession, stopReplayImmediate, stopSampler]);
 
   const handleBackToSetupFromSort = React.useCallback(() => {
     const ok = window.confirm('Leave sorting? This unfinished session will not be available for replay.');
@@ -2895,16 +2958,32 @@ export default function App() {
     sortConfig.type,
   ]);
 
-  // Recording changes are infrequent (a completed move or stage transition),
-  // so they use the same eager hand-off to IndexedDB.
+  // Keep completed actions eager. Camera-only changes use a small recovery
+  // journal and bounded checkpoints instead of rewriting the session per frame.
   React.useLayoutEffect(() => {
-    if (!boardId || !isProjectHydrated) return;
-    if (mode !== 'sort' || !isRecording) return;
-    if (!recordingSession) return;
+    const previous = previousAutosaveRecordingRef.current;
+    previousAutosaveRecordingRef.current = recordingSession;
+    if (!boardId || !isProjectHydrated || mode !== 'sort' || !isRecording || !recordingSession) {
+      cancelPendingCameraSave();
+      return;
+    }
     const sessionId = recordingSession.createdAt;
     if (discardedSessionIdsRef.current.has(sessionId)) return;
+    const cameraOnly = previous && previous.cameraTrack !== recordingSession.cameraTrack &&
+      (Object.keys(recordingSession) as Array<keyof RecordingSession>).every(key =>
+        key === 'cameraTrack' || previous[key] === recordingSession[key]);
+    if (cameraOnly && journalCameraTrack(boardId, recordingSession, previous.cameraTrack?.length || 0)) {
+      pendingCameraSaveRef.current = () => persistCurrentRecordingSession('camera checkpoint');
+      if (cameraSaveIdleRef.current !== null) window.clearTimeout(cameraSaveIdleRef.current);
+      cameraSaveIdleRef.current = window.setTimeout(flushPendingCameraSave, 150);
+      if (cameraSaveDeadlineRef.current === null) {
+        cameraSaveDeadlineRef.current = window.setTimeout(flushPendingCameraSave, 1000);
+      }
+      return;
+    }
+    cancelPendingCameraSave();
     void persistCurrentRecordingSession('session autosave');
-  }, [boardId, isProjectHydrated, isRecording, mode, persistCurrentRecordingSession, recordingSession]);
+  }, [boardId, cancelPendingCameraSave, flushPendingCameraSave, isProjectHydrated, isRecording, mode, persistCurrentRecordingSession, recordingSession]);
 
   React.useLayoutEffect(() => {
     const flushForPageLifecycle = (reason: string) => {

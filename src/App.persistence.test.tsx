@@ -10,6 +10,10 @@ const putBoardHooks = vi.hoisted(() => ({
   before: null as null | ((board: any) => void | Promise<void>),
   after: null as null | ((board: any) => void | Promise<void>),
 }));
+const putSessionHooks = vi.hoisted(() => ({
+  before: null as null | ((session: any) => void | Promise<void>),
+  after: null as null | ((session: any) => void | Promise<void>),
+}));
 
 vi.mock('./persist', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./persist')>();
@@ -19,6 +23,11 @@ vi.mock('./persist', async (importOriginal) => {
       await putBoardHooks.before?.(board);
       await actual.persistPutBoard(board);
       await putBoardHooks.after?.(board);
+    },
+    persistPutSession: async (session: Parameters<typeof actual.persistPutSession>[0]) => {
+      await putSessionHooks.before?.(session);
+      await actual.persistPutSession(session);
+      await putSessionHooks.after?.(session);
     },
   };
 });
@@ -99,6 +108,8 @@ describe('App pending persistence', () => {
     observedBoardHeight = 800;
     putBoardHooks.before = null;
     putBoardHooks.after = null;
+    putSessionHooks.before = null;
+    putSessionHooks.after = null;
     const persist = await import('./persist');
     await persist.persistDeleteAll();
     vi.restoreAllMocks();
@@ -113,6 +124,8 @@ describe('App pending persistence', () => {
   afterEach(() => {
     putBoardHooks.before = null;
     putBoardHooks.after = null;
+    putSessionHooks.before = null;
+    putSessionHooks.after = null;
     cleanup();
   });
 
@@ -282,5 +295,56 @@ describe('App pending persistence', () => {
     const boardRaw = await zip.file('board.json')?.async('string');
     const exportedBoard = JSON.parse(boardRaw!) as { cards: Array<{ id: string; meta?: { name?: string } }> };
     expect(boardCardName(exportedBoard, cardId)).toBe('Latest snapshot');
+  });
+
+  it('keeps the newest camera checkpoint when an older write completes afterward', async () => {
+    await renderAppReady();
+    const persist = await import('./persist');
+    const projectId = await persist.persistGetActiveProjectId();
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    await screen.findByRole('button', { name: 'Finish sorting' });
+    await waitFor(async () => expect(await persist.persistListSessions(projectId!)).toHaveLength(1));
+
+    let releaseOld!: () => void;
+    let oldStarted!: () => void;
+    let oldFinished!: () => void;
+    const gate = new Promise<void>(resolve => { releaseOld = resolve; });
+    const started = new Promise<void>(resolve => { oldStarted = resolve; });
+    const finished = new Promise<void>(resolve => { oldFinished = resolve; });
+    let blocked = false;
+    putSessionHooks.before = async (session) => {
+      if (!blocked && session.recording.cameraTrack.at(-1).viewportW === 1301) {
+        blocked = true;
+        oldStarted();
+        await gate;
+      }
+    };
+    putSessionHooks.after = session => {
+      if (session.recording.cameraTrack.at(-1).viewportW === 1301) oldFinished();
+    };
+
+    const width = window.innerWidth;
+    try {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1301 });
+      fireEvent(window, new Event('resize'));
+      fireEvent(window, new Event('pagehide'));
+      await started;
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1401 });
+      fireEvent(window, new Event('resize'));
+      fireEvent(window, new Event('pagehide'));
+      await waitFor(async () => {
+        expect((await persist.persistListSessions(projectId!))[0].recording.cameraTrack?.at(-1)?.viewportW).toBe(1401);
+      });
+      releaseOld();
+      await finished;
+      await waitFor(async () => {
+        const track = (await persist.persistListSessions(projectId!))[0].recording.cameraTrack!;
+        expect(track.at(-1)?.viewportW).toBe(1401);
+        expect(track.some(frame => frame.viewportW === 1301)).toBe(true);
+      });
+    } finally {
+      releaseOld();
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
   });
 });
