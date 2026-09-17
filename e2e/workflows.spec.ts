@@ -65,6 +65,7 @@ async function dragCardTo(page: Page, cardTestId: string, targetTestId: string) 
     { x: cardBox.x + cardBox.width / 2, y: cardBox.y + cardBox.height / 2 },
     { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 }
   );
+  return cardBox;
 }
 
 async function testIdOf(locator: Locator) {
@@ -224,6 +225,20 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
       bucketIndex += 1;
     }
     const bucket = bucketTargets[bucketIndex];
+    if (index === 1) {
+      const fullBucket = bucketTargets.find(entry => entry.placed === entry.capacity)!;
+      expect(fullBucket).toBeTruthy();
+      const card = page.getByTestId(cardTestId);
+      const actionsBefore = await page.getByTestId('recording-status').getAttribute('title');
+      const before = await dragCardTo(page, cardTestId, fullBucket.testId);
+      await expect(page.getByTestId(fullBucket.testId).locator('.widgetBucket__meta')).toHaveText(`${fullBucket.capacity} / ${fullBucket.capacity}`);
+      await expect.poll(async () => {
+        const after = await card.boundingBox();
+        return !!after && !!before && Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1;
+      }, { message: 'A full column must return the rejected card to its previous position' }).toBe(true);
+      await expect(qSortLanes.nth(laneIndex).locator('.boardSurface__count')).toHaveText(String(remainingInLane[laneIndex]));
+      await expect(page.getByTestId('recording-status')).toHaveAttribute('title', actionsBefore!);
+    }
     await dragCardTo(page, cardTestId, bucket.testId);
     bucket.placed += 1;
     remainingInLane[laneIndex] -= 1;
@@ -231,6 +246,15 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
       `${bucket.placed} / ${bucket.capacity}`
     );
     await expect(qSortLanes.nth(laneIndex).locator('.boardSurface__count')).toHaveText(String(remainingInLane[laneIndex]));
+    if (index === 0) {
+      const actionsBefore = await page.getByTestId('recording-status').getAttribute('title');
+      const before = await dragCardTo(page, cardTestId, bucket.testId);
+      await expect.poll(async () => {
+        const after = await page.getByTestId(cardTestId).boundingBox();
+        return !!after && Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1;
+      }, { message: 'An unchanged drop must still restore the card to its slot' }).toBe(true);
+      await expect(page.getByTestId('recording-status')).toHaveAttribute('title', actionsBefore!);
+    }
     if (index < cardsFromBothLanes.length - 1) {
       await expect(endButton).toBeDisabled();
     }

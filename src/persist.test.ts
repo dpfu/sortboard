@@ -161,7 +161,7 @@ describe('current persistence schema', () => {
     await expect(stored?.blob.text()).resolves.toBe('hello');
   });
 
-  it('roundtrips the current closed workflow, assignments, recording, and media through ZIP', async () => {
+  it.each([2, 3] as const)('roundtrips workflow, media, and layout version %d through ZIP', async (surfaceLayoutVersion) => {
     const workflow = createWorkflowForTemplate('closed', 1200, 800, 2);
     const stageId = workflow.stages[0]!.id;
     const source = workflow.widgets.find((widget) => widget.kind === 'source')!;
@@ -195,7 +195,7 @@ describe('current persistence schema', () => {
       id: '2026-02-02T00:00:00.000Z',
       boardId: 'closed-project',
       updatedAt: 1,
-      recording: { ...recording(cards as CardData[], workflow), surfaceLayoutVersion: 2 },
+      recording: { ...recording(cards as CardData[], workflow), surfaceLayoutVersion },
     });
 
     const zipBlob = await persist.persistExportProjectZip('closed-project');
@@ -225,7 +225,7 @@ describe('current persistence schema', () => {
     expect(importedImage).not.toHaveProperty('closedContainerId');
     expect(importedSessions).toHaveLength(1);
     expect(importedSessions[0]!.recording.version).toBe(5);
-    expect(importedSessions[0]!.recording.surfaceLayoutVersion).toBe(2);
+    expect(importedSessions[0]!.recording.surfaceLayoutVersion).toBe(surfaceLayoutVersion);
     expect(importedSessions[0]!.recording).not.toHaveProperty('closedContainersAtStart');
     expect(importedSessions[0]!.recording.workflowAtStart).toEqual(workflow);
     expect(importedSessions[0]!.recording.cardsAtStart[0]!.assetId).toBe(importedImage?.assetId);

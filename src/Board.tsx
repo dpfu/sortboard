@@ -819,7 +819,7 @@ export function Board({
             <div
               key={surface.surfaceId}
               data-testid={`surface-qsort-${surface.widgetId}`}
-              className={`boardSurface boardSurface--qsort ${surface.isSelected ? 'isSelected' : ''}`}
+              className={`boardSurface boardSurface--qsort ${surface.layoutVersion === 3 ? 'boardSurface--qsortGrid' : ''} ${surface.isSelected ? 'isSelected' : ''}`}
               style={{ left: surface.x, top: surface.y, width: surface.w, height: surface.h }}
             >
               {surface.resizeEnabled ? (
@@ -916,10 +916,15 @@ export function Board({
                 <div className="boardQSort__distributionHeader">
                   <div>
                     <div className="boardQSort__distributionTitle">Rank the cards</div>
-                    <div className="boardQSort__distributionHelp">
+                    {surface.layoutVersion !== 3 ? <div className="boardQSort__distributionHelp">
                       Drag from either tray into an empty slot.
-                    </div>
+                    </div> : null}
                   </div>
+                  {surface.layoutVersion === 3 ? <div className={`boardQSort__status ${surface.buckets.some(bucket => bucket.state === 'full') ? 'is-full' : ''}`} role="status">
+                    {surface.buckets.some(bucket => bucket.state === 'full')
+                      ? 'Column full — choose another place'
+                      : `${surface.buckets.reduce((total, bucket) => total + bucket.count, 0)} of ${surface.count} placed`}
+                  </div> : null}
                 </div>
                 <div
                   className="boardQSort__baseline"

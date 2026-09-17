@@ -33,6 +33,9 @@ test('records Open-sort zoom as camera data and preserves the replay viewport af
   const recordedViewport = page.viewportSize();
   if (!recordedViewport) throw new Error('Missing browser viewport');
   await openFreshApp(page);
+  // This case resizes the window; full-screen viewport changes have their own suite.
+  await page.locator('.displaySettings summary').click();
+  await page.getByRole('switch', { name: 'Start in full screen', exact: true }).uncheck();
 
   const zoomSwitch = page.getByRole('switch', { name: 'Allow board zoom' });
   await expect(zoomSwitch).not.toBeChecked();

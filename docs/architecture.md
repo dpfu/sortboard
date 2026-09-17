@@ -65,6 +65,6 @@ Recordings include timestamped `stackTrack` snapshots for card layering and, in 
 
 Replay uses the same board renderer as live sorting and never writes replay poses back to the prepared board.
 
-Closed sort and Pre-Sort prepare a spaced grid once, then preserve individual drop positions without reflowing other cards. Their surface geometry and card display sizes stay fixed at the recording's initial viewport. A drop on neutral space retains the source assignment. Final Q-Sort uses slot reflow. New recordings carry `surfaceLayoutVersion: 2`; earlier recordings retain their original surface layout and card sizing.
+Closed sort and Pre-Sort prepare a spaced grid once, then preserve individual drop positions without reflowing other cards. Their surface geometry and card display sizes stay fixed at the recording's initial viewport. A drop on neutral space retains the source assignment. Final Q-Sort uses slot reflow. New recordings carry `surfaceLayoutVersion: 3`, adding Q-Sort tray grids with stable positions and columns whose height follows their capacity. Versions 1 and 2 retain their original surface layout and card sizing. Rejected or unchanged drags explicitly restore the card motion values, even when the saved coordinates have not changed.
 
 Open-sort panning changes the camera, never card coordinates. The camera frame includes a gutter around the board so navigation works at every zoom level. Camera keyframes record zoom and pan separately from card actions; replay can follow that track or use a free camera.

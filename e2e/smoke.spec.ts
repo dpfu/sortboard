@@ -1,10 +1,10 @@
 import { openProjectMenu } from './helpers/app';
 import fs from 'node:fs';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   cardFromTop,
   cards,
-  dragLocatorBy,
+  dragMouseFromTo,
   exportProjectZip,
   gotoApp,
   handleDialog,
@@ -22,133 +22,6 @@ const imageFixturePayload = {
   mimeType: 'image/png',
   buffer: fs.readFileSync(imageFixturePath),
 };
-
-async function seedOpenReplaySession(page: Page) {
-  await page.evaluate(async () => {
-    const activeProjectId = await new Promise<string | null>((resolve, reject) => {
-      const request = window.indexedDB.open('sortboard-mvp');
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['meta'], 'readonly');
-        const get = tx.objectStore('meta').get('activeProjectId');
-        get.onerror = () => reject(get.error);
-        get.onsuccess = () => {
-          const value = (get.result as { value?: string } | undefined)?.value ?? null;
-          db.close();
-          resolve(value);
-        };
-      };
-    });
-
-    if (!activeProjectId) {
-      throw new Error('Missing active project id');
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const request = window.indexedDB.open('sortboard-mvp');
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['boards', 'sessions'], 'readwrite');
-        const boards = tx.objectStore('boards');
-        const sessions = tx.objectStore('sessions');
-        const get = boards.get(activeProjectId);
-        get.onerror = () => reject(get.error);
-        get.onsuccess = () => {
-          const board = get.result as {
-            id: string;
-            cardW: number;
-            cardH: number;
-            cardLayoutMode: 'as-is' | 'fixed-16-9' | 'fixed-9-16';
-            sortConfig: { type: 'open' | 'closed' | 'qsort' };
-            workflow: {
-              templateId: 'open' | 'closed' | 'qsort';
-              stages: Array<{ id: string; kind: string; name: string; order: number }>;
-              widgets: Array<Record<string, unknown>>;
-            };
-            activeStageId?: string;
-            cards: Array<{
-              id: string;
-              x: number;
-              y: number;
-              z: number;
-              kind: string;
-              meta: Record<string, unknown>;
-              createdAt: number;
-            }>;
-            updatedAt?: number;
-            activeSessionId?: string;
-          };
-          const leadCard = board.cards[0];
-          if (!leadCard) {
-            reject(new Error('Missing cards for replay session seeding'));
-            return;
-          }
-
-          const sessionId = '2026-01-01T00:00:01.000Z';
-          const session = {
-            version: 1,
-            id: sessionId,
-            boardId: board.id,
-            updatedAt: 1_704_067_201_000,
-            recording: {
-              version: 5,
-              createdAt: sessionId,
-              cardW: board.cardW,
-              cardH: board.cardH,
-              boardW: 1200,
-              boardH: 800,
-              sortConfig: board.sortConfig,
-              cardLayoutModeAtStart: board.cardLayoutMode,
-              workflowAtStart: board.workflow,
-              activeStageIdAtStart: board.activeStageId,
-              cardsAtStart: board.cards.map((card) => ({ ...card })),
-              segments: [
-                {
-                  type: 'drag',
-                  id: 'seed-drag-1',
-                  cardId: leadCard.id,
-                  t0: 0,
-                  t1: 600,
-                  from: { x: leadCard.x, y: leadCard.y },
-                  path: [
-                    [0, leadCard.x, leadCard.y],
-                    [300, leadCard.x + 80, leadCard.y + 40],
-                    [600, leadCard.x + 160, leadCard.y + 80],
-                  ],
-                  drop: { x: leadCard.x + 160, y: leadCard.y + 80 },
-                  final: { x: leadCard.x + 160, y: leadCard.y + 80 },
-                  settleMs: 0,
-                },
-              ],
-            },
-          };
-
-          board.updatedAt = Date.now();
-          board.activeSessionId = sessionId;
-          const putBoard = boards.put(board, activeProjectId);
-          const putSession = sessions.put(session, sessionId);
-
-          let pending = 2;
-          const done = () => {
-            pending -= 1;
-            if (pending === 0) {
-              db.close();
-              resolve();
-            }
-          };
-          const fail = (error?: DOMException | null) => reject(error || new Error('Failed to seed replay session'));
-
-          putBoard.onerror = () => fail(putBoard.error);
-          putSession.onerror = () => fail(putSession.error);
-          putBoard.onsuccess = done;
-          putSession.onsuccess = done;
-        };
-      };
-    });
-  });
-}
 
 test('@smoke persists card metadata across reload', async ({ page }) => {
   await openFreshApp(page);
@@ -169,7 +42,7 @@ test('@smoke persists card metadata across reload', async ({ page }) => {
   await expect(page.getByLabel('Notes')).toHaveValue('Persisted note');
 });
 
-test('@smoke uploads an image and replays a recorded sort', async ({ page }, testInfo) => {
+test('@smoke uploads an image and replays a recorded sort', async ({ page }) => {
   await openFreshApp(page);
 
   const beforeCount = await cards(page).count();
@@ -179,26 +52,18 @@ test('@smoke uploads an image and replays a recorded sort', async ({ page }, tes
 
   await page.getByRole('button', { name: 'Start sorting' }).click();
   await expect(page.getByTestId('recording-status')).toBeVisible();
-  if (testInfo.project.name === 'webkit') {
-    await seedOpenReplaySession(page);
-    await page.reload();
-    await waitForAppReady(page);
-    await page.getByRole('button', { name: 'Start sorting' }).click();
-  await expect(page.getByTestId('recording-status')).toBeVisible();
-  } else {
-    await dragLocatorBy(page, await cardFromTop(page), { x: 220, y: 120 });
-    await expect(page.getByText('Recording · 1 action')).toBeVisible();
-  }
+  const card = await cardFromTop(page);
+  await card.scrollIntoViewIfNeeded();
+  const box = await card.boundingBox();
+  if (!box) throw new Error('Missing uploaded image bounds');
+  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await dragMouseFromTo(page, from, { x: from.x + 220, y: from.y + 120 });
+  await expect(page.getByText('Recording · 1 action')).toBeVisible();
 
   await page.getByRole('button', { name: 'Finish sorting' }).click();
   await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
   const replaySessions = page.getByTestId('replay-sessions').getByRole('button');
-  if (testInfo.project.name === 'webkit') {
-    await expect(replaySessions).toHaveCount(2);
-    await replaySessions.nth(1).click();
-  } else {
-    await expect(replaySessions).toHaveCount(1);
-  }
+  await expect(replaySessions).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Play recording' })).toBeEnabled();
 });
 

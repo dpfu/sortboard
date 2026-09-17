@@ -321,7 +321,59 @@ describe('stageSurface layout', () => {
     expect(presortStageId).toBeTruthy();
   });
 
-  it('builds top trays and equal-height columns with top-aligned slots', () => {
+  it.each([900, 1440])('keeps all tray images visible and preserves their places at %d px', (width) => {
+    const workflow = createWorkflowForTemplate('qsort', width, 1000, 24);
+    const pre = workflow.widgets.find(widget => widget.kind === 'pre-sort')!;
+    if (pre.kind !== 'pre-sort') throw new Error('Missing pre-sort');
+    const stageId = workflow.stages.find(stage => stage.kind === 'qsort')!.id;
+    const widget = getQSortWidget(workflow, stageId)!;
+    for (const split of [0, 13]) {
+      const cards = Array.from({ length: 24 }, (_, index) => {
+        const lane = index < split ? 0 : 1;
+        return { ...makeCard(`card-${index}`), widgetAssignments: {
+          [pre.stageId]: { widgetId: pre.id, zoneId: pre.zones[lane].id, order: index },
+          [stageId]: { widgetId: widget.id, zoneId: widget.lanes[lane].id, order: index },
+        } };
+      });
+      const viewport = { width, height: 1000 };
+      const scene = buildStageSurfaceScene(workflow, stageId, cards, null, 'sort', viewport);
+      const surface = scene.surfaces.find(entry => entry.kind === 'qsort-stage')!;
+      const placed = reflowCardsForStage(cards, workflow, stageId, getDemoCardBounds, viewport, 'sort');
+      const boxes = placed.map(card => ({ x: card.x, y: card.y, ...getQSortCardDisplayDimensions(card, surface, getDemoCardBounds) }));
+      boxes.forEach((box, index) => {
+        const lane = surface.lanes.find(entry => entry.zoneId === placed[index].widgetAssignments![stageId]!.zoneId)!;
+        expect(box.x).toBeGreaterThanOrEqual(lane.x);
+        expect(box.y).toBeGreaterThanOrEqual(lane.y + 40);
+        expect(box.x + box.w).toBeLessThanOrEqual(lane.x + lane.w);
+        expect(box.y + box.h).toBeLessThanOrEqual(lane.y + lane.h);
+        for (const other of boxes.slice(index + 1)) {
+          expect(box.x + box.w <= other.x || other.x + other.w <= box.x || box.y + box.h <= other.y || other.y + other.h <= box.y).toBe(true);
+        }
+      });
+      const moved = placed.map((card, index) => index === 0 ? {
+        ...card, widgetAssignments: { ...card.widgetAssignments, [stageId]: {
+          widgetId: widget.id, zoneId: widget.buckets.find(bucket => bucket.capacity > 0)!.id, order: 0,
+        } },
+      } : card);
+      const after = reflowCardsForStage(moved, workflow, stageId, getDemoCardBounds, viewport, 'sort');
+      expect(after.slice(1).map(card => [card.x, card.y])).toEqual(placed.slice(1).map(card => [card.x, card.y]));
+      expect(surface.buckets.flatMap(bucket => bucket.slots).every(slot => slot.h >= 88)).toBe(true);
+    }
+  });
+
+  it('preserves the shelf and equal-height columns for earlier Q-Sort recordings', () => {
+    const workflow = createWorkflowForTemplate('qsort', 1200, 800, 24);
+    const stageId = workflow.stages.find(stage => stage.kind === 'qsort')!.id;
+    for (const version of [1, 2] as const) {
+      const scene = buildStageSurfaceScene(workflow, stageId, [], null, 'sort', { width: 1200, height: 800 }, null, version);
+      const surface = scene.surfaces.find(entry => entry.kind === 'qsort-stage')!;
+      expect(surface.layoutVersion).toBeUndefined();
+      expect(surface.lanes.every(lane => !lane.grid)).toBe(true);
+      expect(new Set(surface.buckets.map(bucket => bucket.h)).size).toBe(1);
+    }
+  });
+
+  it('builds top trays and capacity-shaped columns with top-aligned slots', () => {
     const workflow = createWorkflowForTemplate('qsort', 1200, 800, 15);
     const qsortStageId = workflow.stages.find((stage) => stage.kind === 'qsort')!.id;
     const scene = buildStageSurfaceScene(workflow, qsortStageId, [], null, 'sort', { width: 1200, height: 800 });
@@ -334,7 +386,7 @@ describe('stageSurface layout', () => {
     expect(surface.leftColumnRect.y + surface.leftColumnRect.h).toBeLessThan(surface.distributionRect.y);
     expect(surface.lanes[0]!.x + surface.lanes[0]!.w).toBeLessThan(surface.lanes[1]!.x);
     expect(surface.baselineY).toBeGreaterThan(surface.distributionRect.y);
-    expect(centerBucket.columnHeight).toBe(edgeBucket.columnHeight);
+    expect(centerBucket.columnHeight).toBeGreaterThan(edgeBucket.columnHeight);
     expect(centerBucket.slots).toHaveLength(centerBucket.capacity);
     expect(centerBucket.slots[0]!.y).toBeLessThan(centerBucket.slots[1]!.y);
   });

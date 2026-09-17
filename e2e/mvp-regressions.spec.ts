@@ -128,8 +128,10 @@ async function dragVisibleCardToTarget(
   await page.mouse.down();
   try {
     await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
     await onLift?.();
     await page.mouse.move(to.x, to.y);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
   } finally {
     await page.mouse.up();
   }
@@ -362,9 +364,11 @@ test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the out
   await expect
     .poll(() => board.evaluate((element) => element.scrollWidth - element.clientWidth))
     .toBe(0);
-  await expect
-    .poll(() => board.evaluate((element) => element.scrollHeight - element.clientHeight))
-    .toBe(0);
+  // Small windows scroll vertically so ranked images stay large enough to inspect.
+  const lowestSlot = qSortBuckets.nth(3).locator('[data-testid^="qsort-slot-"]').last();
+  await lowestSlot.scrollIntoViewIfNeeded();
+  await expect(lowestSlot).toBeInViewport();
+  await board.evaluate(element => { element.scrollTop = 0; });
 
   const outerBucket = qSortBuckets.last();
   await outerBucket.scrollIntoViewIfNeeded();

@@ -73,6 +73,7 @@ export type QSortLaneSurfaceView = {
   w: number;
   h: number;
   count: number;
+  grid?: { columns: number; cellW: number; cellH: number; cardIds: string[] };
   placeholderLabel?: string;
   state?: WidgetDropState;
 };
@@ -108,6 +109,7 @@ export type QSortCanvasSurfaceView = BaseSurfaceView & {
   widgetId: string;
   title: string;
   count: number;
+  layoutVersion?: 3;
   leftColumnRect: Rect;
   distributionRect: Rect;
   baselineY: number;
@@ -503,6 +505,67 @@ function buildQSortScene(
   };
 }
 
+// Earlier recordings retain the shelf layout and its original card geometry.
+function buildQSortGridScene(
+  scene: StageSurfaceScene,
+  workflow: SortWorkflowData,
+  cards: CardData[],
+  mode: Mode,
+  viewport: { width: number; height: number }
+): StageSurfaceScene {
+  const surface = scene.surfaces.find((entry): entry is QSortCanvasSurfaceView => entry.kind === 'qsort-stage');
+  if (!surface) return scene;
+  const pad = 24;
+  const gap = 8;
+  const top = mode === 'setup' ? 20 : 84;
+  const width = Math.max(672, viewport.width - pad * 2);
+  const laneW = Math.floor((width - QSORT_LANE_GAP * (surface.lanes.length - 1)) / surface.lanes.length);
+  const columns = Math.max(1, Math.floor((laneW - 24 + gap) / 92));
+  const cellW = Math.floor((laneW - 24 - gap * (columns - 1)) / columns);
+  const cellH = clamp(Math.round(cellW * 0.9), 68, 88);
+  const presort = workflow.widgets.find((entry): entry is PreSortWidgetData => entry.kind === 'pre-sort');
+  // Keep each card's tray place when others are ranked. The pre-sort assignment
+  // remains in the recording even after its Q-Sort assignment changes.
+  const lanePools = surface.lanes.map((lane, laneIndex) => cards.filter((card, cardIndex) => {
+    const homeZone = presort && card.widgetAssignments?.[presort.stageId]?.zoneId;
+    const homeIndex = presort?.zones.findIndex(zone => zone.id === homeZone) ?? -1;
+    const current = card.widgetAssignments?.[surface.stageId];
+    return (homeIndex < 0 ? cardIndex % surface.lanes.length : homeIndex) === laneIndex ||
+      (current?.widgetId === surface.widgetId && current.zoneId === lane.zoneId);
+  }).map(card => card.id));
+  const rows = Math.max(1, ...lanePools.map(pool => Math.ceil(pool.length / columns)));
+  const trayH = 40 + rows * cellH + (rows - 1) * gap + 12;
+  const leftColumnRect = { x: pad, y: top + (mode === 'setup' ? 52 : 0), w: width, h: trayH };
+  const lanes = surface.lanes.map((lane, index) => ({
+    ...lane, x: pad + index * (laneW + QSORT_LANE_GAP), y: leftColumnRect.y, w: laneW, h: trayH,
+    grid: { columns, cellW, cellH, cardIds: lanePools[index] },
+  }));
+  const distributionY = leftColumnRect.y + trayH + 20;
+  const maxCapacity = Math.max(1, ...surface.buckets.map(bucket => bucket.capacity));
+  const bucketW = Math.floor((width - QSORT_BUCKET_GAP * (surface.buckets.length - 1)) / surface.buckets.length);
+  const headerH = 44;
+  const bucketHeaderH = 48;
+  const slotH = clamp(Math.floor((viewport.height - distributionY - headerH - bucketHeaderH - pad - gap * (maxCapacity - 1)) / maxCapacity), 88, 112);
+  const bucketY = distributionY + headerH;
+  const buckets = surface.buckets.map((bucket, index) => {
+    const x = pad + index * (bucketW + QSORT_BUCKET_GAP);
+    const slots = bucket.slots.map(slot => ({
+      ...slot, x, y: bucketY + bucketHeaderH + slot.slotIndex * (slotH + gap), w: bucketW, h: slotH,
+    }));
+    const h = bucketHeaderH + bucket.capacity * (slotH + gap) - (bucket.capacity ? gap : 0);
+    return { ...bucket, x, y: bucketY, w: bucketW, h, columnHeight: h, baselineY: bucketY + bucketHeaderH, slots };
+  });
+  const distributionRect = { x: pad, y: distributionY, w: width, h: headerH + Math.max(...buckets.map(bucket => bucket.h)) };
+  return {
+    ...scene,
+    canvasW: Math.max(viewport.width, width + pad * 2),
+    canvasH: Math.max(viewport.height, distributionY + distributionRect.h + pad),
+    surfaces: [{ ...surface, layoutVersion: 3, x: pad, y: top, w: width,
+      h: distributionY + distributionRect.h - top, leftColumnRect, distributionRect,
+      baselineY: bucketY + bucketHeaderH, lanes, buckets }],
+  };
+}
+
 export function buildStageSurfaceScene(
   workflow: SortWorkflowData,
   stageId: string,
@@ -511,15 +574,16 @@ export function buildStageSurfaceScene(
   mode: Mode,
   viewportInput: { width: number; height: number },
   activeDrop?: { widgetId: string; zoneId: string; state: WidgetDropState } | null,
-  layoutVersion: 1 | 2 = 2
+  layoutVersion: 1 | 2 | 3 = 3
 ): StageSurfaceScene {
   const stageKind = getStageById(workflow, stageId)?.kind || 'closed-sort';
   const viewport = getViewportSize(viewportInput);
-  if (stageKind !== 'qsort' && layoutVersion === 2) {
+  if (stageKind !== 'qsort' && layoutVersion !== 1) {
     viewport.width = Math.max(560, Math.round(viewportInput.width || 1200));
   }
   if (stageKind === 'qsort') {
-    return buildQSortScene(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
+    const scene = buildQSortScene(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
+    return layoutVersion === 3 ? buildQSortGridScene(scene, workflow, cards, mode, viewport) : scene;
   }
   return (layoutVersion === 1 ? buildLegacyClosedOrPreSortScene : buildClosedOrPreSortScene)(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
 }
@@ -560,6 +624,7 @@ export function getQSortCardDisplayDimensions(
   }
 
   const lane = surface.lanes.find((entry) => entry.zoneId === assignment.zoneId);
+  if (lane?.grid) return fitCardDimensions(full, lane.grid.cellW - 4, lane.grid.cellH - 4);
   if (lane) {
     const maxW = clamp(Math.round(lane.w * 0.2), 96, 132);
     const maxH = Math.max(54, lane.h - QSORT_LANE_HEADER_PAD - 18);
@@ -680,9 +745,10 @@ export function reflowCardsForStage(
   stageId: string,
   getBounds: (card: CardData) => CardBounds,
   viewportInput: { width: number; height: number },
-  mode: Mode
+  mode: Mode,
+  layoutVersion: 1 | 2 | 3 = 3
 ) {
-  const scene = buildStageSurfaceScene(workflow, stageId, cards, null, mode, viewportInput);
+  const scene = buildStageSurfaceScene(workflow, stageId, cards, null, mode, viewportInput, null, layoutVersion);
   const nextById = new Map(cards.map((card) => [card.id, card]));
   let changed = false;
   const setPosition = (card: CardData, pos: { x: number; y: number } | undefined) => {
@@ -724,7 +790,15 @@ export function reflowCardsForStage(
     };
     for (const lane of qsortSurface.lanes) {
       const zoneCards = getCardsInWidgetZone(cards, stageId, qsortWidget.id, lane.zoneId);
-      const layout = layoutCardsAsShelf(
+      const layout = lane.grid ? new Map(zoneCards.map(card => {
+        const grid = lane.grid!;
+        const index = grid.cardIds.indexOf(card.id);
+        const dims = getCompactBounds(card);
+        return [card.id, {
+          x: Math.round(lane.x + 12 + (index % grid.columns) * (grid.cellW + 8) + (grid.cellW - dims.w) / 2),
+          y: Math.round(lane.y + 40 + Math.floor(index / grid.columns) * (grid.cellH + 8) + (grid.cellH - dims.h) / 2),
+        }];
+      })) : layoutCardsAsShelf(
         zoneCards,
         insetRect(lane, { top: QSORT_LANE_HEADER_PAD, right: 14, bottom: 14, left: 14 }),
         getCompactBounds

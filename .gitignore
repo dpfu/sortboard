@@ -6,6 +6,9 @@ dist/
 playwright-report/
 test-results/
 
+# local demo originals and review artifacts
+/output/
+
 # env
 .env
 .env.*

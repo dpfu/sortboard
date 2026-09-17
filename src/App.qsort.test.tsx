@@ -167,7 +167,7 @@ describe('App qsort workflow', () => {
     const edgeBucket = qsortWidget.buckets[0]!;
     const centerColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${centerBucket.id}`);
     const edgeColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${edgeBucket.id}`);
-    expect(parseFloat(centerColumn.style.height)).toBe(parseFloat(edgeColumn.style.height));
+    expect(parseFloat(centerColumn.style.height)).toBeGreaterThan(parseFloat(edgeColumn.style.height));
     expect(screen.getByRole('button', { name: 'Finish sorting' })).toBeTruthy();
 
     expect(activeProjectId).toBeTruthy();

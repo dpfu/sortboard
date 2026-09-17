@@ -1454,10 +1454,11 @@ export default function App() {
         stageId,
         isQSortStage ? getQSortCardBounds : getClosedCardBounds,
         viewport,
-        nextMode
+        nextMode,
+        modeRef.current === 'sort' ? recordingSession?.surfaceLayoutVersion || 1 : 3
       );
     },
-    [surfaceViewport, getClosedCardBounds, getQSortCardBounds]
+    [surfaceViewport, getClosedCardBounds, getQSortCardBounds, recordingSession?.surfaceLayoutVersion]
   );
 
   const commitBoardState = React.useCallback((nextCards: CardData[], nextStacks: StackData[]) => {
@@ -1996,7 +1997,7 @@ export default function App() {
         cardLayoutModeAtStart: cardLayoutMode,
         workflowAtStart: toPersistedWorkflow(startWorkflow),
         activeStageIdAtStart: startStageId || undefined,
-        surfaceLayoutVersion: 2,
+        surfaceLayoutVersion: 3,
         cardsAtStart: startCards.map((card) => ({ ...card })),
         segments: [],
         cameraTrack: [cameraFrame(initialCamera, 0, 'initial')],
@@ -3030,9 +3031,10 @@ export default function App() {
         selectedWidgetIdArg,
         nextMode,
         surfaceViewport,
-        activeDrop
+        activeDrop,
+        modeRef.current === 'sort' ? recordingSession?.surfaceLayoutVersion || 1 : 3
       ),
-    [surfaceViewport, selectedWidgetId]
+    [surfaceViewport, selectedWidgetId, recordingSession?.surfaceLayoutVersion]
   );
 
   const reflowActiveWidgetStageCards = React.useCallback(
@@ -5411,7 +5413,7 @@ export default function App() {
             {activeProject?.instructions ? (
               <details className="projectInstructions projectInstructions--sort"><summary><BookOpen />Instructions</summary><p>{activeProject.instructions}</p></details>
             ) : null}
-            <button className="btn btn--ghost btn--tiny" type="button" onClick={() => setShowControls(true)}><HelpCircle /><HelpCircle />Controls</button>
+            <button className="btn btn--ghost btn--tiny" type="button" onClick={() => setShowControls(true)}><HelpCircle />Controls</button>
             <span className="sortBar__recIndicator" data-testid="recording-status" data-camera-changes={sortCameraChangeCount}
               title={`Recording · ${countLabel(sortMoveCount, 'action')}`}>
               Recording<span className="srOnly"> · {countLabel(sortMoveCount, 'action')}</span>

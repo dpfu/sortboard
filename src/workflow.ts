@@ -56,14 +56,6 @@ export function getWidgetsForStage(workflow: SortWorkflowData | null | undefined
     .sort((a, b) => a.z - b.z || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
 }
 
-export function cloneWorkflow(workflow: SortWorkflowData): SortWorkflowData {
-  return {
-    templateId: workflow.templateId,
-    stages: workflow.stages.map((stage) => ({ ...stage })),
-    widgets: workflow.widgets.map((widget) => JSON.parse(JSON.stringify(widget)) as BoardWidgetData),
-  };
-}
-
 function createStage(kind: SortStageData['kind'], order: number): SortStageData {
   return {
     id: nanoid(),

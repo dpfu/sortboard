@@ -33,7 +33,7 @@ New projects and demos start sorting in full screen by default. Open **Display**
 
 **Open-sort navigation:** drag empty space to pan, or hold **Space** and drag over cards. Middle-button dragging also pans. In Setup, **Shift + drag** selects several cards; **Enter** selects a focused card. **Center board** restores the view. Panning is always available; zoom is optional. Drop cards onto one another to form a stack and double-click its label to name it. Group names and membership are included in the recording.
 
-In Closed sort and Pre-Sort, cards stay where you release them. Dropping inside an eligible category assigns the card; dropping on neutral board space keeps it unsorted. Other cards stay in place. Arrow keys choose an available position in the next area. The final Q-Sort stage uses its fixed slots.
+In Closed sort and Pre-Sort, cards stay where you release them. Dropping inside an eligible category assigns the card; dropping on neutral board space keeps it unsorted. Other cards stay in place. Arrow keys choose an available position in the next area. The final Q-Sort stage uses fixed slots and image trays with stable positions. Full columns reject a drop and return the card to its previous place. Smaller windows scroll vertically to keep images readable.
 
 Replay opens at the final result. **Go to start**, **Play recording**, and **Show result** control playback. **View** contains recorded-camera versus free-view navigation and display sizing. The recorded viewport remains fixed and is fitted into the current window.
 

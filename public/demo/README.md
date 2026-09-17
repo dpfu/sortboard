@@ -10,4 +10,4 @@ The app serves WebP copies with a maximum dimension of 1024 pixels, quality 88, 
 
 Same prompts do not constitute a controlled model benchmark. Aspect ratios, generation settings, image content and unsolicited text differ. Closed Sort asks about perceived origin; it does not compare a mixed AI/non-AI dataset. Q-Sort records subjective impressions.
 
-Source PNGs and the local catalog are prepared with scripts/build-demo-assets.py (Python and Pillow). The checked-in WebP files and catalog are sufficient for normal builds; Python is not a production dependency.
+scripts/build-demo-assets.py (Python and Pillow) creates the WebP copies and catalog from the local full-resolution demo archive. The checked-in WebP files and catalog are sufficient for normal builds; Python is not a production dependency.

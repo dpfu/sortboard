@@ -923,7 +923,7 @@ function normalizeRecording(recording: RecordingSession): RecordingSession {
     cardLayoutModeAtStart: normalizeCurrentCardLayoutMode(recording.cardLayoutModeAtStart),
     workflowAtStart,
     activeStageIdAtStart: requestedStageId || getDefaultActiveStageId(workflowAtStart) || undefined,
-    surfaceLayoutVersion: recording.surfaceLayoutVersion === 2 ? 2 : undefined,
+    surfaceLayoutVersion: recording.surfaceLayoutVersion === 2 || recording.surfaceLayoutVersion === 3 ? recording.surfaceLayoutVersion : undefined,
     cardsAtStart: normalizeRuntimeCards(recording.cardsAtStart),
     segments,
     cameraTrack: normalizeCameraTrack(recording.cameraTrack, recording.boardW, recording.boardH),

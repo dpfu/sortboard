@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { motion, useDragControls, useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
+import { animate, motion, useDragControls, useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
 import type { CardData, Mode } from './types';
 import { clamp } from './utils';
 import { CardPreview } from './CardPreview';
@@ -51,7 +51,7 @@ export interface DraggableCardProps {
   coordinateScale?: number;
   dragConstraintsRef: React.RefObject<HTMLElement>;
   onBringToFront: (id: string) => void;
-  onMoveEnd: (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => void;
+  onMoveEnd: (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => boolean | void;
   onResizeStart?: (id: string, pointer: ResizeStartPayload) => void;
   onSelectCard?: (id: string, options?: { toggle?: boolean }) => void;
   onKeyboardMove?: (id: string, direction: 'left' | 'right' | 'up' | 'down') => void;
@@ -86,11 +86,14 @@ function DraggableCardComponent({
   onOpenPreview,
   showChrome,
 }: DraggableCardProps) {
+  const x = useMotionValue(card.x);
+  const y = useMotionValue(card.y);
   const rawRotate = useMotionValue(0);
   const springRotate = useSpring(rawRotate, { stiffness: 800, damping: 55 });
   const prefersReducedMotion = useReducedMotion();
   const rotate = prefersReducedMotion ? rawRotate : springRotate;
   const dragControls = useDragControls();
+  const [isDragging, setIsDragging] = React.useState(false);
   const canResize = mode === 'setup' && !!isSelected && !!onResizeStart;
   const liftScale = Math.max(
     1,
@@ -209,7 +212,7 @@ function DraggableCardComponent({
 
   return (
     <motion.div
-      className={`card ${mode === 'setup' ? 'card--setup' : 'card--sort'} ${dragEnabled ? 'card--draggable' : 'card--static'} ${isSelected ? 'isSelected' : ''} ${
+      className={`card ${mode === 'setup' ? 'card--setup' : 'card--sort'} ${dragEnabled ? 'card--draggable' : 'card--static'} ${isSelected ? 'isSelected' : ''} ${isDragging ? 'isDragging' : ''} ${
         resizeHotEdge && canResize ? 'isResizeHot' : ''
       } ${
         resizeHotEdge && canResize ? `isResizeHot--${resizeHotEdge}` : ''
@@ -221,7 +224,7 @@ function DraggableCardComponent({
       aria-label={`Card: ${cardLabel}${locationLabel ? `. Current area: ${locationLabel}` : ''}`}
       aria-describedby={isKeyboardInteractive ? keyboardDescriptionId : undefined}
       aria-pressed={mode === 'setup' ? !!isSelected : undefined}
-      style={{ zIndex: card.z, rotate, width: cardW, height: cardH }}
+      style={{ x, y, zIndex: card.z, rotate, width: cardW, height: cardH }}
       drag={dragEnabled}
       dragControls={dragControls}
       dragListener={false}
@@ -240,7 +243,7 @@ function DraggableCardComponent({
       onPointerMove={updateResizeHotEdge}
       onPointerEnter={updateResizeHotEdge}
       onPointerLeave={() => setResizeHotEdge(null)}
-      onPointerCancel={() => setResizeHotEdge(null)}
+      onPointerCancel={() => { setResizeHotEdge(null); setIsDragging(false); }}
       onDrag={(e, info) => {
         void e;
         // Very subtle rotation driven by recent horizontal movement.
@@ -255,18 +258,29 @@ function DraggableCardComponent({
         });
       }}
       onDragStart={() => {
+        setIsDragging(true);
         rawRotate.set(0);
         onDragTraceStart?.(card.id, card.x, card.y);
       }}
       onDragEnd={(e, info) => {
         void e;
+        setIsDragging(false);
         rawRotate.set(0);
         const nextX = card.x + info.offset.x / coordinateScale;
         const nextY = card.y + info.offset.y / coordinateScale;
-        onMoveEnd(card.id, nextX, nextY, {
+        const moved = onMoveEnd(card.id, nextX, nextY, {
           x: nextX + cardW / 2,
           y: nextY + cardH / 2,
         });
+        // Rejected and unchanged drops keep the same React coordinates. Motion
+        // therefore needs an explicit return from its temporary drag position.
+        if (moved === false) {
+          const transition = prefersReducedMotion
+            ? { duration: 0 }
+            : { type: 'spring' as const, stiffness: 520, damping: 40, mass: 0.7 };
+          animate(x, card.x, transition);
+          animate(y, card.y, transition);
+        }
       }}
       onDoubleClick={() => {
         if (card.kind !== 'text') {
