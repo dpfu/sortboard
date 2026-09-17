@@ -34,6 +34,7 @@ for (const width of [900, 1454]) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await resetAppState(page);
     await page.goto('/');
+    await page.getByRole('button', { name: /Start with a demo project/ }).click();
     await page.getByRole('button', { name: 'Open demo with 15 images', exact: true }).click();
     await expect(cards(page)).toHaveCount(15);
     await openDisplay(page);

@@ -4,13 +4,13 @@ SortBoard is an experimental tool for arranging images, text, and short videos. 
 
 Use a desktop or laptop browser. No account is needed. Your projects and recordings stay in that browser; nothing is sent back automatically.
 
-1. On your first visit, keep the suggested **Closed sort** demo and choose **Open demo with 15 images**.
+1. On your first visit, choose **Start with a demo project**, keep the suggested **Closed sort**, and choose **Open demo with 15 images**. Choose **Start with a blank project** instead to use your own material.
 2. Open **Instructions** to read the task, then select **Start sorting**. Recording starts automatically, and the demo enters full screen if your browser allows it.
 3. Drag every image into a category. Double-click an image to enlarge it; **Esc** closes the preview. You can move images again whenever you change your mind.
 4. Choose **Finish sorting**. The completed result appears first. Use **Play recording** or the timeline to revisit your decisions.
 5. Choose **Export project** to download the project ZIP, including images and recording. Send that ZIP with your feedback if you want us to inspect the session. Nothing is submitted automatically.
 
-**New sorting session** starts again from the prepared board. **Setup** returns to project preparation; **Recordings** opens saved sessions, including after a reload. To try another demo, open the project-name menu and choose **Try a demo project**. **Customize images** changes a demo's suggested selection.
+**New sorting session** starts again from the prepared board. **Setup** returns to project preparation; **Recordings** opens saved sessions, including after a reload. To try another demo, choose **Demo projects** at the top of the left Setup sidebar. **Customize images** changes a demo's suggested selection.
 
 **Open sort** includes 60 images: arrange them freely, drop images onto one another to form stacks, and double-click a stack label to name it. Drag empty space or hold **Space** while dragging over an image to move around the board. **Q-Sort** includes 24 images and uses Pre-Sort followed by a fixed distribution.
 

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { testProjectArchive } from '../../src/testFixtures/project';
 import { expect, type FilePayload, type Locator, type Page } from '@playwright/test';
 
 const DB_NAME = 'sortboard-mvp';
@@ -27,14 +28,19 @@ export async function resetAppState(page: Page) {
 
 export async function gotoApp(page: Page) {
   await page.goto('/');
-  await waitForAppReady(page);
+  await expect(page.getByRole('dialog', { name: 'Welcome to SortBoard' })).toBeVisible();
 }
 
 export async function openFreshApp(page: Page) {
   await resetAppState(page);
   await page.goto('/');
-  // The first-visit dialog is lazy-loaded and may appear after the board.
-  await page.getByRole('button', { name: 'Open starter board' }).click();
+  // Existing-workflow scenarios start with explicit test data. First visits
+  // and both welcome choices are exercised separately in onboarding.spec.ts.
+  await expect(page.getByRole('dialog', { name: 'Welcome to SortBoard' })).toBeVisible();
+  await page.getByTestId('project-import-input').setInputFiles({
+    name: 'test-project.sortboard.zip', mimeType: 'application/zip',
+    buffer: Buffer.from(await testProjectArchive()),
+  });
   await waitForAppReady(page);
 }
 
@@ -72,8 +78,6 @@ export async function waitForAppReady(page: Page) {
   const startButton = page.getByRole('button', { name: 'Start sorting' });
   await expect(startButton).toBeVisible();
   await expect(startButton).toBeEnabled({ timeout: 10_000 });
-  const welcome = page.getByRole('button', { name: 'Open starter board' });
-  if (await welcome.isVisible()) await welcome.click();
   await expect.poll(() => selectedProjectName(page)).not.toBe('');
   await expect.poll(() => persistedBoardCardCount(page)).not.toBeNull();
   const expectedCardCount = await persistedBoardCardCount(page);

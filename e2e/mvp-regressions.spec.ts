@@ -198,8 +198,8 @@ test('@smoke flushes a pending card edit before switching projects', async ({ pa
   await page.getByRole('button', { name: 'New', exact: true }).click();
   await expect.poll(() => selectedProjectName(page)).toBe('Project 2');
   await openProjectMenu(page);
-  await page.getByLabel('Select project').selectOption({ label: 'Demo Project' });
-  await expect.poll(() => selectedProjectName(page)).toBe('Demo Project');
+  await page.getByLabel('Select project').selectOption({ label: 'Test Project' });
+  await expect.poll(() => selectedProjectName(page)).toBe('Test Project');
 
   const cardTestId = await editTopCard(page, 'Name', 'Saved before project switch');
   await closeDetailsDrawerIfPresent(page);
@@ -208,8 +208,8 @@ test('@smoke flushes a pending card edit before switching projects', async ({ pa
   await expect.poll(() => selectedProjectName(page)).toBe('Project 2');
 
   await openProjectMenu(page);
-  await page.getByLabel('Select project').selectOption({ label: 'Demo Project' });
-  await expect.poll(() => selectedProjectName(page)).toBe('Demo Project');
+  await page.getByLabel('Select project').selectOption({ label: 'Test Project' });
+  await expect.poll(() => selectedProjectName(page)).toBe('Test Project');
   await page.getByTestId(cardTestId).click();
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Saved before project switch');
 });
@@ -226,7 +226,7 @@ test('@smoke flushes a pending card edit before reload', async ({ page }) => {
   await expect(page.getByLabel('Notes', { exact: true })).toHaveValue('Saved before reload');
 });
 
-test('@smoke recovers a pending card edit after an interrupted IndexedDB write', async ({ page }) => {
+test('@smoke shows save failures after import and recovers a pending card edit after reload', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: VIEWPORT_HEIGHT });
   await openFreshApp(page);
 
@@ -283,7 +283,7 @@ test('@smoke flushes a pending card edit into an immediate project export', asyn
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Saved in immediate export');
 });
 
-test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', async ({ page }) => {
+test('@smoke keeps all 24 cards reachable through a closed-sort workflow', async ({ page }) => {
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });
@@ -319,7 +319,7 @@ test('@smoke keeps all 24 demo cards reachable through a closed-sort workflow', 
   await expect(cards(page)).toHaveCount(24);
 });
 
-test('@smoke moves all 24 demo cards through Q-Sort pre-sort and reaches the outer bucket', async ({ page }) => {
+test('@smoke moves all 24 cards through Q-Sort pre-sort and reaches the outer bucket', async ({ page }) => {
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1280, height: VIEWPORT_HEIGHT });

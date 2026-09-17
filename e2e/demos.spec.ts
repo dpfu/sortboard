@@ -5,8 +5,9 @@ import JSZip from 'jszip';
 import { cards, exportProjectZip, importProjectZip, openFreshApp } from './helpers/app';
 
 async function openDemos(page: Page, type: string) {
-  await openProjectMenu(page);
-  await page.getByRole('button', { name: 'Try a demo project', exact: true }).click();
+  const projectMenu = page.getByRole('button', { name: 'Project menu', exact: true });
+  if (await projectMenu.getAttribute('aria-expanded') === 'true') await projectMenu.click();
+  await page.getByRole('button', { name: 'Demo projects', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Demo projects' });
   await dialog.getByRole('button', { name: 'Customize images' }).click();
   await expect(dialog.getByRole('checkbox')).toHaveCount(60);
@@ -125,8 +126,7 @@ test('completes the 24-image Q-Sort demo and exports its replay', async ({ page 
   expect(sessions[0].recording.cardsAtStart).toHaveLength(24);
   expect(sessions[0].recording.segments).toHaveLength(49);
   await page.getByRole('button', { name: 'Setup', exact: true }).click();
-  await openProjectMenu(page);
-  await expect(page.getByRole('button', { name: 'Try a demo project' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Demo projects', exact: true })).toBeVisible();
   await expect(page.locator('[data-testid^="surface-work-area-"] .boardSurface__count')).toHaveText('24');
   const afterReturn = await exportProjectZip(page, testInfo.outputDir, 'after-setup.sortboard.zip');
   const afterZip = await JSZip.loadAsync(await fs.readFile(afterReturn));

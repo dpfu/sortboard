@@ -33,6 +33,7 @@ Workflow templates add structure to the shared board:
 - `src/replayIndex.ts`: replay tracks and timeline markers
 - `src/stackRecording.ts`: group name/membership keyframes and replay group geometry
 - `src/ProjectMenu.tsx` and `src/ControlsDialog.tsx`: grouped project controls and contextual gesture reference
+- `src/WelcomeDialog.tsx`: first-visit choices and local-data introduction
 
 ## Interface styles
 
@@ -45,6 +46,8 @@ The header separates project selection, Setup/Recordings navigation, and context
 ## Persistence
 
 IndexedDB stores projects, boards, media assets, sessions, metadata, and setup undo history. Runtime media URLs are created from stored blobs and are not persisted.
+
+With no saved projects, the welcome dialog offers a blank project, the demo library, or ZIP import. Startup and deletion of the last project never generate placeholder cards. Existing projects, including older starter boards, are preserved. Workflow tests seed explicit fixtures independently of onboarding.
 
 Project ZIP exports contain the board state, sessions, asset metadata, media blobs, and optional project instructions. Import assigns new local IDs so an archive can be restored without overwriting an existing project.
 

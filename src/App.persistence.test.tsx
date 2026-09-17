@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import 'fake-indexeddb/auto';
+import { seedTestProject } from './testFixtures/project';
 import * as React from 'react';
 import JSZip from 'jszip';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -56,8 +57,6 @@ async function renderAppReady() {
     const button = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
     if (button.disabled) throw new Error('start sorting still disabled');
   }, { timeout: 5000 });
-  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
-  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -112,6 +111,7 @@ describe('App pending persistence', () => {
     putSessionHooks.after = null;
     const persist = await import('./persist');
     await persist.persistDeleteAll();
+    await seedTestProject();
     vi.restoreAllMocks();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       const blob = new Blob(['demo'], { type: 'image/svg+xml' });
@@ -153,7 +153,7 @@ describe('App pending persistence', () => {
 
     await userEvent.selectOptions(projectSelect, originalProjectId!);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Project menu' }).getAttribute('title')).toBe('Demo Project');
+      expect(screen.getByRole('button', { name: 'Project menu' }).getAttribute('title')).toBe('Test Project');
       expect(view.container.querySelector(`[data-testid="${testId}"]`)).toBeTruthy();
     });
     await userEvent.click(view.container.querySelector(`[data-testid="${testId}"]`) as HTMLElement);

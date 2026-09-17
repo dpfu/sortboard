@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import 'fake-indexeddb/auto';
+import { seedTestProject } from './testFixtures/project';
 import * as React from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
@@ -28,8 +29,6 @@ async function renderAppReady() {
       throw new Error('start sorting still disabled');
     }
   }, { timeout: 5000 });
-  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
-  if (welcome) await userEvent.click(welcome);
   return view;
 }
 
@@ -79,6 +78,7 @@ describe('App closed sort widgets', () => {
   beforeEach(async () => {
     const persist = await import('./persist');
     await persist.persistDeleteAll();
+    await seedTestProject();
     vi.restoreAllMocks();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       const blob = new Blob(['cat'], { type: 'image/png' });

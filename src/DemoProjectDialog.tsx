@@ -1,10 +1,9 @@
 import * as React from 'react';
-import { ArrowRight, Check, FilePlus2, LayoutDashboard, Columns3, SlidersHorizontal, Table2, Upload, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, LayoutDashboard, Columns3, SlidersHorizontal, Table2, X } from 'lucide-react';
 import { createDemoArchive, demoAssetUrl, demoDistribution, loadDemoCatalog, type DemoCatalog } from './demoProjects';
 
-export function DemoProjectDialog({ onClose, onImport, firstVisit = false, onNewProject, onImportProject }: {
+export function DemoProjectDialog({ onClose, onImport, firstVisit = false }: {
   onClose: () => void; onImport: (archive: Blob) => Promise<void>; firstVisit?: boolean;
-  onNewProject?: () => void; onImportProject?: () => void;
 }) {
   const dialogRef = React.useRef<HTMLDialogElement>(null);
   const [catalog, setCatalog] = React.useState<DemoCatalog | null>(null);
@@ -57,8 +56,8 @@ export function DemoProjectDialog({ onClose, onImport, firstVisit = false, onNew
       event.preventDefault(); if (!busy) onClose();
     }}>
       <header className="demoDialog__header">
-        <div><h2 id="demo-title">{firstVisit ? 'Try SortBoard' : 'Demo projects'}</h2><p>Sort a set of images, then replay your session.</p></div>
-        <button className={`btn btn--ghost ${firstVisit ? '' : 'btn--icon'}`} type="button" aria-label={firstVisit ? 'Open starter board' : 'Close'} title={firstVisit ? undefined : 'Close'} onClick={onClose} disabled={busy}>{firstVisit ? <>Open starter board<ArrowRight /></> : <X />}</button>
+        <div><h2 id="demo-title">Demo projects</h2><p>Sort a set of images, then replay your session.</p></div>
+        <button className={`btn btn--ghost ${firstVisit ? '' : 'btn--icon'}`} type="button" aria-label={firstVisit ? 'Back to welcome' : 'Close'} title={firstVisit ? undefined : 'Close'} onClick={onClose} disabled={busy}>{firstVisit ? <><ArrowLeft />Back</> : <X />}</button>
       </header>
       <div className="demoDialog__body" aria-busy={busy}>
         {!catalog && !error ? <p role="status">Loading demo library...</p> : null}
@@ -97,7 +96,6 @@ export function DemoProjectDialog({ onClose, onImport, firstVisit = false, onNew
           </>}
         </> : null}
       </div>
-      {firstVisit ? <div className="demoDialog__ownProject"><span>Use your own material</span><button className="btn btn--ghost" disabled={busy} onClick={onNewProject}><FilePlus2 />New project</button><button className="btn btn--ghost" disabled={busy} onClick={onImportProject}><Upload />Import project</button></div> : null}
       <footer className="demoDialog__footer">
         {error ? <p role="alert">{error}</p> : <p role="status">{progress || 'Stored in this browser. Export to share.'}</p>}
         <div>{busy && !importing ? <button className="btn btn--ghost" onClick={() => requestRef.current?.abort()}>Cancel</button> : null}{!catalog && error ? <button className="btn" onClick={() => setAttempt(value => value + 1)}>Retry</button> : null}

@@ -183,6 +183,7 @@ test.describe('keyboard card workflows', () => {
       const card = page.getByTestId(testId);
       await card.focus();
       await page.keyboard.press(validDirection);
+      await afterBrowserPaint(page);
       await expect(source.locator('.boardSurface__count')).toHaveText(String(cardTestIds.length - index - 1));
       await expect(category.locator('.boardSurface__count')).toHaveText(String(index + 1));
     }

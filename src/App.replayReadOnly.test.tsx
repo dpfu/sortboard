@@ -262,8 +262,6 @@ async function renderAppReady() {
     },
     { timeout: 5000 }
   );
-  const welcome = screen.queryByRole('button', { name: 'Open starter board' });
-  if (welcome) await userEvent.click(welcome);
   return view;
 }
 

@@ -21,13 +21,13 @@ All three modes use the same board and card model.
 
 ## Core workflow
 
-1. On your first visit, open a prepared demo. Closed sort with 15 images is suggested for a short test. You can also open the generated starter board or use your own material.
+1. On your first visit, choose **Start with a blank project** for your own material or **Start with a demo project**. Closed sort with 15 images is suggested for a short test. No project or placeholder cards are created until you choose.
 2. In **Setup**, add cards, choose a sort mode, and configure categories or the distribution. Select a card or area to open its details.
 3. Select **Start sorting**. Recording starts automatically. Double-click an image or video to inspect it. **Instructions** opens the task; **Controls** collects the available gestures.
 4. Select **Finish sorting** when ready. Q-Sort first uses **Continue to Q-Sort** to advance from Pre-Sort.
 5. Review the result, play the recording, or scrub through the timeline. **Export project** downloads the project and its recordings.
 
-**Setup** and **Recordings** are available from the project header. **New sorting session** starts from the prepared Setup board. Completed sorts do not overwrite that preparation. The project-name menu contains project switching, creation, import, export, and the demo library.
+**Setup** and **Recordings** are available from the project header. **New sorting session** starts from the prepared Setup board. Completed sorts do not overwrite that preparation. The project-name menu contains project switching, creation, import, and export. **Demo projects** is always visible at the top of the left Setup sidebar.
 
 New projects and demos start sorting in full screen by default. Open **Display** in Setup to turn off **Start in full screen** or change card proportions and size. Existing projects retain their saved preference. Full screen can also be toggled while sorting; **Esc** returns to the window. Finishing a sort leaves full screen. If full screen is unavailable, sorting continues in the window.
 
@@ -41,7 +41,7 @@ Replay opens at the final result. **Go to start**, **Play recording**, and **Sho
 
 The optional demo library contains 30 DiffusionDB / Imagegen pairs. Choose the suggested Open (60 images), Closed (15), or Q-Sort (24) selection, select your own images, or start with an empty template. Q-Sort capacities follow the selected image count. Each demo creates a separate browser-local project with task instructions and source details in card Notes.
 
-The library opens on the first visit and can be reopened from the project menu. Only the selected images are copied into a project. Its 60 resized WebP copies total about 5.6 MiB. Original prompts and provenance are retained; images are resized without cropping. See [demo sources](public/demo/README.md) and the [colleague test guide](docs/colleague-test.md).
+The welcome screen links to the library; **Demo projects** reopens it from Setup. Choosing a blank project does not load the library. Only the selected images are copied into a project. Its 60 resized WebP copies total about 5.6 MiB. Original prompts and provenance are retained; images are resized without cropping. See [demo sources](public/demo/README.md) and the [colleague test guide](docs/colleague-test.md).
 
 ## Local data and exports
 

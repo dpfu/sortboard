@@ -4,7 +4,7 @@ import { cards, handleDialog, openFreshApp, selectedProjectName } from './helper
 
 test('creates, renames, switches, and deletes projects', async ({ page }) => {
   await openFreshApp(page);
-  await expect.poll(() => selectedProjectName(page)).toBe('Demo Project');
+  await expect.poll(() => selectedProjectName(page)).toBe('Test Project');
 
   await openProjectMenu(page);
   await page.getByRole('button', { name: 'New' }).click();
@@ -23,7 +23,7 @@ test('creates, renames, switches, and deletes projects', async ({ page }) => {
 
   const projectSelect = page.getByLabel('Select project');
   await openProjectMenu(page);
-  await projectSelect.selectOption({ label: 'Demo Project' });
+  await projectSelect.selectOption({ label: 'Test Project' });
   await expect.poll(async () => await cards(page).count()).toBeGreaterThan(1);
 
   await openProjectMenu(page);
@@ -34,6 +34,6 @@ test('creates, renames, switches, and deletes projects', async ({ page }) => {
   await handleDialog(page, () => page.getByRole('button', { name: 'Delete' }).click(), {
     messageIncludes: 'Permanently delete “Alpha Project”',
   });
-  await expect.poll(() => selectedProjectName(page)).toBe('Demo Project');
+  await expect.poll(() => selectedProjectName(page)).toBe('Test Project');
   await expect(page.getByTestId('project-status')).toContainText('Project deleted.');
 });

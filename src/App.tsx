@@ -1,5 +1,6 @@
 import { ProjectMenu } from './ProjectMenu';
 import { ControlsDialog } from './ControlsDialog';
+import { WelcomeDialog } from './WelcomeDialog';
 import { buildStackBadges, stackFrame, stackFrameAt } from './stackRecording';
 import * as React from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCheck, CircleAlert, Download, FilePlus2, FolderOpen, HelpCircle, History, ImagePlus, LayoutDashboard, Maximize, Minimize, Minus, PanelRightOpen, PanelsTopLeft, Pause, Pencil, Play, Plus, Scan, Settings2, SkipBack, SkipForward, Trash2, Type, Undo2, Upload, X } from 'lucide-react';
@@ -144,8 +145,6 @@ const CARD_W_MIN = 160;
 const CARD_W_MAX = 360;
 const CARD_W_STEP = 8;
 const DEFAULT_SORT_CONFIG: SortConfig = { type: 'open', stacksEnabled: true, zoomEnabled: false, startInFullscreen: true };
-const DEFAULT_PROJECT_NAME = 'Demo Project';
-const DEMO_CARD_COUNT = 24;
 const DEFAULT_CARD_LAYOUT_MODE: CardLayoutMode = 'as-is';
 const DEFAULT_STACK_SORT_KEY: StackSortKey = 'name';
 const STACK_SPLIT_OFFSET_PX = 32;
@@ -463,22 +462,6 @@ function nextCreatedAt(index = 0) {
   return Date.now() + index;
 }
 
-function createTextCard(index: number, z: number): CardData {
-  return {
-    id: nanoid(),
-    kind: 'text',
-    createdAt: nextCreatedAt(index),
-    meta: defaultTextMeta(index),
-    x: 28 + index * 18,
-    y: 28 + index * 18,
-    z,
-  };
-}
-
-function createInitialCards(): CardData[] {
-  return Array.from({ length: 6 }).map((_, i) => createTextCard(i, i + 1));
-}
-
 function toPersistedCards(cards: CardData[]) {
   return cards.map((c, index) => ({
     id: c.id,
@@ -570,81 +553,11 @@ function clampCardWidth(width: number) {
   return clamp(Math.round(width), CARD_W_MIN, CARD_W_MAX);
 }
 
-const DEMO_CARD_PALETTES = [
-  ['#f4f0e7', '#243642', '#e7a23b'],
-  ['#edf7f2', '#265947', '#d76847'],
-  ['#f3edf8', '#3b315f', '#7db6d8'],
-  ['#eef3fb', '#244a70', '#d2a33d'],
-  ['#f8eeee', '#673b44', '#58a48d'],
-  ['#edf2ea', '#35472d', '#bf6f4a'],
-] as const;
-
-function escapeSvgText(value: string) {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      case "'":
-        return '&apos;';
-      default:
-        return char;
-    }
-  });
-}
-
-function createLocalDemoImageBlob(index: number) {
-  const [background, ink, accent] = DEMO_CARD_PALETTES[index % DEMO_CARD_PALETTES.length]!;
-  const label = escapeSvgText(`Demo ${index + 1}`);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
-<rect width="960" height="540" rx="36" fill="${background}"/>
-<circle cx="${160 + (index % 4) * 120}" cy="${140 + (index % 3) * 48}" r="92" fill="${accent}" opacity="0.9"/>
-<path d="M96 388 C 226 298, 326 458, 456 360 S 692 258, 864 352" fill="none" stroke="${ink}" stroke-width="24" stroke-linecap="round"/>
-<path d="M108 430 L 840 430" stroke="${ink}" stroke-width="4" stroke-linecap="round" opacity="0.35"/>
-<text x="72" y="104" font-family="system-ui, sans-serif" font-size="54" font-weight="700" fill="${ink}">${label}</text>
-<text x="76" y="162" font-family="system-ui, sans-serif" font-size="24" font-weight="600" letter-spacing="6" fill="${ink}" opacity="0.62">LOCAL DEMO CARD</text>
-</svg>`;
-  return new Blob([svg], { type: 'image/svg+xml' });
-}
-
-function bootstrapProjectsOnce(createDemoProjectCards: (count?: number) => Promise<CardData[]>) {
+function bootstrapProjectsOnce() {
   if (!projectBootstrapPromise) {
     projectBootstrapPromise = (async () => {
-      let listed = await persistListProjects();
+      const listed = await persistListProjects();
       const firstVisit = listed.length === 0;
-
-      if (listed.length === 0) {
-        const projectId = nanoid();
-        const now = Date.now();
-        const starter = await createDemoProjectCards(DEMO_CARD_COUNT);
-        await persistPutProject({
-          version: 1,
-          id: projectId,
-          name: DEFAULT_PROJECT_NAME,
-          createdAt: now,
-          updatedAt: now,
-        });
-        await persistPutBoard({
-          version: 2,
-          id: projectId,
-          updatedAt: now,
-          sortConfig: DEFAULT_SORT_CONFIG,
-          cardW: DEFAULT_CARD_W,
-          cardH: fixedCardHeightFromWidth(DEFAULT_CARD_W),
-          cardLayoutMode: DEFAULT_CARD_LAYOUT_MODE,
-          stacks: [],
-          workflow: createWorkflowForTemplate('open', 1200, 800, starter.length),
-          activeStageId: undefined,
-          cards: toPersistedCards(starter),
-        });
-        await persistSetActiveProjectId(projectId);
-        listed = await persistListProjects();
-      }
 
       let active = await persistGetActiveProjectId();
       if (!active || !listed.some((p) => p.id === active)) {
@@ -675,7 +588,7 @@ export default function App() {
   const stacksEnabled = sortConfig.stacksEnabled !== false;
   const zoomEnabled = sortConfig.zoomEnabled === true;
   const startInFullscreen = sortConfig.startInFullscreen === true;
-  const [cards, setCards] = React.useState<CardData[]>(() => createInitialCards());
+  const [cards, setCards] = React.useState<CardData[]>([]);
   const [stacks, setStacks] = React.useState<StackData[]>([]);
   const [workflow, setWorkflow] = React.useState<SortWorkflowData>(() => createWorkflowForTemplate('open', 1200, 800, 0));
   const [activeStageId, setActiveStageId] = React.useState<string | null>(null);
@@ -815,11 +728,7 @@ export default function App() {
     } catch (err) {
       console.error(`[persist] ${label} failed`, err);
       if (modeRef.current === 'setup') {
-        setProjectStatus((prev) =>
-          prev && !prev.startsWith('Couldn’t save your latest changes')
-            ? prev
-            : 'Couldn’t save your latest changes in this browser. Keep this tab open to avoid losing them.'
-        );
+        setProjectStatus('Couldn’t save your latest changes in this browser. Keep this tab open to avoid losing them.');
       }
       return false;
     }
@@ -1633,38 +1542,6 @@ export default function App() {
     setReplayResizeWarningDismissed(false);
   }, [cancelReplayFrame]);
 
-  const createDemoProjectCards = React.useCallback(async (count = DEMO_CARD_COUNT) => {
-    const out: CardData[] = [];
-
-    for (let i = 0; i < count; i += 1) {
-      const x = 28 + i * 18;
-      const y = 28 + i * 18;
-      const z = i + 1;
-      const blob = createLocalDemoImageBlob(i);
-      const displayName = `Demo ${i + 1}`;
-      const assetId = nanoid();
-      await persistPutAsset(assetId, blob, blob.type);
-      const src = URL.createObjectURL(blob);
-      assetUrlRef.current.set(assetId, src);
-      out.push({
-        id: nanoid(),
-        kind: 'image',
-        createdAt: nextCreatedAt(i),
-        assetId,
-        src,
-        meta: createCardMetadata(displayName, '', ['demo'], {
-          aspectRatio: 16 / 9,
-          originalFileName: `demo-${i + 1}.svg`,
-        }),
-        x,
-        y,
-        z,
-      });
-    }
-
-    return out;
-  }, []);
-
   // Keep latest cards for unmount cleanup.
   const cardsRef = React.useRef<CardData[]>(cards);
   React.useEffect(() => {
@@ -1684,19 +1561,19 @@ export default function App() {
     let cancelled = false;
 
     (async () => {
-      const { projects: listed, activeProjectId: active, firstVisit } = await bootstrapProjectsOnce(createDemoProjectCards);
+      const { projects: listed, activeProjectId: active, firstVisit } = await bootstrapProjectsOnce();
 
       if (!cancelled) {
         setProjects(listed);
         activateProject(active);
-        if (firstVisit) { setIsFirstVisit(true); setShowDemoProjects(true); }
+        if (firstVisit) setIsFirstVisit(true);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [activateProject, createDemoProjectCards]);
+  }, [activateProject]);
 
   React.useEffect(() => {
     if (!activeProjectId) {
@@ -1767,7 +1644,7 @@ export default function App() {
       }
 
       if (!persisted) {
-        const starter = createInitialCards();
+        const starter: CardData[] = [];
         await persistPutBoard({
           version: 2,
           id: boardId,
@@ -2796,6 +2673,7 @@ export default function App() {
         }
         const projectName = `Project ${projects.length + 1}`;
         await createProjectWithCards(projectName, [], DEFAULT_SORT_CONFIG);
+        setIsFirstVisit(false);
         setMode('setup');
         setProjectStatus(`Created "${projectName}".`);
       } catch (err) {
@@ -2845,13 +2723,19 @@ export default function App() {
       try {
         const deleted = await persistDeleteProject(activeProjectId);
         setupUndoPastByProjectRef.current.delete(activeProjectId);
-        let listed = await persistListProjects();
+        const listed = await persistListProjects();
         let nextActive = deleted.activeProjectId;
 
         if (listed.length === 0) {
-          const starter = await createDemoProjectCards(DEMO_CARD_COUNT);
-          nextActive = await createProjectWithCards(DEFAULT_PROJECT_NAME, starter, DEFAULT_SORT_CONFIG);
-          listed = await persistListProjects();
+          nextActive = null;
+          setCards([]);
+          setStacks([]);
+          setSessions([]);
+          setRecordingSession(null);
+          setWorkflow(createWorkflowForTemplate('open', 1200, 800, 0));
+          setActiveStageId(null);
+          setSortConfig({ ...DEFAULT_SORT_CONFIG });
+          setIsFirstVisit(true);
         } else if (!nextActive || !listed.some((p) => p.id === nextActive)) {
           nextActive = listed[0].id;
           await persistSetActiveProjectId(nextActive);
@@ -2867,7 +2751,7 @@ export default function App() {
         setIsProjectBusy(false);
       }
     })();
-  }, [activateProject, activeProject, activeProjectId, createDemoProjectCards, createProjectWithCards, isProjectBusy]);
+  }, [activateProject, activeProject, activeProjectId, isProjectBusy]);
 
   const handleExportProject = React.useCallback(() => {
     if (!activeProject || !activeProjectId || isProjectBusy) return;
@@ -2921,6 +2805,7 @@ export default function App() {
         activateProject(projectId);
         setMode('setup');
         setProjectStatus('Project imported.');
+        setIsFirstVisit(false);
       } catch (err) {
         setProjectStatus(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
         throw err;
@@ -5057,7 +4942,7 @@ export default function App() {
         ? 'Distribution complete.'
         : 'All cards placed.';
   React.useEffect(() => {
-    if (mode !== 'setup' || showDemoProjects) return;
+    if (mode !== 'setup' || showDemoProjects || isFirstVisit) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
@@ -5071,7 +4956,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [canUndoSetup, mode, showDemoProjects, undoSetup]);
+  }, [canUndoSetup, isFirstVisit, mode, showDemoProjects, undoSetup]);
 
   const renderProjectControls = () => (
     <div className="projectTools projectTools--compact">
@@ -5130,12 +5015,12 @@ export default function App() {
 
   return (
     <div className={`app app--${mode}`} ref={appFullscreenRef}>
+      {isFirstVisit && !showDemoProjects ? <WelcomeDialog busy={isProjectBusy} status={projectStatus}
+        onBlank={handleCreateProject} onDemo={() => setShowDemoProjects(true)} onImport={handleImportProject} /> : null}
       {showDemoProjects ? (
         <React.Suspense fallback={<div className="demoLoading" role="status">Opening demo library...</div>}>
           <DemoProjectDialog firstVisit={isFirstVisit}
-            onClose={() => { setShowDemoProjects(false); setIsFirstVisit(false); }} onImport={importProjectArchive}
-            onNewProject={() => { setShowDemoProjects(false); setIsFirstVisit(false); handleCreateProject(); }}
-            onImportProject={() => { setShowDemoProjects(false); setIsFirstVisit(false); handleImportProject(); }} />
+            onClose={() => setShowDemoProjects(false)} onImport={importProjectArchive} />
         </React.Suspense>
       ) : null}
       <input
@@ -5156,9 +5041,8 @@ export default function App() {
       />
       {mode !== 'sort' ? <header className="appHeader">
         <span className="appHeader__brand"><PanelsTopLeft /><span>SortBoard</span></span>
-        <ProjectMenu name={activeProject?.name || 'Loading project…'} disabled={projectInteractionDisabled}>
+        <ProjectMenu name={activeProject?.name || 'No project yet'} disabled={projectInteractionDisabled}>
           {renderProjectControls()}
-          <button className="btn btn--ghost" type="button" onClick={() => setShowDemoProjects(true)}><FolderOpen />Try a demo project</button>
         </ProjectMenu>
         <nav className="appHeader__nav" aria-label="Project views">
           <button type="button" className={mode === 'setup' ? 'isActive' : ''} aria-current={mode === 'setup' ? 'page' : undefined} disabled={projectInteractionDisabled} onClick={() => { if (mode === 'end') returnToSetupFromReplay(); }}><LayoutDashboard />Setup</button>
@@ -5176,6 +5060,7 @@ export default function App() {
       {mode === 'setup' ? (
         <div className="layout layout--setupThreePane">
           <aside className="panel">
+            <div className="panel__demos"><button className="btn btn--ghost" type="button" disabled={projectInteractionDisabled} onClick={() => setShowDemoProjects(true)}><FolderOpen />Demo projects<ArrowRight /></button></div>
             {sortingSetupIssue ? <div className="panel__top">
               {sortingSetupIssue ? (
                 <div className="actionHint" id="sorting-setup-issue" role="status">

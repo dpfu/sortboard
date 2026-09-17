@@ -51,7 +51,8 @@ test('@smoke welcomes a new colleague, saves the result, and starts fresh after 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await resetAppState(page);
   await page.goto('/');
-  const welcome = page.getByRole('dialog', { name: 'Try SortBoard' });
+  await page.getByRole('button', { name: /Start with a demo project/ }).click();
+  const welcome = page.getByRole('dialog', { name: 'Demo projects' });
   await expect(welcome.getByRole('radio', { name: /^Closed sort/ })).toBeChecked();
   await expect(welcome.getByRole('checkbox')).toHaveCount(0);
   await expect(welcome.locator('.demoDialog__preview img')).toHaveCount(6);
@@ -161,7 +162,7 @@ test('inspects images, names a group, and preserves names and the prepared board
   await expect(label).toContainText('Unexpected connections');
   await page.getByRole('button', { name: 'Full screen', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Exit full screen', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Enlarge Demo 2' }).focus();
+  await page.getByRole('button', { name: 'Enlarge Card 2' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('image-preview-dialog')).toBeVisible();
   if (browserName !== 'chromium') await page.getByTestId('image-preview-dialog').getByRole('button', { name: 'Close', exact: true }).click();
