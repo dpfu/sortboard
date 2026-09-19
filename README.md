@@ -64,8 +64,6 @@ The archive is intended for backup and transfer between SortBoard installations 
 
 Card sorting, visual sorting and online Q studies have a substantial software history. These projects provide useful points of comparison for SortBoard's local-first board and replayable sorting process.
 
-Public sources checked on **2026-09-19**. Years identify the linked publication, documentation, release or announced launch.
-
 | Project and reference | Access / deployment | Sorting features |
 | --- | --- | --- |
 | **[MeSort](https://mesoftware.org/index.php/mesort/)** — [2020 manual](https://mesoftware.org/wp-content/uploads/2020/03/Working-Paper-Manual-MeSort-v1.0.pdf) | Web; open source ([AGPL-3.0](https://github.com/zemki/mesort)). Developed at the University of Bremen. | Circle, Q- and concentric-circle/network sorts; image/text tokens, multiple passes, accompanying questions and PDF/XLSX exports. |
