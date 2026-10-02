@@ -1,0 +1,14 @@
+{
+  "name": "colab-sort-demo",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Server-free image sorting for one host and up to four guests",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/protocol.test.cjs",
+    "test:scale": "node tests/scale.cjs",
+    "test:ui": "python tests/browser-ui.py",
+    "test:e2e": "python tests/browser-native.py",
+    "build:single": "node build-single.cjs"
+  }
+}
