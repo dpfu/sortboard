@@ -161,6 +161,34 @@ describe('current persistence schema', () => {
     await expect(stored?.blob.text()).resolves.toBe('hello');
   });
 
+  it('retains fixed Q-Sort places in boards, recordings and replay after ZIP transfer', async () => {
+    const workflow = createWorkflowForTemplate('qsort', 1200, 800, 12);
+    const stageId = workflow.stages.find(stage => stage.kind === 'qsort')!.id;
+    const widget = workflow.widgets.find(widget => widget.kind === 'qsort')!;
+    if (widget.kind !== 'qsort') throw new Error('Missing Q-Sort');
+    const bucket = widget.buckets[3];
+    bucket.capacity = 4;
+    const cards = [0, 2].map(slotIndex => ({ ...textCard(`card-${slotIndex}`, slotIndex), widgetAssignments: {
+      [stageId]: { widgetId: widget.id, zoneId: bucket.id, order: slotIndex, slotIndex },
+    } }));
+    const rec = recording(cards as CardData[], workflow);
+    rec.activeStageIdAtStart = stageId;
+    rec.segments = [{ type:'drag', id:'move', cardId:cards[0].id, t0:0, t1:100, path:[], from:{x:0,y:0}, drop:{x:0,y:300}, final:{x:0,y:300},
+      widgetAssignmentChanges:[{cardId:cards[0].id, stageId, assignment:{widgetId:widget.id,zoneId:bucket.id,order:3,slotIndex:3}}] }];
+    await persist.persistPutProject({version:1,id:'fixed-qsort',name:'Fixed Q-Sort',createdAt:1,updatedAt:1});
+    await persist.persistPutBoard({...board('fixed-qsort',cards,workflow),activeStageId:stageId});
+    await persist.persistPutSession({version:1,id:rec.createdAt,boardId:'fixed-qsort',updatedAt:1,recording:rec});
+    const zip = await persist.persistExportProjectZip('fixed-qsort');
+    const imported = await persist.persistImportProjectZip(zip);
+    const importedBoard = await persist.persistGetBoard(imported.projectId);
+    expect(importedBoard!.cards.map(card => card.widgetAssignments![stageId]!.slotIndex)).toEqual([0,2]);
+    const restored = (await persist.persistListSessions(imported.projectId))[0].recording;
+    expect(restored.cardsAtStart.map(card => card.widgetAssignments![stageId]!.slotIndex)).toEqual([0,2]);
+    const index = buildReplayIndex(restored);
+    const final = replayCardsAt(restored,index,index.durationMs + 1);
+    expect(final.map(card => card.widgetAssignments![stageId]!.slotIndex)).toEqual([3,2]);
+  });
+
   it.each([2, 3] as const)('roundtrips workflow, media, and layout version %d through ZIP', async (surfaceLayoutVersion) => {
     const workflow = createWorkflowForTemplate('closed', 1200, 800, 2);
     const stageId = workflow.stages[0]!.id;

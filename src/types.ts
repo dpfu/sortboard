@@ -113,6 +113,8 @@ export interface CardWidgetAssignment {
   widgetId: string;
   zoneId: string;
   order: number;
+  // Fixed physical place in a Q-Sort column; absent in earlier recordings.
+  slotIndex?: number;
 }
 
 export type CardWidgetAssignmentsByStage = Record<string, CardWidgetAssignment | undefined>;

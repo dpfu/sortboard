@@ -44,6 +44,7 @@ type KeyboardDropTarget = {
   w: number;
   h: number;
   available: boolean;
+  dropCenter?: { x: number; y: number };
 };
 
 export interface BoardProps {
@@ -134,6 +135,7 @@ function keyboardDropTargets(scene: StageSurfaceScene | null | undefined): Keybo
       });
     }
     for (const bucket of surface.buckets) {
+      const freeSlot = bucket.slots.find(slot => !slot.occupied);
       targets.push({
         key: `${surface.widgetId}:${bucket.zoneId}`,
         kind: 'bucket',
@@ -143,6 +145,7 @@ function keyboardDropTargets(scene: StageSurfaceScene | null | undefined): Keybo
         w: bucket.w,
         h: bucket.h,
         available: bucket.count < bucket.capacity,
+        ...(freeSlot ? { dropCenter: { x: freeSlot.x + freeSlot.w / 2, y: freeSlot.y + freeSlot.h / 2 } } : {}),
       });
     }
   }
@@ -317,7 +320,8 @@ export function Board({
         return;
       }
 
-      let destination = { x: target.x + (target.w - dims.w) / 2, y: target.y + (target.h - dims.h) / 2 };
+      let destination = target.dropCenter ? { x: target.dropCenter.x - dims.w / 2, y: target.dropCenter.y - dims.h / 2 }
+        : { x: target.x + (target.w - dims.w) / 2, y: target.y + (target.h - dims.h) / 2 };
       if (surfaceScene?.cardFrame) {
         // Keyboard placement uses an empty spot; pointer placement keeps the
         // release position. Neither gesture rearranges other cards.

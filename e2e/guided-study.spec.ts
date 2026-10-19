@@ -5,10 +5,10 @@ import { testStudy, testStudyArchive } from '../src/testFixtures/study';
 import { studyScores } from '../src/study/model';
 import { dragMouseFromTo, resetAppState, openFreshApp } from './helpers/app';
 
-async function loadStudy(page: Page) {
+async function loadStudy(page: Page, archive?: Buffer) {
   await resetAppState(page); await page.goto('/');
   await expect(page.getByRole('dialog', { name: 'Welcome to SortBoard' })).toBeVisible();
-  const buffer = Buffer.from(await testStudyArchive());
+  const buffer = archive || Buffer.from(await testStudyArchive());
   await page.getByTestId('project-import-input').setInputFiles({ name: 'study.sortboard.zip', mimeType: 'application/zip', buffer });
   await expect(page.getByRole('button', { name: 'Start sorting', exact: true })).toBeVisible();
 }
@@ -50,6 +50,90 @@ async function rankAll(page: Page, drag: boolean, count = 12) {
     await expect.poll(remaining).toBe(count - ids.indexOf(id) - 1);
   }
 }
+
+test('@smoke keeps Q-Sort places fixed when adding, removing and replacing images', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await loadStudy(page, process.env.SORTBOARD_STUDY_ARCHIVE ? await fs.readFile(process.env.SORTBOARD_STUDY_ARCHIVE) : undefined);
+  await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
+  await expect(page.locator('[data-testid^="card-"]')).toHaveCount(12);
+  const ids = await page.locator('[data-testid^="card-"]').evaluateAll(nodes => nodes.slice(0, 5).map(node => node.getAttribute('data-testid')!));
+  const column = page.locator('[data-testid^="qsort-bucket-"]').nth(3);
+  const drop = async (id: string, slot: number) => {
+    const card = page.getByTestId(id);
+    await card.scrollIntoViewIfNeeded();
+    const target = column.locator('.widgetBucket__slot').nth(slot);
+    await target.scrollIntoViewIfNeeded();
+    const a = await card.boundingBox(); const b = await target.boundingBox();
+    expect(a).toBeTruthy(); expect(b).toBeTruthy();
+    await dragMouseFromTo(page, { x:a!.x + a!.width / 2, y:a!.y + a!.height / 2 }, { x:b!.x + b!.width / 2, y:b!.y + b!.height / 2 });
+  };
+  for (let i = 0; i < 3; i++) {
+    await drop(ids[i], i);
+    await expect(column.locator('.widgetBucket__meta')).toHaveText(`${i + 1} / 4`);
+  }
+  const before = await Promise.all(ids.slice(0, 3).map(id => page.getByTestId(id).boundingBox()));
+  const lastSlot = await column.locator('.widgetBucket__slot').last().boundingBox();
+  await drop(ids[3], 3);
+  await expect(column.locator('.widgetBucket__meta')).toHaveText('4 / 4');
+  await expect.poll(async () => {
+    const placed = await page.getByTestId(ids[3]).boundingBox();
+    return !!placed && !!lastSlot && Math.abs(placed.y + placed.height / 2 - lastSlot.y - lastSlot.height / 2) < 2;
+  }, { message:'The new image must occupy the last empty place' }).toBe(true);
+  for (const [i, id] of ids.slice(0, 3).entries()) {
+    const after = await page.getByTestId(id).boundingBox();
+    expect(after!.x).toBeCloseTo(before[i]!.x, 0);
+    expect(after!.y).toBeCloseTo(before[i]!.y, 0);
+  }
+  await expect.poll(async () => (await storedStudy(page)).sessions[0].recording.segments.length).toBe(4);
+  const saved = (await storedStudy(page)).sessions[0].recording;
+  // Releasing over an occupied place in the same column must keep this ordering.
+  await drop(ids[1], 0);
+  await expect.poll(async () => {
+    const card = await page.getByTestId(ids[1]).boundingBox();
+    return !!card && Math.abs(card.y - before[1]!.y) < 1;
+  }).toBe(true);
+  expect((await storedStudy(page)).sessions[0].recording.segments).toEqual(saved.segments);
+  const fixedIds = [ids[0], ids[2], ids[3]];
+  const fixedPositions = await Promise.all(fixedIds.map(id => page.getByTestId(id).boundingBox()));
+  const remove = async (id: string) => {
+    const a = await page.getByTestId(id).boundingBox();
+    const b = await page.locator('[data-testid^="qsort-lane-"]').first().boundingBox();
+    await dragMouseFromTo(page, { x:a!.x + a!.width / 2, y:a!.y + a!.height / 2 }, { x:b!.x + b!.width / 2, y:b!.y + b!.height / 2 });
+    await expect(column.locator('.widgetBucket__slot')).toHaveClass([/is-occupied/, /^widgetBucket__slot\s*$/, /is-occupied/, /is-occupied/]);
+  };
+  const expectFixed = async () => {
+    for (const [i, id] of fixedIds.entries()) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(box!.x).toBeCloseTo(fixedPositions[i]!.x, 0);
+      expect(box!.y).toBeCloseTo(fixedPositions[i]!.y, 0);
+    }
+  };
+  await remove(ids[1]);
+  await expectFixed();
+  await drop(ids[4], 1);
+  await expect(column.locator('.widgetBucket__meta')).toHaveText('4 / 4');
+  await expectFixed();
+  const replacement = await page.getByTestId(ids[4]).boundingBox();
+  expect(replacement!.y + replacement!.height / 2).toBeCloseTo(before[1]!.y + before[1]!.height / 2, 0);
+  await remove(ids[4]);
+  await expectFixed();
+  await page.reload();
+  await page.getByRole('button', { name:'Resume round 1', exact:true }).click();
+  await expect(column.locator('.widgetBucket__meta')).toHaveText('3 / 4');
+  await expect(column.locator('.widgetBucket__slot').nth(1)).not.toHaveClass(/is-occupied/);
+  await expectFixed();
+  await page.getByRole('button', { name:'Pause', exact:true }).click();
+  await page.getByRole('button', { name:'Workspace', exact:true }).click();
+  await page.getByRole('button', { name:/Recordings \(/ }).click();
+  await page.getByTestId('replay-sessions').getByRole('button').first().click();
+  await expect(column.locator('.widgetBucket__meta')).toHaveText('3 / 4');
+  await expect(column.locator('.widgetBucket__slot').nth(1)).not.toHaveClass(/is-occupied/);
+  for (const [i, slot] of [0, 2, 3].entries()) {
+    const a = await page.getByTestId(fixedIds[i]).boundingBox();
+    const b = await column.locator('.widgetBucket__slot').nth(slot).boundingBox();
+    expect(Math.abs(a!.y + a!.height / 2 - b!.y - b!.height / 2)).toBeLessThan(2);
+  }
+});
 
 test('@smoke authors a single-round Q-Sort in Setup with a custom task and scale, then replays its frozen design', async ({ page }, info) => {
   test.setTimeout(120000);

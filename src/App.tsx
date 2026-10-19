@@ -108,6 +108,7 @@ import {
   WIDGET_ZONE_CONTENT,
 } from './workflow';
 import {
+  assignCardToQSortZone,
   assignCardsToWidgetZone,
   assignUnassignedCardsToWidgetZone,
   type CardBounds as WidgetCardBounds,
@@ -4209,11 +4210,14 @@ export default function App() {
                   ...entry, x: finalPos.x, y: finalPos.y,
                   widgetAssignments: { ...entry.widgetAssignments, [stageId]: assignment },
                 } : entry);
-              } else nextCards = reflowCardsForStage(
-                assignCardsToWidgetZone(sourceCards, stageId, target.widgetId, target.zoneId, [id], { insertAt: 'front' }),
-                workflowRef.current,
-                stageId
-              );
+              } else {
+                const widget = getQSortWidget(workflowRef.current, stageId);
+                if (widget) nextCards = reflowCardsForStage(
+                  assignCardToQSortZone(sourceCards, stageId, widget, target.zoneId, id, target.slotIndex),
+                  workflowRef.current,
+                  stageId
+                );
+              }
               accepted = true;
             }
           }
@@ -4229,7 +4233,8 @@ export default function App() {
               current.y !== previous.y ||
               currentAssignment?.widgetId !== previousAssignment?.widgetId ||
               currentAssignment?.zoneId !== previousAssignment?.zoneId ||
-              currentAssignment?.order !== previousAssignment?.order
+              currentAssignment?.order !== previousAssignment?.order ||
+              currentAssignment?.slotIndex !== previousAssignment?.slotIndex
             );
           });
         nextState = { cards: didMove ? nextCards : sourceCards, stacks: [] };
@@ -4319,21 +4324,13 @@ export default function App() {
           if (hasWidgetWorkflow) {
             const stageId = activeStageIdRef.current;
             if (stageId) {
-              const previousAssignment = sourceCards.find((current) => current.id === id)?.widgetAssignments?.[stageId];
-              const finalAssignment = nextState.cards.find((current) => current.id === id)?.widgetAssignments?.[stageId];
-              if (
-                previousAssignment?.widgetId !== finalAssignment?.widgetId ||
-                previousAssignment?.zoneId !== finalAssignment?.zoneId ||
-                previousAssignment?.order !== finalAssignment?.order
-              ) {
-                seg.widgetAssignmentChanges = [
-                  {
-                    cardId: id,
-                    stageId,
-                    assignment: finalAssignment,
-                  },
-                ];
-              }
+              const previousAssignments = new Map(sourceCards.map(current => [current.id, current.widgetAssignments?.[stageId]]));
+              seg.widgetAssignmentChanges = nextState.cards.flatMap(current => {
+                const previous = previousAssignments.get(current.id);
+                const final = current.widgetAssignments?.[stageId];
+                return previous?.widgetId !== final?.widgetId || previous?.zoneId !== final?.zoneId || previous?.order !== final?.order || previous?.slotIndex !== final?.slotIndex
+                  ? [{ cardId: current.id, stageId, assignment: final }] : [];
+              });
             }
           }
           const movedIdsExcludingLeader = new Set([id, ...(seg.groupMembers || []).map((member) => member.cardId)]);

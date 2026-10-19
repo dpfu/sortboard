@@ -13,9 +13,11 @@ import {
 } from './workflow';
 import {
   assignCardsToWidgetZone,
+  assignCardToQSortZone,
   assignUnassignedCardsToWidgetZone,
   countCardsInWidgetZone,
   getMinimumWidgetSize,
+  getQSortBucketCardSlots,
   isStageComplete,
   seedStageAssignments,
   transitionPreSortToQSort,
@@ -40,6 +42,42 @@ function makeCard(id: string): CardData {
 }
 
 describe('widgetSort workflow helpers', () => {
+  it('keeps fixed Q-Sort places when removing cards and fills holes without moving their neighbours', () => {
+    const workflow = createWorkflowForTemplate('qsort', 1200, 800, 12);
+    const stageId = workflow.stages.find(stage => stage.kind === 'qsort')!.id;
+    const widget = getQSortWidget(workflow, stageId)!;
+    const bucket = widget.buckets[3];
+    bucket.capacity = 4;
+    let cards = seedStageAssignments(['a', 'b', 'c', 'd'].map(makeCard), stageId, widget.id, widget.lanes[0].id);
+    for (const id of ['a', 'b', 'c']) cards = assignCardToQSortZone(cards, stageId, widget, bucket.id, id);
+    const first = cards.find(card => card.id === 'a')!.widgetAssignments![stageId];
+    const third = cards.find(card => card.id === 'c')!.widgetAssignments![stageId];
+    cards = assignCardToQSortZone(cards, stageId, widget, widget.lanes[0].id, 'b');
+    expect([...getQSortBucketCardSlots(cards, stageId, widget.id, bucket.id, bucket.capacity)]).toEqual([['a', 0], ['c', 2]]);
+    cards = assignCardToQSortZone(cards, stageId, widget, bucket.id, 'd');
+    expect(cards.find(card => card.id === 'a')!.widgetAssignments![stageId]).toEqual(first);
+    expect(cards.find(card => card.id === 'c')!.widgetAssignments![stageId]).toEqual(third);
+    expect(cards.find(card => card.id === 'd')!.widgetAssignments![stageId]?.slotIndex).toBe(1);
+    expect(assignCardToQSortZone(cards, stageId, widget, bucket.id, 'c')).toBe(cards);
+    // An explicit empty place can also be chosen within the same column.
+    cards = assignCardToQSortZone(cards, stageId, widget, bucket.id, 'd', 3);
+    expect(cards.find(card => card.id === 'd')!.widgetAssignments![stageId]?.slotIndex).toBe(3);
+    expect(cards.find(card => card.id === 'c')!.widgetAssignments![stageId]).toEqual(third);
+  });
+
+  it('pins the visible positions in a resumed older Q-Sort before removing a card', () => {
+    const workflow = createWorkflowForTemplate('qsort', 1200, 800, 12);
+    const stageId = workflow.stages.find(stage => stage.kind === 'qsort')!.id;
+    const widget = getQSortWidget(workflow, stageId)!;
+    const bucket = widget.buckets.find(entry => entry.capacity >= 3)!;
+    const cards = ['a', 'b', 'c'].map((id, order) => ({ ...makeCard(id), widgetAssignments: {
+      [stageId]: { widgetId: widget.id, zoneId: bucket.id, order },
+    } }));
+    const moved = assignCardToQSortZone(cards, stageId, widget, widget.lanes[0].id, 'b');
+    expect([...getQSortBucketCardSlots(moved, stageId, widget.id, bucket.id, bucket.capacity)]).toEqual([['a', 0], ['c', 2]]);
+    expect(cards.every(card => !('slotIndex' in card.widgetAssignments[stageId]))).toBe(true);
+  });
+
   it('transitions cards from pre-sort zones into separate q-sort lanes', () => {
     const workflow: SortWorkflowData = {
       templateId: 'qsort',

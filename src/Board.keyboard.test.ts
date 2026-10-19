@@ -117,10 +117,10 @@ describe('Board keyboard target navigation', () => {
               y: 20,
               w: 200,
               h: 600,
-              count: 0,
-              capacity: 1,
-              capacityLabel: '0 / 1',
-              slots: [],
+              count: 2,
+              capacity: 3,
+              capacityLabel: '2 / 3',
+              slots: [0, 1, 2].map(slotIndex => ({slotIndex, x:560, y:100 + slotIndex * 100, w:200, h:80, occupied:slotIndex !== 1})),
               columnHeight: 200,
               baselineY: 500,
               isCenter: true,
@@ -133,5 +133,6 @@ describe('Board keyboard target navigation', () => {
     const qCard = { ...card, x: 40, y: 80 };
     const targets = boardKeyboardTestUtils.keyboardDropTargets(qScene);
     expect(boardKeyboardTestUtils.nextKeyboardDropTarget(targets, qCard, 200, 120, 'right')?.label).toBe('0');
+    expect(targets.find(target => target.label === '0')?.dropCenter).toEqual({x:660,y:240});
   });
 });

@@ -18,6 +18,7 @@ import {
 import {
   countCardsInWidgetZone,
   getCardsInWidgetZone,
+  getQSortBucketCardSlots,
   layoutCardsInQSortBucketSlots,
   type CardBounds,
   type WidgetDropState,
@@ -30,6 +31,7 @@ export type SurfaceDropTarget = {
   widgetKind: BoardWidgetData['kind'];
   zoneId: string;
   zoneKind: 'content' | 'presort-zone' | 'lane' | 'bucket';
+  slotIndex?: number;
 };
 
 type BaseSurfaceView = {
@@ -448,13 +450,14 @@ function buildQSortScene(
   const center = (qsortWidget.buckets.length - 1) / 2;
   const buckets = qsortWidget.buckets.map((bucket, index) => {
     const count = countCardsInWidgetZone(cards, stageId, qsortWidget.id, bucket.id);
+    const occupiedSlots = new Set(getQSortBucketCardSlots(cards, stageId, qsortWidget.id, bucket.id, bucket.capacity).values());
     const slots = Array.from({ length: Math.max(0, bucket.capacity) }, (_, slotIndex) => ({
       slotIndex,
       x: bucketStartX + index * (bucketW + QSORT_BUCKET_GAP),
       y: slotAreaTop + slotIndex * (slotHeight + QSORT_SLOT_GAP),
       w: bucketW,
       h: slotHeight,
-      occupied: slotIndex < Math.min(count, bucket.capacity),
+      occupied: occupiedSlots.has(slotIndex),
     }));
     return {
       zoneId: bucket.id,
@@ -815,7 +818,8 @@ export function reflowCardsForStage(
     }
     for (const bucket of qsortSurface.buckets) {
       const zoneCards = getCardsInWidgetZone(cards, stageId, qsortWidget.id, bucket.zoneId);
-      const layout = layoutCardsInQSortBucketSlots(zoneCards, bucket, getCompactBounds);
+      const layout = layoutCardsInQSortBucketSlots(zoneCards, bucket, getCompactBounds,
+        getQSortBucketCardSlots(cards, stageId, qsortWidget.id, bucket.zoneId, bucket.capacity));
       for (const card of zoneCards) {
         setPosition(card, layout.get(card.id));
       }
@@ -861,11 +865,13 @@ export function findStageSurfaceDropTarget(scene: StageSurfaceScene, bounds: Car
     }
     for (const bucket of surface.buckets) {
       if (rectContains(bucket, center.x, center.y)) {
+        const freeSlot = bucket.slots.find(slot => !slot.occupied && rectContains(slot, center.x, center.y));
         return {
           widgetId: surface.widgetId,
           widgetKind: 'qsort',
           zoneId: bucket.zoneId,
           zoneKind: 'bucket',
+          ...(freeSlot ? { slotIndex: freeSlot.slotIndex } : {}),
         };
       }
     }

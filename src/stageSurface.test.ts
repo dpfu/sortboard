@@ -67,6 +67,28 @@ function assignToZone(cards: CardData[], stageId: string, widgetId: string, zone
 }
 
 describe('stageSurface layout', () => {
+  it('preserves empty Q-Sort places and targets the exact free slot', () => {
+    const workflow = createWorkflowForTemplate('qsort', 1200, 800, 12);
+    const stageId = workflow.stages.find(stage => stage.kind === 'qsort')!.id;
+    const widget = getQSortWidget(workflow, stageId)!;
+    const bucket = widget.buckets[3];
+    bucket.capacity = 4;
+    const cards = ['a', 'b', 'c'].map((id, slotIndex) => ({ ...makeCard(id), widgetAssignments: {
+      [stageId]: { widgetId: widget.id, zoneId: bucket.id, order: slotIndex, slotIndex },
+    } }));
+    const placed = reflowCardsForStage(cards, workflow, stageId, getCardBounds, {width:1200,height:800}, 'sort', 4);
+    const removed = placed.filter(card => card.id !== 'b');
+    const after = reflowCardsForStage(removed, workflow, stageId, getCardBounds, {width:1200,height:800}, 'sort', 4);
+    expect(after).toEqual(removed);
+    const scene = buildStageSurfaceScene(workflow, stageId, after, null, 'sort', {width:1200,height:800}, null, 4);
+    const surface = scene.surfaces.find(surface => surface.kind === 'qsort-stage')!;
+    if (surface.kind !== 'qsort-stage') throw new Error('Missing Q-Sort');
+    const column = surface.buckets.find(entry => entry.zoneId === bucket.id)!;
+    expect(column.slots.map(slot => slot.occupied)).toEqual([true, false, true, false]);
+    const empty = column.slots[1];
+    expect(findStageSurfaceDropTarget(scene, {x:empty.x + empty.w / 2,y:empty.y + empty.h / 2,w:0,h:0})?.slotIndex).toBe(1);
+  });
+
   it('retains the original vertical targets and card sizes for older recordings', () => {
     let workflow = createWorkflowForTemplate('closed', 1280, 720, 15);
     const stageId = getDefaultActiveStageId(workflow)!;

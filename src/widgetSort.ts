@@ -19,6 +19,7 @@ export type WidgetDropTarget = {
   widgetKind: BoardWidgetData['kind'];
   zoneId: string;
   zoneKind: 'content' | 'presort-zone' | 'lane' | 'bucket';
+  slotIndex?: number;
 };
 
 const HEADER_H = 44;
@@ -90,6 +91,57 @@ export function getCardsInWidgetZone(cards: CardData[], stageId: string, widgetI
     .sort(compareAssignedCards(stageId));
 }
 
+export function getQSortBucketCardSlots(cards: CardData[], stageId: string, widgetId: string, zoneId: string, capacity: number) {
+  const placed = getCardsInWidgetZone(cards, stageId, widgetId, zoneId);
+  const slots = new Map<string, number>();
+  const occupied = new Set<number>();
+  for (const card of placed) {
+    const index = getAssignment(card, stageId)?.slotIndex;
+    if (index !== undefined && Number.isInteger(index) && index >= 0 && index < capacity && !occupied.has(index)) {
+      slots.set(card.id, index); occupied.add(index);
+    }
+  }
+  // Earlier recordings used compact ordering. Keep their visible places until
+  // a live move pins those places, without changing their saved recording.
+  let nextFree = 0;
+  for (const card of placed) {
+    if (slots.has(card.id)) continue;
+    while (occupied.has(nextFree)) nextFree++;
+    if (nextFree >= capacity) break;
+    slots.set(card.id, nextFree); occupied.add(nextFree);
+  }
+  return slots;
+}
+
+export function assignCardToQSortZone(cards: CardData[], stageId: string, widget: QSortWidgetData, zoneId: string, cardId: string, requestedSlot?: number) {
+  const card = cards.find(entry => entry.id === cardId);
+  if (!card) return cards;
+  const previous = getAssignment(card, stageId);
+  const sameZone = previous?.widgetId === widget.id && previous.zoneId === zoneId;
+  const bucket = widget.buckets.find(entry => entry.id === zoneId);
+  const bucketSlots = widget.buckets.map(entry => getQSortBucketCardSlots(cards, stageId, widget.id, entry.id, entry.capacity));
+  let slotIndex: number | undefined;
+  if (bucket) {
+    const currentSlots = bucketSlots[widget.buckets.indexOf(bucket)];
+    const occupied = new Set([...currentSlots].filter(([id]) => id !== cardId).map(([, slot]) => slot));
+    slotIndex = requestedSlot !== undefined && Number.isInteger(requestedSlot) && requestedSlot >= 0 && requestedSlot < bucket.capacity && !occupied.has(requestedSlot)
+      ? requestedSlot : sameZone ? currentSlots.get(cardId) : Array.from({ length: bucket.capacity }, (_, i) => i).find(i => !occupied.has(i));
+    if (slotIndex === undefined || (sameZone && slotIndex === currentSlots.get(cardId))) return cards;
+  } else if (sameZone || !widget.lanes.some(lane => lane.id === zoneId)) return cards;
+
+  const pinnedSlots = new Map(bucketSlots.flatMap(slots => [...slots]));
+  const pinned = cards.map(entry => {
+    const slot = pinnedSlots.get(entry.id);
+    const assignment = getAssignment(entry, stageId);
+    return slot === undefined || (assignment?.slotIndex === slot && assignment.order === slot) ? entry
+      : setAssignment(entry, stageId, { ...assignment!, order: slot, slotIndex: slot });
+  });
+  if (!bucket) return assignCardsToWidgetZone(pinned, stageId, widget.id, zoneId, [cardId]);
+  return pinned.map(entry => entry.id === cardId ? setAssignment(entry, stageId, {
+    widgetId: widget.id, zoneId, order: slotIndex!, slotIndex,
+  }) : entry);
+}
+
 export function countCardsInWidgetZone(cards: CardData[], stageId: string, widgetId: string, zoneId: string) {
   let count = 0;
   for (const card of cards) {
@@ -115,21 +167,23 @@ function maxCardSize(cards: CardData[], getBounds: (card: CardData) => CardBound
 export function layoutCardsInQSortBucketSlots(
   cards: CardData[],
   bucket: QSortBucketLayoutView,
-  getBounds: (card: CardData) => CardBounds
+  getBounds: (card: CardData) => CardBounds,
+  slotByCardId?: Map<string, number>
 ) {
   if (cards.length === 0) return new Map<string, { x: number; y: number }>();
   const next = new Map<string, { x: number; y: number }>();
-  const slottedCount = Math.min(cards.length, bucket.slots.length);
-  for (let index = 0; index < slottedCount; index += 1) {
+  const overflowCards: CardData[] = [];
+  for (let index = 0; index < cards.length; index += 1) {
     const card = cards[index];
-    const slot = bucket.slots[index];
+    const slotIndex = slotByCardId ? slotByCardId.get(card.id) : index;
+    const slot = slotIndex === undefined ? undefined : bucket.slots[slotIndex];
+    if (!slot) { overflowCards.push(card); continue; }
     const bounds = getBounds(card);
     next.set(card.id, {
       x: Math.round(slot.x + Math.max(0, (slot.w - bounds.w) / 2)),
       y: Math.round(slot.y + Math.max(0, (slot.h - bounds.h) / 2)),
     });
   }
-  const overflowCards = cards.slice(slottedCount);
   if (overflowCards.length > 0) {
     const { maxW, maxH } = maxCardSize(overflowCards, getBounds);
     const startX = bucket.x + Math.max(0, Math.round((bucket.w - maxW) / 2));

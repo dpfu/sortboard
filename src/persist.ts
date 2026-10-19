@@ -257,8 +257,10 @@ function normalizeWidgetAssignments(value: unknown): CardWidgetAssignmentsByStag
     const zoneId = normalizeOptionalString((rawAssignment as { zoneId?: unknown }).zoneId);
     const orderRaw = (rawAssignment as { order?: unknown }).order;
     const order = typeof orderRaw === 'number' && Number.isFinite(orderRaw) && orderRaw >= 0 ? Math.floor(orderRaw) : 0;
+    const slotIndex = (rawAssignment as { slotIndex?: unknown }).slotIndex;
     if (!widgetId || !zoneId) continue;
-    next[stageId] = { widgetId, zoneId, order };
+    next[stageId] = { widgetId, zoneId, order,
+      ...(typeof slotIndex === 'number' && Number.isInteger(slotIndex) && slotIndex >= 0 ? { slotIndex } : {}) };
   }
   return Object.keys(next).length > 0 ? next : undefined;
 }
