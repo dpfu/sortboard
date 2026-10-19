@@ -28,6 +28,7 @@
 .studyRoundResult strong { display: block; font-size: 12px; margin-bottom: 10px; }
 .studyResultImage { display: block; padding: 5px; width: 100%; border: 0; background: white; margin: 5px 0; border-radius: 4px; cursor: zoom-in; color: inherit; }
 .studyResultImage img { width: 100%; height: 58px; object-fit: contain; display: block; }
+.studyResultImage .cardPreview { height: 58px; }
 .studyResultImage span { font-size: 11px; }
 .studyComparison { overflow: auto; margin: 28px 0; }
 .studyComparison table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d5dfd7; }
@@ -40,6 +41,8 @@
 .studyReplayHint { padding: 10px 24px; margin: 0; font-size: 13px; line-height: 1.5; background: #eaf0eb; }
 .studyImage { display: inline-flex; align-items: center; gap: 14px; padding: 0; background: none; border: 0; cursor: zoom-in; color: inherit; font: inherit; }
 .studyImage img { width: 100px; height: 68px; object-fit: contain; border-radius: 5px; }
+.studyImage .cardPreview { width: 100px; height: 68px; border-radius: 5px; }
+.studyImage .cardPreview__text, .studyResultImage .cardPreview__text { font-size: 11px; padding: 6px; }
 .sortBar--study .studySortPrompt { min-width: 0; display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; }
 .studySortPrompt small { font-size: 11px; color: #5e7565; }
 .studySortPrompt strong { font-size: clamp(14px, 1.4vw, 19px); line-height: 1.35; }
@@ -67,4 +70,33 @@
 .boardSurface--study .widgetBucket.is-center { background: transparent; }
 .boardSurface--study .widgetBucket.is-valid .widgetBucket__slot { background: #e5eee7; border-color: #86a28d; }
 .boardSurface--study .widgetBucket.is-full .widgetBucket__slot { border-color: var(--warning); }
+.studySetup { width: min(720px, calc(100vw - 40px)); max-height: calc(100vh - 48px); padding: 0; color: var(--ink); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 80px #183a2529; }
+.studySetup::backdrop { background: #142d224d; }
+.studySetup form { display: flex; flex-direction: column; max-height: calc(100vh - 50px); }
+.studySetup header, .studySetup footer { display: flex; align-items: center; gap: 12px; padding: 16px 24px; background: var(--surface, white); }
+.studySetup header { justify-content: space-between; border-bottom: 1px solid var(--border); }
+.studySetup h2 { margin: 0; font-size: 20px; }
+.studySetup h3 { margin: 0 0 16px; font-size: 15px; }
+.studySetup footer { justify-content: flex-end; border-top: 1px solid var(--border); }
+.studySetup footer p { flex: 1; margin: 0; color: #9b2f32; font-size: 13px; }
+.studySetup__body { overflow-y: auto; border: 0; margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 28px; }
+.studySetup label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.studySetup input:not([type=checkbox]), .studySetup textarea, .studySetup select { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid #ccd8cf; border-radius: 6px; background: white; font: inherit; color: inherit; }
+.studySetup textarea { resize: vertical; }
+.studySetup__round { padding: 0 0 16px; }
+.studySetup__row { display: flex; align-items: end; gap: 12px; margin: 0 0 12px; }
+.studySetup__row label { flex: 1; }
+.studySetup__row output { padding-bottom: 8px; font-size: 12px; white-space: nowrap; }
+.studySetup__invalid { color: #9b2f32; }
+.studySetup__anchors { display: flex; gap: 12px; margin-bottom: 16px; }
+.studySetup__anchors label { flex: 1; min-width: 0; }
+.studySetup__scale { width: 100%; border-spacing: 0 6px; table-layout: fixed; font-size: 13px; }
+.studySetup__scale th { text-align: left; font-weight: 500; color: #667b6d; }
+.studySetup__scale td { padding-right: 8px; }
+.studySetup label.studySetup__check { flex-direction: row; align-items: center; margin-bottom: 16px; }
+.studySetup details { margin-top: 20px; }
+.studySetup summary { cursor: pointer; font-size: 13px; }
+.studySetup details label { margin-top: 16px; }
+.qSortDesignSummary { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.qSortDesignSummary .hint { font-size: 12px; }
 @media (max-width: 720px) { .studyPage { padding: 28px 18px; } .studyHeader { padding: 0 18px; } .sortBar--study { flex-wrap: wrap; padding: 10px 16px; } .studySortPrompt { flex-basis: 70%; } }

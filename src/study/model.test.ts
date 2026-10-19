@@ -6,6 +6,32 @@ import type { CardData, RecordingSession } from '../types';
 import { buildStageSurfaceScene, reflowCardsForStage, getQSortCardDisplayDimensions } from '../stageSurface';
 
 describe('guided study data', () => {
+  it('accepts one or several tasks and snapshots the design independently of later setup edits', () => {
+    for (const count of [1, 3]) {
+      const study = normalizeStudy({ ...testStudy, rounds: Array.from({ length: count }, (_, i) => ({ id: `round-${i}`, title: `Task ${i}`, prompt: 'Rank by usefulness.' })),
+        anchors: { disagree: 'Discard', undecided: 'Unsure', agree: 'Keep' }, preSort: { labels: ['Useful', 'Less useful'] } })!;
+      expect(study.rounds).toHaveLength(count);
+      const frozen = normalizeStudyRound({ ...study.rounds[0], design: study })!;
+      study.scale[6].value = 99;
+      study.anchors!.agree = 'Changed';
+      expect(frozen.design!.scale[6].value).toBe(3);
+      expect(frozen.design!.anchors!.agree).toBe('Keep');
+    }
+    expect(() => normalizeStudy({ ...testStudy, rounds: [] })).toThrow();
+    expect(() => normalizeStudy({ ...testStudy, preSort: { labels: ['Only one'] } })).toThrow();
+  });
+  it('prepares optional pre-sort groups without assigning cards to the ranking stage early', () => {
+    const study = { ...testStudy, preSort: { labels: ['Keep', 'Discard'] as [string, string] } };
+    const prepared = prepareStudyRound(study, createTestProject().board.cards.slice(0, 12) as CardData[], 1280, 800);
+    expect(prepared.workflow.stages.map(s => s.kind)).toEqual(['presort', 'qsort']);
+    const source = prepared.workflow.widgets.find(w => w.kind === 'source')!;
+    const grid = prepared.workflow.widgets.find(w => w.kind === 'qsort')!;
+    expect(prepared.cards.every(c => c.widgetAssignments?.[prepared.activeStageId]?.widgetId === source.id)).toBe(true);
+    if (grid.kind !== 'qsort') throw new Error('Missing grid');
+    expect(grid.lanes.map(l => l.label)).toEqual(['Keep', 'Discard']);
+    const surface = buildStageSurfaceScene(prepared.workflow, grid.stageId, prepared.cards, null, 'sort', {width:1280,height:900}, null, 4).surfaces[0];
+    expect(surface.kind === 'qsort-stage' && surface.promptRect).toBeTruthy();
+  });
   it('fits the new study board without moving the layout used by earlier recordings', () => {
     const prepared = prepareStudyRound(testStudy, createTestProject().board.cards.slice(0, 12) as CardData[], 1280, 800);
     const scene = (version: 3 | 4) => buildStageSurfaceScene(prepared.workflow, prepared.activeStageId, prepared.cards, null, 'sort', { width:1280, height:800 }, null, version);
@@ -55,8 +81,9 @@ describe('guided study data', () => {
     const widget = prepared.workflow.widgets[0];
     const finalCards = prepared.cards.map(c => ({ ...c, widgetAssignments: { [prepared.activeStageId]: { widgetId: widget.id, zoneId: 'score-6', order: 0 } } }));
     const rec = { version: 5, createdAt: new Date().toISOString(), cardsAtStart: finalCards, segments: [], workflowAtStart: prepared.workflow,
-      activeStageIdAtStart: prepared.activeStageId, studyRound: { ...testStudy.rounds[0], completedAt: new Date().toISOString() } } as unknown as RecordingSession;
+      activeStageIdAtStart: prepared.activeStageId, studyRound: { ...testStudy.rounds[0], design: normalizeStudy(testStudy), completedAt: new Date().toISOString() } } as unknown as RecordingSession;
     expect([...studyScores(testStudy, rec).values()]).toEqual(Array(12).fill(3));
+    expect([...studyScores({ ...testStudy, scale: testStudy.scale.map(s => ({ ...s, value: s.value * 10 })) }, rec).values()]).toEqual(Array(12).fill(3));
     expect(studyRecordings(testStudy, [{ recording: rec }])).toEqual([rec, undefined]);
   });
 });

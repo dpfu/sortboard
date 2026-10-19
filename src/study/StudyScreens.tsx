@@ -3,6 +3,7 @@ import { ArrowRight, Download, Play, Check, PanelsTopLeft } from 'lucide-react';
 import type { CardData, RecordingSession } from '../types';
 import { studyScores, type StudyDefinition } from './model';
 import { studyCopy } from './copy';
+import { CardPreview } from '../CardPreview';
 import './study.css';
 
 export function StudyScreens({ study, recordings, cards, busy, status, onStart, onReplay, onExport, onNew, onNotes, onWorkspace, onPreview }: {
@@ -53,11 +54,11 @@ export function StudyScreens({ study, recordings, cards, busy, status, onStart, 
         {!finished ? <>
           <h2>{previous.studyRound?.title}: {copy.result}</h2>
           <p>{previous.studyRound?.prompt}</p>
-          <div className="studyRoundResult" aria-label="Saved first-round result">
+          <div className="studyRoundResult" aria-label="Saved round result" style={{ gridTemplateColumns: `repeat(${study.scale.length}, minmax(0, 1fr))` }}>
             {study.scale.map(position => <div key={position.value}><strong>{position.label}</strong>
               {cards.filter(card => scores[next - 1]?.get(card.id) === position.value).map(card => <button key={card.id}
                 className="studyResultImage" aria-label={`Enlarge image ${card.meta.name}`} onClick={() => onPreview(card)}>
-                <img src={card.src} alt={`Image ${card.meta.name}`} /><span>{card.meta.name}</span></button>)}
+                <CardPreview card={card} showPreviewButton={false} /><span>{card.meta.name}</span></button>)}
             </div>)}
           </div>
         </> : null}
@@ -84,21 +85,21 @@ export function StudyScreens({ study, recordings, cards, busy, status, onStart, 
         <section className="studyReviewStep">
         <h2>{copy.compareTitle}</h2>
         <ul>{copy.compareQuestions.map(q => <li key={q}>{q}</li>)}</ul>
-        <div className="studyComparison"><table><caption>{copy.table}</caption><thead><tr><th scope="col">Image</th>{study.rounds.map(r => <th key={r.id} scope="col">{r.title}</th>)}<th scope="col">{copy.difference}</th></tr></thead>
+        <div className="studyComparison"><table><caption>{copy.table}</caption><thead><tr><th scope="col">Card</th>{study.rounds.map(r => <th key={r.id} scope="col">{r.title}</th>)}{study.rounds.length === 2 ? <th scope="col">{copy.difference}</th> : null}</tr></thead>
           <tbody>{[...cards].sort((a, b) => a.meta.name.localeCompare(b.meta.name)).map(card => <tr key={card.id}>
-            <th scope="row"><button className="studyImage" onClick={() => onPreview(card)} aria-label={`Enlarge image ${card.meta.name}`}><img src={card.src} alt={`Image ${card.meta.name}`} /><span>{card.meta.name}</span></button></th>
+            <th scope="row"><button className="studyImage" onClick={() => onPreview(card)} aria-label={`Enlarge image ${card.meta.name}`}><CardPreview card={card} showPreviewButton={false} /><span>{card.meta.name}</span></button></th>
             {scores.map((s, i) => <td key={i}>{s.has(card.id) ? (s.get(card.id)! > 0 ? '+' : '') + s.get(card.id) : '—'}</td>)}
-            <td className="studyDifference">{scores[0]?.has(card.id) && scores[1]?.has(card.id) ?
-              `${scores[1].get(card.id)! - scores[0].get(card.id)! > 0 ? '+' : ''}${scores[1].get(card.id)! - scores[0].get(card.id)!}` : '—'}</td>
+            {study.rounds.length === 2 ? <td className="studyDifference">{scores[0]?.has(card.id) && scores[1]?.has(card.id) ?
+              `${scores[1].get(card.id)! - scores[0].get(card.id)! > 0 ? '+' : ''}${scores[1].get(card.id)! - scores[0].get(card.id)!}` : '—'}</td> : null}
           </tr>)}</tbody></table></div>
-        <p className="hint">{copy.differenceHint}</p>
+        {study.rounds.length === 2 ? <p className="hint">{copy.differenceHint}</p> : null}
         {recordings.slice(0, -1).map(r => r?.studyRound?.reflection ? <details key={r.createdAt} className="studyCredits">
           <summary>{r.studyRound.title}: {copy.notes}</summary><p className="studyCreditText">{r.studyRound.reflection}</p>
         </details> : null)}
-        <label htmlFor="study-comparison">{copy.comparisonNotes} <span className="hint">{copy.optional}</span></label>
+        {study.rounds.length > 1 ? <><label htmlFor="study-comparison">{copy.comparisonNotes} <span className="hint">{copy.optional}</span></label>
         <textarea id="study-comparison" rows={4} value={comparisonNotes} disabled={allBusy} placeholder={copy.comparisonPlaceholder}
           onChange={e => { setComparisonNotes(e.target.value); try { sessionStorage.setItem(`sortboard.study-comparison:${previous?.createdAt}`, e.target.value); } catch { /* Optional recovery. */ } }} />
-        <button className="btn btn--ghost btn--tiny" disabled={allBusy} onClick={() => void saveNotes()}>Save notes</button>
+        <button className="btn btn--ghost btn--tiny" disabled={allBusy} onClick={() => void saveNotes()}>Save notes</button></> : null}
         </section>
         <section className="studyReviewStep"><h2>{copy.replayTitle}</h2><p>{copy.replay}</p>
           <div className="studyResultsActions">{recordings.map((r, i) => r ? <button key={r.createdAt} className="btn btn--ghost" disabled={allBusy}

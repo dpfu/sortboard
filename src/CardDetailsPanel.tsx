@@ -101,6 +101,7 @@ export interface CardDetailsPanelProps {
   isDrawer?: boolean;
   floating?: boolean;
   onClose?: () => void;
+  onEditQSortDesign?: () => void;
 }
 
 function parseTagsInput(value: string) {
@@ -125,7 +126,7 @@ const TEXT_CARD_COLOR_LABELS: Record<TextCardColorKey, string> = {
   amber: 'Amber',
 };
 
-export function CardDetailsPanel({ context, isDrawer = false, floating = false, onClose }: CardDetailsPanelProps) {
+export function CardDetailsPanel({ context, isDrawer = false, floating = false, onClose, onEditQSortDesign }: CardDetailsPanelProps) {
   const addableStacks =
     context.kind === 'multi' ? context.stackOptions : context.kind === 'card' ? context.stackOptions || [] : [];
   const [targetStackId, setTargetStackId] = React.useState(addableStacks[0]?.id || '');
@@ -412,7 +413,8 @@ export function CardDetailsPanel({ context, isDrawer = false, floating = false, 
         </>
       ) : null}
 
-      {context.kind === 'pre-sort-widget' ? (
+      {(context.kind === 'pre-sort-widget' || context.kind === 'qsort-widget') && onEditQSortDesign ? <div className="detailsPanel__section"><button className="btn btn--ghost" onClick={onEditQSortDesign}>Edit Q-Sort design</button></div> : null}
+      {context.kind === 'pre-sort-widget' && !onEditQSortDesign ? (
         <>
           <div className="detailsPanel__section">
             <div className="detailsPanel__field">
@@ -447,7 +449,7 @@ export function CardDetailsPanel({ context, isDrawer = false, floating = false, 
         </>
       ) : null}
 
-      {context.kind === 'qsort-widget' ? (
+      {context.kind === 'qsort-widget' && !onEditQSortDesign ? (
         <>
           <div className="detailsPanel__section">
             <div className="detailsPanel__field">

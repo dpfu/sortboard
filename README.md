@@ -15,7 +15,7 @@ SortBoard is pre-release research software. The current goal is a small, testabl
 | --- | --- |
 | Open sort | Place cards freely, with optional movable stacks and board zoom. |
 | Closed sort | Sort cards from a source into named categories. |
-| Q-Sort | Move cards through a two-step Pre-Sort and Q-Sort distribution. |
+| Q-Sort | Rank cards on a capacity-limited scale, with optional Pre-Sort and repeated tasks. |
 
 All three modes use the same board and card model.
 
@@ -40,9 +40,11 @@ Replay opens at the final result. **Go to start**, **Play recording**, and **Sho
 
 ## Guided studies
 
-A prepared project can include a guided sequence of Q-Sort tasks using the same images and grid. Importing such a project opens its introduction directly. Participants sort under one visible statement at a time, discuss each saved result, and continue to an empty grid with the images reshuffled. A paused or interrupted round can be resumed. At the end, participants can compare scores and replay each round.
+In Setup, choose **Q-Sort → Set up tasks and rounds**. Enter one or more tasks, name the scale ends and middle, and set the values and places. **Fit to cards** adjusts capacities to the current card count. Pre-Sort is optional and can have two named groups. A task round is a complete sort; Pre-Sort is a preparation step within each round. Exercise language and discussion questions are configurable; app controls remain English.
 
-**Export study** includes the original media, task statements, recordings, optional discussion notes, image credits and a `results.csv` table. **New participant** creates a fresh project while preserving earlier results. The regular Open, Closed and two-stage Q-Sort workflows remain available in the workspace.
+The resulting project uses the clean Q-Sort board with its current task above the grid. **Edit Q-Sort design** reopens the editor; **Guided study** previews the participant introduction. Importing a prepared study opens that introduction directly. Participants discuss each saved result and continue to an empty grid with the cards reshuffled. A paused or interrupted round can be resumed. At the end, participants review the result, compare multiple tasks and replay each round.
+
+**Export study** includes the original media, task statements, recordings, optional discussion notes, image credits and a `results.csv` table. **New participant** creates a fresh project while preserving earlier results. Saving a changed design prepares fresh rounds and keeps previous recordings available in **Recordings**. Each new recording stores its task, scale and labels. Open, Closed and the existing two-stage Q-Sort remain available in the workspace.
 
 **[Seminar entry](https://dpfu.github.io/sortboard/?study=climate-images):** import the separately provided climate-image project ZIP once on the seminar computer, then select **Start sorting**. It contains twelve images and two German tasks. Instructions and reflection questions are German; app controls remain English. The final screen guides the group through comparison, replay and downloading its work. On later visits the link reopens the matching project. Results remain in that browser and are not submitted automatically. See the [seminar guide](docs/climate-seminar.md).
 

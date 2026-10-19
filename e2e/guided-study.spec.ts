@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs/promises';
 import JSZip from 'jszip';
 import { testStudy, testStudyArchive } from '../src/testFixtures/study';
-import { dragMouseFromTo, resetAppState } from './helpers/app';
+import { dragMouseFromTo, resetAppState, openFreshApp } from './helpers/app';
 
 async function loadStudy(page: Page) {
   await resetAppState(page); await page.goto('/');
@@ -23,8 +23,10 @@ async function storedStudy(page: Page) {
     finally { db.close(); }
   });
 }
-async function rankAll(page: Page, drag: boolean) {
-  await expect(page.locator('[data-testid^="card-"]')).toHaveCount(12);
+async function rankAll(page: Page, drag: boolean, count = 12) {
+  await expect(page.locator('.layout--sort')).toBeVisible();
+  await expect(page.locator('[data-testid^="card-"]')).toHaveCount(count);
+  const remaining = () => page.locator('[data-testid^="qsort-lane-"] .boardSurface__count').evaluateAll(nodes => nodes.reduce((sum, n) => sum + Number(n.textContent), 0));
   const ids = await page.locator('[data-testid^="card-"]').evaluateAll(ns => ns.map(n => n.getAttribute('data-testid')!));
   for (const id of ids) {
     const card = page.getByTestId(id);
@@ -38,15 +40,143 @@ async function rankAll(page: Page, drag: boolean) {
     } else {
       await card.focus();
       for (const direction of ['ArrowDown', 'ArrowRight', 'ArrowLeft', 'ArrowUp']) {
-        const before = await page.locator('[data-testid^="qsort-lane-"] .boardSurface__count').textContent();
+        const before = await remaining();
         await page.keyboard.press(direction);
         await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
-        if (await page.locator('[data-testid^="qsort-lane-"] .boardSurface__count').textContent() !== before) break;
+        if (await remaining() !== before) break;
       }
     }
-    await expect(page.locator('[data-testid^="qsort-lane-"] .boardSurface__count')).toHaveText(String(12 - ids.indexOf(id) - 1));
+    await expect.poll(remaining).toBe(count - ids.indexOf(id) - 1);
   }
 }
+
+test('@smoke authors a single-round Q-Sort in Setup with a custom task and scale, then replays its frozen design', async ({ page }, info) => {
+  test.setTimeout(120000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openFreshApp(page);
+  await page.getByRole('button', { name: 'Q-Sort', exact: true }).click();
+  await page.getByRole('button', { name: 'Set up tasks and rounds', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Q-Sort design', exact: true });
+  await editor.getByLabel('Round 1 title', { exact: true }).fill('Keep or discard');
+  await editor.getByLabel('Task for round 1', { exact: true }).fill('Which of these images would you keep?');
+  await editor.getByLabel('Left label', { exact: true }).fill('Discard');
+  await editor.getByLabel('Middle label', { exact: true }).fill('Unsure');
+  await editor.getByLabel('Right label', { exact: true }).fill('Keep');
+  await editor.getByLabel('Scale positions', { exact: true }).selectOption('5');
+  const count = await page.locator('[data-testid^="card-"]').count();
+  await editor.getByLabel('Places at position 1', { exact: true }).fill('0');
+  await editor.getByRole('button', { name: 'Save design', exact: true }).click();
+  await expect(editor.getByRole('alert')).toContainText('places for');
+  await editor.getByRole('button', { name: `Fit to ${count} cards`, exact: true }).click();
+  await page.screenshot({ path: info.outputPath('qsort-design-editor.png') });
+  await editor.getByRole('button', { name: 'Save design', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit Q-Sort design', exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Which of these images would you keep?', exact: true })).toBeVisible();
+  await expect(page.locator('.studyBoard__anchor').filter({ hasText: /^Discard$/ })).toBeVisible();
+  await expect(page.locator('.studyBoard__anchor').filter({ hasText: /^Keep$/ })).toBeVisible();
+  await expect(page.locator('.widgetBucket')).toHaveCount(5);
+  await rankAll(page, false, count);
+  await page.getByRole('button', { name: 'Finish round', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Review your sort', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Comparison notes')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Workspace', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Q-Sort design', exact: true }).click();
+  await editor.getByLabel('Right label', { exact: true }).fill('Collect');
+  await editor.getByLabel('Exercise language', { exact: true }).selectOption('de');
+  await editor.getByLabel('Task for round 1', { exact: true }).fill('A different task for a later participant.');
+  await editor.getByRole('button', { name: 'Save design', exact: true }).click();
+  await page.getByRole('button', { name: /Recordings \(/ }).click();
+  await page.getByTestId('replay-sessions').getByRole('button').first().click();
+  await expect(page.getByRole('heading', { name: 'Which of these images would you keep?', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Which of these images would you keep?', exact: true })).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.studyBoard__anchor').filter({ hasText: /^Keep$/ })).toBeVisible();
+  const stored = await storedStudy(page);
+  expect(stored.sessions[0].recording.studyRound.design.anchors.agree).toBe('Keep');
+  expect(stored.projects[0].study.anchors.agree).toBe('Collect');
+});
+
+test('authors three rounds with optional pre-sort and resumes the ranking stage before comparing all tasks', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await loadStudy(page);
+  await page.getByRole('button', { name: 'Workspace', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Q-Sort design', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Q-Sort design', exact: true });
+  await editor.getByRole('button', { name: 'Add round', exact: true }).click();
+  await editor.getByLabel('Task for round 3', { exact: true }).fill('Which images would start a useful discussion?');
+  await editor.getByLabel('Pre-sort before each round', { exact: true }).check();
+  await editor.getByLabel('Group 1', { exact: true }).fill('More');
+  await editor.getByLabel('Group 2', { exact: true }).fill('Less');
+  await editor.getByRole('button', { name: 'Save design', exact: true }).click();
+  await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
+  for (let round = 0; round < 3; round++) {
+    await expect(page.getByRole('button', { name: 'Continue to Q-Sort', exact: true })).toBeVisible();
+    const ids = await page.locator('[data-testid^="card-"]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-testid')!));
+    for (const [i, id] of ids.entries()) {
+      const card = page.getByTestId(id);
+      await card.scrollIntoViewIfNeeded();
+      const target = page.locator('[data-testid^="surface-sink-"]').nth(i % 2);
+      await target.scrollIntoViewIfNeeded();
+      const a = await card.boundingBox(); const b = await target.boundingBox();
+      await dragMouseFromTo(page, {x:a!.x+a!.width/2,y:a!.y+a!.height/2}, {x:b!.x+b!.width/2,y:b!.y+b!.height/2});
+    }
+    await page.getByRole('button', { name: 'Continue to Q-Sort', exact: true }).click();
+    await expect(page.locator('.boardSurface--study')).toHaveCount(1);
+    await expect(page.locator('[data-testid^="qsort-lane-"]')).toHaveCount(2);
+    if (round === 0) {
+      await page.getByRole('button', { name: 'Pause', exact: true }).click();
+      await page.reload();
+      await page.getByRole('button', { name: 'Resume round 1', exact: true }).click();
+      await expect(page.locator('.boardSurface--study')).toHaveCount(1);
+      await expect(page.getByRole('button', { name: 'Continue to Q-Sort', exact: true })).toHaveCount(0);
+    }
+    await rankAll(page, true);
+    await page.getByRole('button', { name: 'Finish round', exact: true }).click();
+    if (round < 2) await page.getByRole('button', { name: `Continue to round ${round + 2}`, exact: true }).click();
+  }
+  await expect(page.locator('.studyComparison thead th')).toHaveCount(4);
+  const stored = await storedStudy(page);
+  expect(stored.sessions).toHaveLength(3);
+  expect(stored.sessions.every((s: any) => s.recording.studyRound.completedAt && s.recording.segments.some((seg: any) => seg.type === 'stage-transition'))).toBe(true);
+  await page.getByRole('button', { name: 'New participant', exact: true }).click();
+  expect((await storedStudy(page)).sessions).toHaveLength(3);
+  await expect(page.getByRole('button', { name: 'Start sorting', exact: true })).toBeVisible();
+});
+
+test('creates a Q-Sort from blank with text cards and exports a restorable one-task design', async ({ page }, info) => {
+  await resetAppState(page); await page.goto('/');
+  await page.getByRole('button', { name: /Start with a blank project/ }).click();
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: 'Text card', exact: true }).click();
+    await expect(page.locator('[data-testid^="card-"]')).toHaveCount(i + 1);
+  }
+  await page.getByRole('button', { name: 'Q-Sort', exact: true }).click();
+  await page.getByRole('button', { name: 'Set up tasks and rounds', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Q-Sort design', exact: true });
+  await editor.getByLabel('Task for round 1', { exact: true }).fill('Rank these ideas by usefulness.');
+  await editor.getByLabel('Scale positions', { exact: true }).selectOption('3');
+  await editor.getByRole('button', { name: 'Save design', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Rank these ideas by usefulness.', exact: true })).toBeVisible();
+  await rankAll(page, false, 3);
+  await page.getByRole('button', { name: 'Finish round', exact: true }).click();
+  await expect(page.locator('.studyImage .cardPreview__text')).toHaveCount(3);
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export study', exact: true }).click();
+  const file = info.outputPath('single-task-text.sortboard.zip');
+  await (await downloading).saveAs(file);
+  const zip = await JSZip.loadAsync(await fs.readFile(file));
+  const recorded = JSON.parse(await zip.file('sessions.json')!.async('string'))[0].recording;
+  expect(recorded.studyRound.design.rounds).toHaveLength(1);
+  expect(recorded.studyRound.design.scale.map((s: any) => s.capacity)).toEqual([1, 1, 1]);
+  await page.getByRole('button', { name: 'Workspace', exact: true }).click();
+  await page.getByTestId('project-import-input').setInputFiles(file);
+  await expect(page.locator('.studyImage .cardPreview__text')).toHaveCount(3);
+});
 
 test('@smoke completes both guided rounds, preserves the first result, replays and exports a restorable study', async ({ page }, info) => {
   test.setTimeout(120000);

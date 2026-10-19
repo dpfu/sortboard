@@ -892,7 +892,7 @@ export function Board({
                     data-testid={`qsort-lane-${surface.widgetId}-${lane.zoneId}`}
                     style={{ left: lane.x - surface.leftColumnRect.x, top: lane.y - surface.leftColumnRect.y, width: lane.w, height: lane.h }}
                   >
-                    <div className={`boardSurface__titleRow ${surface.layoutVersion === 4 ? 'srOnly' : ''}`}>
+                    <div className={`boardSurface__titleRow ${surface.layoutVersion === 4 && surface.lanes.length === 1 ? 'srOnly' : ''}`}>
                       <div className="boardSurface__title">{lane.label}</div>
                       <div className="boardSurface__count">{lane.count}</div>
                     </div>
@@ -953,7 +953,7 @@ export function Board({
                   >
                     <div className="widgetBucket__footer">
                       <div className="widgetBucket__label">
-                        {surface.layoutVersion === 4 ? bucket.label.match(/^[+-]?\d+/)?.[0] || bucket.label : /^[1-9]\d*$/.test(bucket.label) ? `+${bucket.label}` : bucket.label}
+                        {/^[1-9]\d*$/.test(bucket.label) ? `+${bucket.label}` : bucket.label}
                       </div>
                       <div className={`widgetBucket__meta ${surface.layoutVersion === 4 ? 'srOnly' : ''}`}>{bucket.capacityLabel}</div>
                       {surface.layoutVersion === 4 && studyPrompt ? <div className="studyBoard__anchor" lang={studyPrompt.language}>

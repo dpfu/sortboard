@@ -19,9 +19,9 @@ export function ControlsDialog({ mode, sortType, stacksEnabled = true, taskLangu
   const rows = taskLanguage === 'de' ? [
     ['Bilder ansehen', 'Doppelklick auf ein Bild vergrößert es. Close schließt die Ansicht. Mit der Tastatur: Bild fokussieren und Enter drücken.'],
     ...(mode === 'end' ? [['Entscheidungen nachverfolgen', 'Play recording startet das Replay. Pause hält an. Bewege den Zeitregler zu einer interessanten Stelle. Back to study führt zum Vergleich zurück.']] : [
-      ['Bilder einordnen', 'Ziehe ein Bild auf einen freien Platz der Skala. Links bedeutet Ablehnung der Aussage, rechts Zustimmung. Die Reihen sind zusätzliche Plätze mit demselben Wert. Pfeiltasten bewegen ein fokussiertes Bild.'],
+      ['Karten einordnen', 'Ziehe eine Karte auf einen freien Platz der Skala. Beachte die Aufgabe und die Skalenbeschriftungen. Die Reihen sind zusätzliche Plätze mit demselben Wert. Pfeiltasten bewegen eine fokussierte Karte.'],
       ['Umsortieren', 'Du kannst Bilder jederzeit auf einen anderen freien Platz oder in die Ablage zurückziehen. Eine volle Spalte nimmt kein weiteres Bild an; die Karte kehrt zurück.'],
-      ['Durchgang abschließen', 'Wenn alle zwölf Bilder eingeordnet sind, wird Finish round aktiv. Danach besprecht ihr die Entscheidungen. Pause unterbricht; Resume setzt den Durchgang später fort.'],
+      ['Durchgang abschließen', 'Wenn alle Karten eingeordnet sind, wird Finish round aktiv. Bei einer Vorsortierung führt Continue to Q-Sort zum Raster. Pause unterbricht; Resume setzt den Durchgang später fort.'],
     ]),
     ['Vollbild', 'Das Symbol mit den vier Ecken wechselt in die Vollbildansicht. Esc verlässt sie, ohne die Sortierung zu löschen.'],
   ] : [

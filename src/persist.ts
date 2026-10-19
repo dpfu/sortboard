@@ -1440,6 +1440,17 @@ export async function persistStudyRoundStart(board: PersistedBoardV1, recording:
   await tx.done;
 }
 
+export async function persistStudyDesign(project: PersistedProjectV1, board: PersistedBoardV1) {
+  if (project.id !== board.id) throw new Error('The study project and board must match.');
+  const normalizedProject = normalizeProject(project);
+  const normalizedBoard = normalizeBoard(board);
+  const db = await getDB();
+  const tx = db.transaction(['projects', 'boards'], 'readwrite');
+  await tx.objectStore('projects').put(normalizedProject, project.id);
+  await tx.objectStore('boards').put(normalizedBoard, board.id);
+  await tx.done;
+}
+
 export async function persistExportProjectZip(projectId: string): Promise<Blob> {
   const JSZip = await loadJSZip();
   const db = await getDB();

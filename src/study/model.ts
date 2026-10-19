@@ -1,5 +1,5 @@
 import { buildReplayIndex, replayCardsAt } from '../replayIndex';
-import { createQSortWorkflow } from '../workflow';
+import { createQSortWorkflow, WIDGET_ZONE_CONTENT } from '../workflow';
 import type { CardData, RecordingSession } from '../types';
 
 export interface StudyDefinition {
@@ -10,6 +10,10 @@ export interface StudyDefinition {
   introduction: string;
   reference: string;
   credits: string;
+  anchors?: { disagree: string; undecided: string; agree: string };
+  preSort?: { labels: [string, string] };
+  discussionQuestions?: string[];
+  comparisonQuestions?: string[];
   scale: Array<{ value: number; label: string; capacity: number }>;
   rounds: Array<{ id: string; title: string; prompt: string }>;
 }
@@ -21,6 +25,7 @@ export interface StudyRoundRecording {
   completedAt?: string;
   reflection?: string;
   comparisonNotes?: string;
+  design?: StudyDefinition;
 }
 
 export function normalizeStudy(value: unknown): StudyDefinition | undefined {
@@ -29,15 +34,22 @@ export function normalizeStudy(value: unknown): StudyDefinition | undefined {
   if (v.version !== 1 || (v.taskLanguage !== undefined && v.taskLanguage !== 'de') || !v.id || !v.title || typeof v.introduction !== 'string' ||
       typeof v.reference !== 'string' || typeof v.credits !== 'string' ||
       !Array.isArray(v.scale) || v.scale.length < 3 || v.scale.length > 15 ||
-      !Array.isArray(v.rounds) || v.rounds.length !== 2 ||
+      !Array.isArray(v.rounds) || v.rounds.length < 1 ||
       new Set(v.rounds.map(r => r.id)).size !== v.rounds.length ||
       new Set(v.scale.map(s => s.value)).size !== v.scale.length ||
       v.rounds.some(r => !r.id || !r.title || !r.prompt || [r.id, r.title, r.prompt].some(x => typeof x !== 'string')) ||
-      v.scale.some(s => !Number.isFinite(s.value) || typeof s.label !== 'string' || !Number.isInteger(s.capacity) || s.capacity < 0)) {
+      v.scale.some(s => !Number.isFinite(s.value) || typeof s.label !== 'string' || !Number.isInteger(s.capacity) || s.capacity < 0) ||
+      (v.anchors !== undefined && ['disagree', 'undecided', 'agree'].some(k => typeof v.anchors?.[k as keyof NonNullable<StudyDefinition['anchors']>] !== 'string')) ||
+      (v.preSort !== undefined && (!Array.isArray(v.preSort.labels) || v.preSort.labels.length !== 2 || v.preSort.labels.some(s => typeof s !== 'string' || !s.trim()))) ||
+      [v.discussionQuestions, v.comparisonQuestions].some(q => q !== undefined && (!Array.isArray(q) || q.some(s => typeof s !== 'string')))) {
     throw new Error('Invalid guided study configuration.');
   }
   return { version: 1, ...(v.taskLanguage ? { taskLanguage: v.taskLanguage } : {}), id: v.id, title: v.title, introduction: v.introduction, reference: v.reference,
     credits: v.credits, scale: v.scale.map(s => ({ value: s.value, label: s.label, capacity: s.capacity })),
+    ...(v.anchors ? { anchors: { ...v.anchors } } : {}),
+    ...(v.preSort ? { preSort: { labels: [...v.preSort.labels] as [string, string] } } : {}),
+    ...(v.discussionQuestions ? { discussionQuestions: [...v.discussionQuestions] } : {}),
+    ...(v.comparisonQuestions ? { comparisonQuestions: [...v.comparisonQuestions] } : {}),
     rounds: v.rounds.map(r => ({ id: r.id, title: r.title, prompt: r.prompt })) };
 }
 
@@ -48,7 +60,8 @@ export function normalizeStudyRound(value: unknown): StudyRoundRecording | undef
       (v.completedAt !== undefined && !Number.isFinite(Date.parse(v.completedAt))) ||
       (v.reflection !== undefined && typeof v.reflection !== 'string') ||
       (v.comparisonNotes !== undefined && typeof v.comparisonNotes !== 'string')) throw new Error('Invalid study round.');
-  return { id: v.id, title: v.title, prompt: v.prompt, completedAt: v.completedAt, reflection: v.reflection, comparisonNotes: v.comparisonNotes };
+  return { id: v.id, title: v.title, prompt: v.prompt, completedAt: v.completedAt, reflection: v.reflection, comparisonNotes: v.comparisonNotes,
+    ...(v.design ? { design: normalizeStudy(v.design) } : {}) };
 }
 
 export function studyRecordings(study: StudyDefinition, sessions: Array<{ recording: RecordingSession }>) {
@@ -60,7 +73,7 @@ export function studyRecordings(study: StudyDefinition, sessions: Array<{ record
 export function prepareStudyRound(study: StudyDefinition, cards: CardData[], width: number, height: number,
   random: () => number = Math.random) {
   if (study.scale.reduce((sum, s) => sum + s.capacity, 0) !== cards.length) {
-    throw new Error('The study must have exactly one place for every image.');
+    throw new Error('The study must have exactly one place for every card.');
   }
   const original = cards.map(c => c.id).join(',');
   const shuffled = [...cards];
@@ -72,21 +85,27 @@ export function prepareStudyRound(study: StudyDefinition, cards: CardData[], wid
   if (shuffled.length > 1 && shuffled.map(c => c.id).join(',') === original) shuffled.push(shuffled.shift()!);
   const workflow = createQSortWorkflow(width, height, cards.length);
   const stage = workflow.stages.find(s => s.kind === 'qsort')!;
-  stage.order = 0;
+  stage.order = study.preSort ? 1 : 0;
   const widget = workflow.widgets.find(w => w.kind === 'qsort')!;
   if (widget.kind !== 'qsort') throw new Error('Missing Q-Sort grid.');
-  widget.title = study.taskLanguage === 'de' ? 'Starke Ablehnung ← Deine Zustimmung → Starke Zustimmung' : 'Strongly disagree ← Your agreement → Strongly agree';
-  widget.lanes = [{ id: 'images', label: study.taskLanguage === 'de' ? 'Bilder zum Einordnen' : 'Images to place' }];
+  widget.title = 'Q-Sort';
+  const preSort = workflow.widgets.find(w => w.kind === 'pre-sort')!;
+  if (study.preSort && preSort.kind === 'pre-sort') {
+    preSort.zones = preSort.zones.map((zone, i) => ({ ...zone, label: study.preSort!.labels[i] })) as typeof preSort.zones;
+    widget.lanes = preSort.zones.map(z => ({ ...z }));
+  } else widget.lanes = [{ id: 'images', label: study.taskLanguage === 'de' ? 'Karten zum Einordnen' : 'Cards to place' }];
   widget.buckets = study.scale.map((s, i) => ({ id: `score-${i}`, label: s.label, capacity: s.capacity }));
-  workflow.stages = [stage];
-  workflow.widgets = [widget];
-  return { workflow, activeStageId: stage.id, cards: shuffled.map((card, order) => ({
+  if (!study.preSort) { workflow.stages = [stage]; workflow.widgets = [widget]; }
+  const firstStage = workflow.stages[0];
+  const firstWidget = study.preSort ? workflow.widgets.find(w => w.kind === 'source')! : widget;
+  return { workflow, activeStageId: firstStage.id, cards: shuffled.map((card, order) => ({
     ...card, z: order + 1, stackId: undefined, stackOrder: undefined,
-    widgetAssignments: { [stage.id]: { widgetId: widget.id, zoneId: 'images', order } },
+    widgetAssignments: { [firstStage.id]: { widgetId: firstWidget.id, zoneId: study.preSort ? WIDGET_ZONE_CONTENT : 'images', order } },
   })) };
 }
 
 export function studyScores(study: StudyDefinition, recording: RecordingSession): Map<string, number> {
+  const scale = recording.studyRound?.design?.scale || study.scale;
   const index = buildReplayIndex(recording);
   const final = replayCardsAt(recording, index, Math.max(1, index.durationMs + 1));
   const widget = recording.workflowAtStart.widgets.find(w => w.kind === 'qsort');
@@ -95,7 +114,7 @@ export function studyScores(study: StudyDefinition, recording: RecordingSession)
   for (const card of final) {
     const assignment = card.widgetAssignments?.[widget.stageId];
     const position = widget.buckets.findIndex(b => b.id === assignment?.zoneId && assignment?.widgetId === widget.id);
-    if (position >= 0 && study.scale[position]) scores.set(card.id, study.scale[position].value);
+    if (position >= 0 && scale[position]) scores.set(card.id, scale[position].value);
   }
   return scores;
 }

@@ -520,7 +520,7 @@ function buildQSortGridScene(
   const pad = 24;
   const gap = 8;
   const singleTray = surface.lanes.length === 1;
-  const cleanStudy = singleTray && layoutVersion === 4;
+  const cleanStudy = layoutVersion === 4;
   const top = mode === 'setup' ? 20 : cleanStudy ? 80 : singleTray ? 124 : 84;
   const width = Math.max(672, viewport.width - pad * 2);
   const laneW = Math.floor((width - QSORT_LANE_GAP * (surface.lanes.length - 1)) / surface.lanes.length);
@@ -538,7 +538,7 @@ function buildQSortGridScene(
       (current?.widgetId === surface.widgetId && current.zoneId === lane.zoneId);
   }).map(card => card.id));
   const rows = Math.max(1, ...lanePools.map(pool => Math.ceil(pool.length / columns)));
-  const trayTopInset = cleanStudy ? 16 : 40;
+  const trayTopInset = cleanStudy && singleTray ? 16 : 40;
   const trayH = trayTopInset + rows * cellH + (rows - 1) * gap + (cleanStudy ? 16 : 12);
   const leftColumnRect = { x: pad, y: top + (mode === 'setup' ? 52 : 0), w: width, h: trayH };
   const lanes = surface.lanes.map((lane, index) => ({

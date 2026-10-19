@@ -68,6 +68,8 @@ def main():
         'introduction': 'Dieselben zwölf Bilder unter zwei Perspektiven: Zuerst sortierst du nach der Wichtigkeit des Klimawandels, danach nach deiner eigenen Handlungsmöglichkeit. Nach jedem Durchgang besprecht ihr die Entscheidungen; am Ende vergleicht ihr beide Sortierungen und schaut ausgewählte Momente im Replay an.',
         'reference': 'Lehrübung nach Metag et al. (2016), Perceptions of Climate Change Imagery, Science Communication 38(2), 197–227. https://doi.org/10.1177/1075547016635181\nDie zwölf Bilder sind eine eigene Auswahl. Die Studie verwendete 40 Bilder und neun Skalenpositionen; hier sind es zwölf Bilder und sieben Positionen. Dies ist keine Replikation und keine Q-Faktorenanalyse. Ein Foto von trockenem Boden oder Hochwasser belegt für sich keine Klimawandel-Ursache.',
         'credits': '\n\n'.join(credits),
+        'comparisonQuestions': ['Welche Bilder haben ihre Position besonders stark verändert? Warum?',
+            'Welche Bilder vermitteln Wichtigkeit, aber wenig eigene Handlungsmöglichkeit? Wie erklärt ihr den Unterschied?'],
         'scale': [{'value': i - 3, 'label': f'{i - 3:+}' if i > 3 else str(i - 3), 'capacity': c} for i, c in enumerate(capacities)],
         'rounds': [
             {'id': 'importance', 'title': 'Wichtigkeit', 'prompt': 'Dieses Bild gibt mir das Gefühl, dass der Klimawandel wichtig ist.'},

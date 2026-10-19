@@ -17,7 +17,7 @@ const english = {
   local: 'Sorting movements are recorded automatically. No audio or screen video is recorded. Results stay in this browser; export them at the end.',
   nextRound: 'The same images will be mixed again on an empty grid. Sort them according to this new statement.',
   compareTitle: '1 · Compare the two sorts',
-  compareQuestions: ['Which images changed position most, and why?', 'Which images felt important but did not make you feel able to act? What explains that difference?'],
+  compareQuestions: ['Which cards changed position most, and why?', 'How did the different tasks affect your choices?'],
   table: 'Each image under both statements', difference: 'Change', differenceHint: 'Change = round 2 minus round 1. This describes your placements, not an effect or a statistical result.',
   comparisonNotes: 'Comparison notes', comparisonPlaceholder: 'Two or three observations and the participant’s explanations.',
   replayTitle: '2 · Revisit decisions together',
@@ -47,7 +47,7 @@ const german: typeof english = {
   local: 'Die Sortierbewegungen werden automatisch aufgezeichnet, aber kein Ton und kein Bildschirmvideo. Ergebnisse bleiben in diesem Browser; exportiert sie am Schluss.',
   nextRound: 'Dieselben Bilder werden auf einem leeren Raster neu gemischt. Sortiere sie jetzt nach der neuen Aussage.',
   compareTitle: '1 · Beide Sortierungen vergleichen',
-  compareQuestions: ['Welche Bilder haben ihre Position besonders stark verändert? Warum?', 'Welche Bilder vermitteln Wichtigkeit, aber wenig eigene Handlungsmöglichkeit? Wie erklärt ihr den Unterschied?'],
+  compareQuestions: ['Welche Karten haben ihre Position besonders stark verändert? Warum?', 'Wie haben die unterschiedlichen Aufgaben eure Entscheidungen beeinflusst?'],
   table: 'Jedes Bild unter beiden Aussagen', difference: 'Veränderung', differenceHint: 'Veränderung = Durchgang 2 minus Durchgang 1. Das beschreibt eure Platzierungen, keinen Effekt und kein statistisches Ergebnis.',
   comparisonNotes: 'Notizen zum Vergleich', comparisonPlaceholder: 'Zwei bis drei Beobachtungen und die Erklärungen der sortierenden Person.',
   replayTitle: '2 · Entscheidungen gemeinsam nachverfolgen',
@@ -60,4 +60,28 @@ const german: typeof english = {
   replayHint: 'Play recording startet die Wiedergabe. Mit Pause oder dem Zeitregler könnt ihr eine Entscheidung erneut anschauen und nach den Gründen fragen. Back to study führt zum Vergleich zurück.',
 };
 
-export const studyCopy = (study: Pick<StudyDefinition, 'taskLanguage'>) => study.taskLanguage === 'de' ? german : english;
+export function studyCopy(study: Pick<StudyDefinition, 'taskLanguage'> & Partial<StudyDefinition>) {
+  const de = study.taskLanguage === 'de';
+  const base = de ? german : english;
+  const multiple = (study.rounds?.length || 1) > 1;
+  return { ...base,
+    scale: study.anchors || base.scale,
+    completed: de ? 'Sortierung gespeichert' : 'Sorting saved',
+    comparison: study.rounds?.length === 2 ? base.comparison : multiple ? (de ? 'Sortierungen vergleichen' : 'Compare your sorts') : (de ? 'Deine Sortierung' : 'Review your sort'),
+    steps: de ? ['1 · Karten sortieren', '2 · Entscheidungen besprechen', ...(multiple ? ['3 · Weitere Perspektive ausprobieren'] : [])]
+      : ['1 · Sort the cards', '2 · Discuss your choices', ...(multiple ? ['3 · Try another perspective'] : [])],
+    instructions: de ? ['Ziehe jede Karte auf einen Platz der Skala. Du kannst jederzeit umsortieren. Ein Doppelklick vergrößert ein Bild.',
+      'Orientiere dich an der Aufgabe und den Beschriftungen der Skala. Die senkrechten Reihen sind zusätzliche Plätze mit demselben Wert. Belege alle Plätze; es gibt keine richtige oder falsche Lösung.']
+      : ['Drag every card into a place on the scale. Move cards again whenever you change your mind. Double-click an image to enlarge it.',
+        'Use the task and scale labels as your guide. Rows are extra places within the same score. Fill every place; there is no right or wrong answer.'],
+    roundQuestions: study.discussionQuestions || base.roundQuestions,
+    compareQuestions: multiple ? study.comparisonQuestions || base.compareQuestions : study.discussionQuestions || base.roundQuestions,
+    compareTitle: multiple ? (de ? '1 · Sortierungen vergleichen' : '1 · Compare the sorts') : (de ? '1 · Sortierung ansehen' : '1 · Review the sort'),
+    table: de ? 'Platzierungen nach Aufgabe' : 'Placements by task',
+    rolesTitle: de ? 'Für die Begleitung' : 'For facilitators',
+    roles: de ? 'Lasst die sortierende Person selbst entscheiden. Fragt nach den Begründungen und beobachtet Zögern, Änderungen und Hilfebedarf. Gebt keine richtige Platzierung vor.'
+      : 'Let the participant decide the placements. Ask about their reasons and observe hesitation, revisions and requests for help. Do not suggest a correct answer.',
+    export: de ? 'Klickt auf Export study und behaltet die heruntergeladene ZIP-Datei. Sie enthält die Sortierungen, Replays, Notizen, Karten, Bildnachweise und results.csv. Ergebnisse werden nicht automatisch versendet.'
+      : 'Select Export study and keep the downloaded ZIP. It contains the sorts, replays, notes, cards, credits and results.csv. Results are not sent automatically.',
+  };
+}
