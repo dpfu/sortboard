@@ -925,7 +925,7 @@ function normalizeRecording(recording: RecordingSession): RecordingSession {
     cardLayoutModeAtStart: normalizeCurrentCardLayoutMode(recording.cardLayoutModeAtStart),
     workflowAtStart,
     activeStageIdAtStart: requestedStageId || getDefaultActiveStageId(workflowAtStart) || undefined,
-    surfaceLayoutVersion: recording.surfaceLayoutVersion === 2 || recording.surfaceLayoutVersion === 3 ? recording.surfaceLayoutVersion : undefined,
+    surfaceLayoutVersion: recording.surfaceLayoutVersion === 2 || recording.surfaceLayoutVersion === 3 || recording.surfaceLayoutVersion === 4 ? recording.surfaceLayoutVersion : undefined,
     studyRound: normalizeStudyRound(recording.studyRound),
     cardsAtStart: normalizeRuntimeCards(recording.cardsAtStart),
     segments,

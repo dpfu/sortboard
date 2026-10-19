@@ -90,6 +90,7 @@ test('@smoke completes both guided rounds, preserves the first result, replays a
   const zip = await JSZip.loadAsync(await fs.readFile(file));
   const recordings = JSON.parse(await zip.file('sessions.json')!.async('string')).map((s: any) => s.recording);
   expect(recordings).toHaveLength(2);
+  expect(recordings.every((r: any) => r.surfaceLayoutVersion === 4)).toBe(true);
   const firstExported = recordings.find((r: any) => r.studyRound.id === 'importance');
   expect(JSON.stringify(firstExported.segments)).toBe(JSON.stringify(firstSaved.segments));
   expect(JSON.stringify(firstExported.cardsAtStart)).toBe(JSON.stringify(firstSaved.cardsAtStart));

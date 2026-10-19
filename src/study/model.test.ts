@@ -3,8 +3,28 @@ import { createTestProject } from '../testFixtures/project';
 import { testStudy } from '../testFixtures/study';
 import { normalizeStudy, normalizeStudyRound, prepareStudyRound, studyRecordings, studyScores } from './model';
 import type { CardData, RecordingSession } from '../types';
+import { buildStageSurfaceScene, reflowCardsForStage, getQSortCardDisplayDimensions } from '../stageSurface';
 
 describe('guided study data', () => {
+  it('fits the new study board without moving the layout used by earlier recordings', () => {
+    const prepared = prepareStudyRound(testStudy, createTestProject().board.cards.slice(0, 12) as CardData[], 1280, 800);
+    const scene = (version: 3 | 4) => buildStageSurfaceScene(prepared.workflow, prepared.activeStageId, prepared.cards, null, 'sort', { width:1280, height:800 }, null, version);
+    const old = scene(3);
+    const surface = scene(4).surfaces.find(s => s.kind === 'qsort-stage')!;
+    expect(surface.kind).toBe('qsort-stage');
+    if (surface.kind !== 'qsort-stage') throw new Error('Missing grid');
+    expect(surface.promptRect!.y).toBeGreaterThanOrEqual(surface.lanes[0].y + surface.lanes[0].h);
+    expect(surface.buckets[0].y).toBeGreaterThanOrEqual(surface.promptRect!.y + surface.promptRect!.h);
+    expect(surface.buckets.flatMap(b => b.slots)).toHaveLength(12);
+    expect(surface.buckets.every(b => b.slots.every(s => s.y + s.h <= 800))).toBe(true);
+    const bounds = (card: CardData) => ({ x:card.x, y:card.y, w:200, h:140 });
+    const cards = reflowCardsForStage(prepared.cards, prepared.workflow, prepared.activeStageId, bounds, { width:1280, height:800 }, 'sort', 4);
+    expect(cards.every(card => {
+      const dims = getQSortCardDisplayDimensions(card, surface, () => bounds(card));
+      return card.y >= surface.lanes[0].y && card.y + dims.h <= surface.lanes[0].y + surface.lanes[0].h;
+    })).toBe(true);
+    expect(scene(3)).toEqual(old);
+  });
   it('preserves German task language and comparison notes without changing English studies', () => {
     expect(normalizeStudy({ ...testStudy, taskLanguage: 'de' })?.taskLanguage).toBe('de');
     expect(normalizeStudy(testStudy)?.taskLanguage).toBeUndefined();

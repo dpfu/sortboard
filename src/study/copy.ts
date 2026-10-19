@@ -1,6 +1,7 @@
 import type { StudyDefinition } from './model';
 
 const english = {
+  scale: { disagree: 'Disagree', undecided: 'Undecided', agree: 'Agree' },
   introduction: 'A guided sorting exercise', completed: 'Both rounds saved',
   reflection: 'A moment to reflect', comparison: 'Compare your two perspectives',
   saved: 'is saved.', result: 'your result', discuss: 'Talk through your choices',
@@ -30,6 +31,7 @@ const english = {
 };
 
 const german: typeof english = {
+  scale: { disagree: 'Stimme nicht zu', undecided: 'Unentschieden', agree: 'Stimme zu' },
   introduction: 'Eine angeleitete Sortierübung', completed: 'Beide Durchgänge gespeichert',
   reflection: 'Kurz besprechen', comparison: 'Zwei Perspektiven vergleichen',
   saved: 'ist gespeichert.', result: 'deine Sortierung', discuss: 'Eure Entscheidungen besprechen',

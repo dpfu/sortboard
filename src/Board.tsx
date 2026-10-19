@@ -54,6 +54,7 @@ export interface BoardProps {
   stackDropPreview?: { x: number; y: number; w: number; h: number; label: string } | null;
   onRenameStack?: (stackId: string, name: string) => void;
   surfaceScene?: StageSurfaceScene | null;
+  studyPrompt?: { text: string; language: string; scale: { disagree: string; undecided: string; agree: string } };
   baseCardWidth: number;
   cardLayoutMode: CardLayoutMode;
   selectedCardIds?: string[];
@@ -203,6 +204,7 @@ export function Board({
   stackDropPreview,
   onRenameStack,
   surfaceScene,
+  studyPrompt,
   baseCardWidth,
   cardLayoutMode,
   selectedCardIds,
@@ -819,7 +821,7 @@ export function Board({
             <div
               key={surface.surfaceId}
               data-testid={`surface-qsort-${surface.widgetId}`}
-              className={`boardSurface boardSurface--qsort ${surface.layoutVersion === 3 ? 'boardSurface--qsortGrid' : ''} ${surface.isSelected ? 'isSelected' : ''}`}
+              className={`boardSurface boardSurface--qsort ${surface.layoutVersion ? 'boardSurface--qsortGrid' : ''} ${surface.layoutVersion === 4 ? 'boardSurface--study' : ''} ${surface.isSelected ? 'isSelected' : ''}`}
               style={{ left: surface.x, top: surface.y, width: surface.w, height: surface.h }}
             >
               {surface.resizeEnabled ? (
@@ -890,7 +892,7 @@ export function Board({
                     data-testid={`qsort-lane-${surface.widgetId}-${lane.zoneId}`}
                     style={{ left: lane.x - surface.leftColumnRect.x, top: lane.y - surface.leftColumnRect.y, width: lane.w, height: lane.h }}
                   >
-                    <div className="boardSurface__titleRow">
+                    <div className={`boardSurface__titleRow ${surface.layoutVersion === 4 ? 'srOnly' : ''}`}>
                       <div className="boardSurface__title">{lane.label}</div>
                       <div className="boardSurface__count">{lane.count}</div>
                     </div>
@@ -903,6 +905,10 @@ export function Board({
                 ))}
               </div>
 
+              {surface.promptRect && studyPrompt ? <h1 className="studyBoard__prompt studySortPrompt" lang={studyPrompt.language}
+                style={{ left: surface.promptRect.x - surface.x, top: surface.promptRect.y - surface.y, width: surface.promptRect.w, height: surface.promptRect.h }}>
+                {studyPrompt.text}
+              </h1> : null}
               <div
                 className="boardQSort__distribution"
                 data-testid={`qsort-distribution-${surface.widgetId}`}
@@ -913,14 +919,14 @@ export function Board({
                   height: surface.distributionRect.h,
                 }}
               >
-                <div className="boardQSort__distributionHeader">
+                <div className={`boardQSort__distributionHeader ${surface.layoutVersion === 4 ? 'srOnly' : ''}`}>
                   <div>
                     <div className="boardQSort__distributionTitle">{surface.lanes.length === 1 ? surface.title : 'Rank the cards'}</div>
-                    {surface.layoutVersion !== 3 ? <div className="boardQSort__distributionHelp">
+                    {!surface.layoutVersion ? <div className="boardQSort__distributionHelp">
                       Drag from either tray into an empty slot.
                     </div> : null}
                   </div>
-                  {surface.layoutVersion === 3 ? <div className={`boardQSort__status ${surface.buckets.some(bucket => bucket.state === 'full') ? 'is-full' : ''}`} role="status">
+                  {surface.layoutVersion ? <div className={`boardQSort__status ${surface.buckets.some(bucket => bucket.state === 'full') ? 'is-full' : ''}`} role="status">
                     {surface.buckets.some(bucket => bucket.state === 'full')
                       ? 'Column full — choose another place'
                       : `${surface.buckets.reduce((total, bucket) => total + bucket.count, 0)} of ${surface.count} placed`}
@@ -931,7 +937,7 @@ export function Board({
                   aria-hidden
                   style={{ top: surface.baselineY - surface.distributionRect.y }}
                 />
-                {surface.buckets.map((bucket) => (
+                {surface.buckets.map((bucket, bucketIndex) => (
                   <div
                     key={bucket.zoneId}
                     className={`widgetBucket ${surfaceStateClass(bucket.state)} ${bucket.isCenter ? 'is-center' : ''} ${
@@ -947,9 +953,12 @@ export function Board({
                   >
                     <div className="widgetBucket__footer">
                       <div className="widgetBucket__label">
-                        {/^[1-9]\d*$/.test(bucket.label) ? `+${bucket.label}` : bucket.label}
+                        {surface.layoutVersion === 4 ? bucket.label.match(/^[+-]?\d+/)?.[0] || bucket.label : /^[1-9]\d*$/.test(bucket.label) ? `+${bucket.label}` : bucket.label}
                       </div>
-                      <div className="widgetBucket__meta">{bucket.capacityLabel}</div>
+                      <div className={`widgetBucket__meta ${surface.layoutVersion === 4 ? 'srOnly' : ''}`}>{bucket.capacityLabel}</div>
+                      {surface.layoutVersion === 4 && studyPrompt ? <div className="studyBoard__anchor" lang={studyPrompt.language}>
+                        {bucketIndex === 0 ? studyPrompt.scale.disagree : bucketIndex === surface.buckets.length - 1 ? studyPrompt.scale.agree : bucket.isCenter ? studyPrompt.scale.undecided : null}
+                      </div> : null}
                     </div>
                     <div
                       className="widgetBucket__column"

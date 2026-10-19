@@ -73,7 +73,7 @@ export type QSortLaneSurfaceView = {
   w: number;
   h: number;
   count: number;
-  grid?: { columns: number; cellW: number; cellH: number; cardIds: string[] };
+  grid?: { columns: number; cellW: number; cellH: number; cardIds: string[]; topInset?: number };
   placeholderLabel?: string;
   state?: WidgetDropState;
 };
@@ -109,7 +109,8 @@ export type QSortCanvasSurfaceView = BaseSurfaceView & {
   widgetId: string;
   title: string;
   count: number;
-  layoutVersion?: 3;
+  layoutVersion?: 3 | 4;
+  promptRect?: Rect;
   leftColumnRect: Rect;
   distributionRect: Rect;
   baselineY: number;
@@ -511,19 +512,21 @@ function buildQSortGridScene(
   workflow: SortWorkflowData,
   cards: CardData[],
   mode: Mode,
-  viewport: { width: number; height: number }
+  viewport: { width: number; height: number },
+  layoutVersion: 3 | 4 = 3
 ): StageSurfaceScene {
   const surface = scene.surfaces.find((entry): entry is QSortCanvasSurfaceView => entry.kind === 'qsort-stage');
   if (!surface) return scene;
   const pad = 24;
   const gap = 8;
   const singleTray = surface.lanes.length === 1;
-  const top = mode === 'setup' ? 20 : singleTray ? 124 : 84;
+  const cleanStudy = singleTray && layoutVersion === 4;
+  const top = mode === 'setup' ? 20 : cleanStudy ? 80 : singleTray ? 124 : 84;
   const width = Math.max(672, viewport.width - pad * 2);
   const laneW = Math.floor((width - QSORT_LANE_GAP * (surface.lanes.length - 1)) / surface.lanes.length);
-  const columns = Math.max(1, Math.floor((laneW - 24 + gap) / 92));
+  const columns = Math.max(1, Math.min(cleanStudy ? cards.length || 1 : Infinity, Math.floor((laneW - 24 + gap) / 92)));
   const cellW = Math.floor((laneW - 24 - gap * (columns - 1)) / columns);
-  const cellH = clamp(Math.round(cellW * 0.9), 68, singleTray ? 80 : 88);
+  const cellH = cleanStudy ? 104 : clamp(Math.round(cellW * 0.9), 68, singleTray ? 80 : 88);
   const presort = workflow.widgets.find((entry): entry is PreSortWidgetData => entry.kind === 'pre-sort');
   // Keep each card's tray place when others are ranked. The pre-sort assignment
   // remains in the recording even after its Q-Sort assignment changes.
@@ -535,17 +538,19 @@ function buildQSortGridScene(
       (current?.widgetId === surface.widgetId && current.zoneId === lane.zoneId);
   }).map(card => card.id));
   const rows = Math.max(1, ...lanePools.map(pool => Math.ceil(pool.length / columns)));
-  const trayH = 40 + rows * cellH + (rows - 1) * gap + 12;
+  const trayTopInset = cleanStudy ? 16 : 40;
+  const trayH = trayTopInset + rows * cellH + (rows - 1) * gap + (cleanStudy ? 16 : 12);
   const leftColumnRect = { x: pad, y: top + (mode === 'setup' ? 52 : 0), w: width, h: trayH };
   const lanes = surface.lanes.map((lane, index) => ({
     ...lane, x: pad + index * (laneW + QSORT_LANE_GAP), y: leftColumnRect.y, w: laneW, h: trayH,
-    grid: { columns, cellW, cellH, cardIds: lanePools[index] },
+    grid: { columns, cellW, cellH, cardIds: lanePools[index], topInset: trayTopInset },
   }));
-  const distributionY = leftColumnRect.y + trayH + 20;
+  const promptRect = cleanStudy ? { x: pad, y: leftColumnRect.y + trayH + 20, w: width, h: 72 } : undefined;
+  const distributionY = promptRect ? promptRect.y + promptRect.h : leftColumnRect.y + trayH + 20;
   const maxCapacity = Math.max(1, ...surface.buckets.map(bucket => bucket.capacity));
   const bucketW = Math.floor((width - QSORT_BUCKET_GAP * (surface.buckets.length - 1)) / surface.buckets.length);
-  const headerH = 44;
-  const bucketHeaderH = 48;
+  const headerH = cleanStudy ? 0 : 44;
+  const bucketHeaderH = cleanStudy ? 64 : 48;
   const slotH = clamp(Math.floor((viewport.height - distributionY - headerH - bucketHeaderH - pad - gap * (maxCapacity - 1)) / maxCapacity), singleTray ? 64 : 88, 112);
   const bucketY = distributionY + headerH;
   const buckets = surface.buckets.map((bucket, index) => {
@@ -561,7 +566,7 @@ function buildQSortGridScene(
     ...scene,
     canvasW: Math.max(viewport.width, width + pad * 2),
     canvasH: Math.max(viewport.height, distributionY + distributionRect.h + pad),
-    surfaces: [{ ...surface, layoutVersion: 3, x: pad, y: top, w: width,
+    surfaces: [{ ...surface, layoutVersion, promptRect, x: pad, y: top, w: width,
       h: distributionY + distributionRect.h - top, leftColumnRect, distributionRect,
       baselineY: bucketY + bucketHeaderH, lanes, buckets }],
   };
@@ -575,7 +580,7 @@ export function buildStageSurfaceScene(
   mode: Mode,
   viewportInput: { width: number; height: number },
   activeDrop?: { widgetId: string; zoneId: string; state: WidgetDropState } | null,
-  layoutVersion: 1 | 2 | 3 = 3
+  layoutVersion: 1 | 2 | 3 | 4 = 3
 ): StageSurfaceScene {
   const stageKind = getStageById(workflow, stageId)?.kind || 'closed-sort';
   const viewport = getViewportSize(viewportInput);
@@ -584,7 +589,7 @@ export function buildStageSurfaceScene(
   }
   if (stageKind === 'qsort') {
     const scene = buildQSortScene(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
-    return layoutVersion === 3 ? buildQSortGridScene(scene, workflow, cards, mode, viewport) : scene;
+    return layoutVersion >= 3 ? buildQSortGridScene(scene, workflow, cards, mode, viewport, layoutVersion as 3 | 4) : scene;
   }
   return (layoutVersion === 1 ? buildLegacyClosedOrPreSortScene : buildClosedOrPreSortScene)(workflow, stageId, cards, selectedWidgetId, mode, viewport, activeDrop);
 }
@@ -747,7 +752,7 @@ export function reflowCardsForStage(
   getBounds: (card: CardData) => CardBounds,
   viewportInput: { width: number; height: number },
   mode: Mode,
-  layoutVersion: 1 | 2 | 3 = 3
+  layoutVersion: 1 | 2 | 3 | 4 = 3
 ) {
   const scene = buildStageSurfaceScene(workflow, stageId, cards, null, mode, viewportInput, null, layoutVersion);
   const nextById = new Map(cards.map((card) => [card.id, card]));
@@ -797,7 +802,7 @@ export function reflowCardsForStage(
         const dims = getCompactBounds(card);
         return [card.id, {
           x: Math.round(lane.x + 12 + (index % grid.columns) * (grid.cellW + 8) + (grid.cellW - dims.w) / 2),
-          y: Math.round(lane.y + 40 + Math.floor(index / grid.columns) * (grid.cellH + 8) + (grid.cellH - dims.h) / 2),
+          y: Math.round(lane.y + (grid.topInset ?? 40) + Math.floor(index / grid.columns) * (grid.cellH + 8) + (grid.cellH - dims.h) / 2),
         }];
       })) : layoutCardsAsShelf(
         zoneCards,

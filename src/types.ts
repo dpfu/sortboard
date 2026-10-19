@@ -235,9 +235,9 @@ export interface RecordingSession {
   cardLayoutModeAtStart: CardLayoutMode;
   workflowAtStart: SortWorkflowData;
   activeStageIdAtStart?: string;
-  // Version 2 adds free category placement; version 3 adds the Q-Sort tray grid.
+  // Version 2 adds free category placement; 3 the tray grid; 4 the study board.
   // Missing on recordings made with the original stacked category layout.
-  surfaceLayoutVersion?: 2 | 3;
+  surfaceLayoutVersion?: 2 | 3 | 4;
   cardsAtStart: CardData[];
   segments: RecordingSegment[];
   // View-only interaction track. It is intentionally separate from segments so
