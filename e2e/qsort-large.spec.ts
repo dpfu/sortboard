@@ -25,8 +25,10 @@ async function dragAcrossBoard(page: Page, card: Locator, target: Locator) {
       if (center < board.y + 80) { await page.mouse.move(box.x + box.width / 2, board.y + 5); return false; }
       if (center > board.y + board.height - 80) { await page.mouse.move(box.x + box.width / 2, board.y + board.height - 5); return false; }
       pointer = { x: box.x + box.width / 2, y: center };
-      await page.mouse.move(pointer.x, pointer.y, { steps: 5 });
-      return true;
+      await page.mouse.move(pointer.x, pointer.y);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const settled = (await target.boundingBox())!;
+      return Math.abs(pointer.y - settled.y - settled.height / 2) < 1;
     }, { timeout: 15000, intervals: [50, 100] }).toBe(true);
     // A stationary pointer must stay attached to its card while the board scrolls.
     await expect.poll(async () => {
@@ -60,6 +62,9 @@ test('@smoke sorts 60 demo images with the common single-round Q-Sort flow', asy
   await editor.getByRole('button', { name: 'Save design', exact: true }).click();
   await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
   await expect(page.locator('.boardSurface--study')).toHaveCount(1);
+  await expect.poll(() => page.locator('[data-testid^="card-"] img').evaluateAll(nodes =>
+    nodes.length === 60 && nodes.every(node => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0)
+  )).toBe(true);
   await page.screenshot({ path: info.outputPath('large-qsort-start.png') });
   const geometry = await page.locator('.board').evaluate(el => ({ viewport: el.clientHeight, height: el.scrollHeight }));
   expect(geometry.height).toBeGreaterThan(geometry.viewport);
