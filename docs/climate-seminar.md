@@ -10,12 +10,12 @@ Open **https://dpfu.github.io/sortboard/?study=climate-images** on the seminar c
 
 ## Participant sequence
 
-1. **Importance:** “Dieses Bild gibt mir das Gefühl, dass der Klimawandel wichtig ist.” Place all twelve images, then select **Finish round**. Discuss the extremes and difficult decisions; record optional notes.
+1. **Importance:** “Dieses Bild gibt mir das Gefühl, dass der Klimawandel wichtig ist.” Place all twelve images, then select **Finish round**. Discuss the extremes and difficult decisions. Use **Replay round 1** beside the result to revisit a moment before continuing.
 2. Select **Continue to round 2**. The same images are reshuffled on an empty grid. The first result and its recording remain saved.
 3. **Ability to act:** “Dieses Bild gibt mir das Gefühl, dass ich etwas gegen den Klimawandel tun kann.” Complete and discuss this sort too.
-4. Compare the scores and changes for each image. Record reasons in **Notizen zum Vergleich**. These are descriptive placements, not Q-method factors or an effect estimate.
-5. Use **Replay round 1 / 2** to revisit a hesitation or revision. **Play recording**, **Pause**, and the timeline control playback; **Back to study** returns to the comparison and notes.
-6. Select **Export study**, check the downloaded ZIP, and hand it to the instructor using the course's agreed channel. The archive contains both recordings, task statements, discussion and comparison notes, images, image credits and `results.csv`. Importing it restores the study in SortBoard.
+4. Compare the scores and changes for each image. Discuss the reasons for changed positions. These are descriptive placements, not Q-method factors or an effect estimate.
+5. Use **Replay round 1 / 2** to revisit a hesitation or revision. **Play recording**, **Pause**, and the timeline control playback; **Back to study** returns to the discussion or final comparison.
+6. Select **Export study**, check the downloaded ZIP, and hand it to the instructor using the course's agreed channel. The archive contains both recordings, task statements, images, image credits and `results.csv`. Importing it restores the study in SortBoard.
 
 The group can complete this sequence without the instructor. **Pause** preserves an unfinished round; reloading the same link offers **Resume**. Work is stored in that browser, not submitted to GitHub or the instructor. Export before leaving a shared computer or clearing its browser data. Recording captures sorting movements, not audio or a screen video. Load the app with an internet connection; an offline reload is not guaranteed.
 

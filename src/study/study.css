@@ -16,8 +16,8 @@
 .studyNext, .studyReflection, .studyReviewStep { padding: 26px; border: 1px solid #d3dfd5; border-radius: 16px; background: #fff; margin: 24px 0; }
 .studyPrimary { background: #315d46; color: white; padding: 13px 20px; margin-top: 12px; }
 .studyReflection > p:first-child { display: flex; align-items: center; gap: 8px; color: #456d53; font-size: 13px; }
-.studyPage label { display: block; font-size: 13px; font-weight: 600; margin-top: 20px; }
-.studyPage textarea { width: 100%; box-sizing: border-box; margin: 8px 0; padding: 12px; border: 1px solid #cbd8cd; border-radius: 8px; font: inherit; resize: vertical; }
+.studyResultHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.studyResultHeading .btn { flex-shrink: 0; }
 .studyCredits { margin-top: 32px; color: #53695a; font-size: 12px; }
 .studyCredits summary { cursor: pointer; }
 .studyCreditText { white-space: pre-wrap; overflow-wrap: anywhere; }

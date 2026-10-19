@@ -2975,13 +2975,12 @@ export default function App() {
       setProjectStatus('Your progress is saved. Resume whenever you are ready.');
     } finally { setIsProjectBusy(false); }
   };
-  const saveStudyNotes = async (recording: RecordingSession, notes: string, comparisonNotes?: string) => {
-    if (!boardId || !recording.studyRound) return false;
-    const saved = await persistSessionSnapshot({ version: 1, id: recording.createdAt, boardId, updatedAt: Date.now(),
-      recording: sanitizeRecording({ ...recording, studyRound: { ...recording.studyRound, reflection: notes,
-        ...(comparisonNotes !== undefined ? { comparisonNotes } : {}) } }) }, 'save discussion notes');
-    setProjectStatus(saved ? 'Discussion notes saved.' : 'Could not save the discussion notes. Please try again.');
-    return saved;
+  const openStudyReplay = async (recording: RecordingSession) => {
+    if (isProjectBusy) return;
+    setIsProjectBusy(true);
+    try { await selectSession(recording.createdAt); setMode('end'); }
+    catch { setProjectStatus('Could not open the replay. Please try again.'); }
+    finally { setIsProjectBusy(false); }
   };
   const saveStudyDesign = async (definition: StudyDefinition) => {
     if (!activeProject || !boardId || isProjectBusy) throw new Error('Wait for the project to finish loading.');
@@ -5276,8 +5275,8 @@ export default function App() {
 
   if (guidedStudy && !showStudyWorkspace && mode === 'setup' && isProjectHydrated) return <div className="app app--study" ref={appFullscreenRef}>
     <StudyScreens study={guidedStudy} recordings={studyRounds} cards={cards} busy={isProjectBusy} status={projectStatus}
-      onStart={index => void startStudyRound(index)} onReplay={recording => { void selectSession(recording.createdAt).then(() => setMode('end')); }}
-      onExport={() => void handleExportProject()} onNew={() => void newStudyParticipant()} onNotes={saveStudyNotes}
+      onStart={index => void startStudyRound(index)} onReplay={recording => void openStudyReplay(recording)}
+      onExport={() => void handleExportProject()} onNew={() => void newStudyParticipant()}
       onWorkspace={() => setShowStudyWorkspace(true)} onPreview={card => openMediaPreview(card.id)} />
     {previewCard ? <VideoPreviewDialog card={previewCard} onClose={closeMediaPreview} showMetadata={false} /> : null}
   </div>;
