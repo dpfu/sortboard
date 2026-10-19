@@ -7,6 +7,8 @@ import { CardPreview } from './CardPreview';
 const ROTATION_MAX = 2; // degrees
 const RESIZE_EDGE_BAND_PX = 12;
 const RESIZE_EDGE_BAND_MIN_PX = 6;
+const DRAG_SCROLL_EDGE_PX = 64;
+const DRAG_SCROLL_SPEED_PX_PER_SEC = 900;
 
 export type ResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -50,6 +52,7 @@ export interface DraggableCardProps {
   dragEnabled: boolean;
   coordinateScale?: number;
   dragConstraintsRef: React.RefObject<HTMLElement>;
+  scrollContainerRef?: React.RefObject<HTMLElement>;
   onBringToFront: (id: string) => void;
   onMoveEnd: (id: string, newX: number, newY: number, dropPoint?: { x: number; y: number }) => boolean | void;
   onResizeStart?: (id: string, pointer: ResizeStartPayload) => void;
@@ -74,6 +77,7 @@ function DraggableCardComponent({
   dragEnabled,
   coordinateScale = 1,
   dragConstraintsRef,
+  scrollContainerRef,
   onBringToFront,
   onMoveEnd,
   onResizeStart,
@@ -94,6 +98,32 @@ function DraggableCardComponent({
   const rotate = prefersReducedMotion ? rawRotate : springRotate;
   const dragControls = useDragControls();
   const [isDragging, setIsDragging] = React.useState(false);
+  const dragScroll = React.useRef<{ anchorX: number; anchorY: number; pointerX: number; pointerY: number; frame?: number } | null>(null);
+  const pointerAnchor = React.useRef({ x: 0.5, y: 0.5 });
+  const stopDragScroll = React.useCallback(() => {
+    if (dragScroll.current?.frame != null) cancelAnimationFrame(dragScroll.current.frame);
+    dragScroll.current = null;
+  }, []);
+  React.useEffect(() => stopDragScroll, [stopDragScroll]);
+  const scrollPosition = () => {
+    const drag = dragScroll.current;
+    const rect = dragConstraintsRef.current?.getBoundingClientRect();
+    if (!drag || !rect) return null;
+    const point = { x: (drag.pointerX - rect.left) / coordinateScale, y: (drag.pointerY - rect.top) / coordinateScale };
+    return { x: point.x - cardW * drag.anchorX, y: point.y - cardH * drag.anchorY, point };
+  };
+  const followScroll = () => {
+    const position = scrollPosition();
+    if (!position) return;
+    x.set(position.x); y.set(position.y);
+    onDragTraceSample?.(card.id, position.x, position.y, position.point);
+  };
+  const followScrollRef = React.useRef(followScroll);
+  followScrollRef.current = followScroll;
+  React.useLayoutEffect(() => {
+    // Q-Sort enlarges a lifted preview; keep the same grip within that image.
+    if (dragScroll.current) followScrollRef.current();
+  }, [cardW, cardH]);
   const canResize = mode === 'setup' && !!isSelected && !!onResizeStart;
   const liftScale = Math.max(
     1,
@@ -159,6 +189,9 @@ function DraggableCardComponent({
       if (!dragEnabled) return;
       if (e.button !== 0) return;
       if (e.shiftKey) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      pointerAnchor.current = { x: clamp((e.clientX - rect.left) / Math.max(1, rect.width), 0, 1),
+        y: clamp((e.clientY - rect.top) / Math.max(1, rect.height), 0, 1) };
       dragControls.start(e);
     },
     [card.id, dragControls, dragEnabled, getResizeEdgeFromEvent, isSelected, onBringToFront, onResizeStart, onSelectCard]
@@ -243,9 +276,14 @@ function DraggableCardComponent({
       onPointerMove={updateResizeHotEdge}
       onPointerEnter={updateResizeHotEdge}
       onPointerLeave={() => setResizeHotEdge(null)}
-      onPointerCancel={() => { setResizeHotEdge(null); setIsDragging(false); }}
+      onPointerCancel={() => { stopDragScroll(); setResizeHotEdge(null); setIsDragging(false); }}
       onDrag={(e, info) => {
-        void e;
+        if (dragScroll.current) {
+          dragScroll.current.pointerX = (e as PointerEvent).clientX;
+          dragScroll.current.pointerY = (e as PointerEvent).clientY;
+          followScroll();
+          return;
+        }
         // Very subtle rotation driven by recent horizontal movement.
         const next = prefersReducedMotion ? 0 : clamp(info.delta.x * 0.35, -ROTATION_MAX, ROTATION_MAX);
         rawRotate.set(next);
@@ -257,18 +295,59 @@ function DraggableCardComponent({
           y: nextY + cardH / 2,
         });
       }}
-      onDragStart={() => {
+      onDragStart={e => {
         setIsDragging(true);
         rawRotate.set(0);
         onDragTraceStart?.(card.id, card.x, card.y);
+        const container = scrollContainerRef?.current;
+        if (!container) return;
+        stopDragScroll();
+        const pointer = e as PointerEvent;
+        const drag = { anchorX: pointerAnchor.current.x, anchorY: pointerAnchor.current.y,
+          pointerX: pointer.clientX, pointerY: pointer.clientY, frame: 0 };
+        dragScroll.current = drag;
+        let lastTime = performance.now();
+        let edgeSince: number | null = null;
+        let previousLeft = container.scrollLeft;
+        let previousTop = container.scrollTop;
+        const tick = (time: number) => {
+          if (dragScroll.current !== drag) return;
+          const dt = Math.min(32, time - lastTime) / 1000;
+          lastTime = time;
+          const rect = container.getBoundingClientRect();
+          const velocity = (point: number, start: number, end: number) => {
+            const band = DRAG_SCROLL_EDGE_PX;
+            return point < start + band ? -DRAG_SCROLL_SPEED_PX_PER_SEC * clamp((start + band - point) / band, 0, 1)
+              : point > end - band ? DRAG_SCROLL_SPEED_PX_PER_SEC * clamp((point - end + band) / band, 0, 1) : 0;
+          };
+          const vx = velocity(drag.pointerX, rect.left, rect.right);
+          const vy = velocity(drag.pointerY, rect.top, rect.bottom);
+          if (vx || vy) edgeSince ??= time;
+          else edgeSince = null;
+          // Briefly passing the edge on a normal drop must not nudge the board.
+          if (edgeSince != null && time - edgeSince >= 150) {
+            container.scrollLeft += vx * dt;
+            container.scrollTop += vy * dt;
+          }
+          if (container.scrollLeft !== previousLeft || container.scrollTop !== previousTop) followScrollRef.current();
+          previousLeft = container.scrollLeft;
+          previousTop = container.scrollTop;
+          drag.frame = requestAnimationFrame(tick);
+        };
+        drag.frame = requestAnimationFrame(tick);
       }}
       onDragEnd={(e, info) => {
-        void e;
         setIsDragging(false);
         rawRotate.set(0);
-        const nextX = card.x + info.offset.x / coordinateScale;
-        const nextY = card.y + info.offset.y / coordinateScale;
-        const moved = onMoveEnd(card.id, nextX, nextY, {
+        if (dragScroll.current) {
+          dragScroll.current.pointerX = (e as PointerEvent).clientX;
+          dragScroll.current.pointerY = (e as PointerEvent).clientY;
+        }
+        const scrolled = scrollPosition();
+        stopDragScroll();
+        const nextX = scrolled?.x ?? card.x + info.offset.x / coordinateScale;
+        const nextY = scrolled?.y ?? card.y + info.offset.y / coordinateScale;
+        const moved = onMoveEnd(card.id, nextX, nextY, scrolled?.point ?? {
           x: nextX + cardW / 2,
           y: nextY + cardH / 2,
         });
@@ -289,7 +368,8 @@ function DraggableCardComponent({
       }}
     >
       <div className="card__surface">
-        <CardPreview card={card} onOpenPreview={onOpenPreview} showPreviewButton={mode !== 'setup'} />
+        <CardPreview card={card} onOpenPreview={onOpenPreview}
+          showPreviewButton={mode !== 'setup' && (card.kind !== 'image' || !scrollContainerRef || Math.min(cardW, cardH) >= 80)} />
 
         {showChrome && mode === 'setup' ? (
           <div className="card__chrome">

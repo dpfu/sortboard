@@ -1,4 +1,4 @@
-import { openProjectMenu } from './helpers/app';
+import { configureQSort, openProjectMenu } from './helpers/app';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { cardFromTop, cards, dragLocatorBy, dragMouseFromTo, openFreshApp, waitForAppReady } from './helpers/app';
 
@@ -247,16 +247,17 @@ test.describe('replay state isolation', () => {
   test('Q-Sort records and replays Pre-Sort first even when setup was showing Q-Sort', async ({ page }) => {
     const card = await createSingleCardProject(page);
     await page.getByRole('button', { name: 'Q-Sort', exact: true }).click();
+    await configureQSort(page);
 
     const stageControl = page.locator('.columns').filter({
-      has: page.locator('.columns__label', { hasText: 'Stage' }),
+      has: page.locator('.columns__label', { hasText: 'Preview' }),
     });
     await stageControl.getByRole('button', { name: 'Q-Sort', exact: true }).click();
     await expect(stageControl.getByRole('button', { name: 'Q-Sort', exact: true })).toHaveClass(/isActive/);
     await expect(page.locator('[data-testid^="surface-qsort-"]')).toHaveCount(1);
 
     await page.getByRole('button', { name: 'Start sorting' }).click();
-    await expect(page.locator('.sortBar__stage')).toHaveText('Pre-Sort');
+    await expect(page.getByRole('button', { name: 'Continue to Q-Sort' })).toBeVisible();
 
     const source = page.locator('[data-testid^="surface-work-area-"]');
     const preSortTargets = page.locator('[data-testid^="surface-sink-"]');
@@ -292,9 +293,10 @@ test.describe('replay state isolation', () => {
     await waitForStableBox(availableSlot, 'Q-Sort bucket slot');
     await dragCardTo(page, liveLaneCard, availableSlot);
     await expect(availableBucket.locator('.widgetBucket__meta')).toHaveText('1 / 1');
-    const endSorting = page.getByRole('button', { name: 'Finish sorting' });
+    const endSorting = page.getByRole('button', { name: 'Finish round' });
     await expect(endSorting).toBeEnabled();
     await endSorting.click();
+    await page.getByRole('button', { name: /^Replay round 1(?: ·|$)/ }).click();
 
     const session = page.getByTestId('replay-sessions').getByRole('button').first();
     await session.click();

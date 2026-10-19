@@ -21,6 +21,7 @@ export function ControlsDialog({ mode, sortType, stacksEnabled = true, taskLangu
     ...(mode === 'end' ? [['Entscheidungen nachverfolgen', 'Play recording startet das Replay. Pause hält an. Bewege den Zeitregler zu einer interessanten Stelle. Back to study führt zur Besprechung zurück.']] : [
       ['Karten einordnen', 'Ziehe eine Karte auf einen freien Platz der Skala. Beachte die Aufgabe und die Skalenbeschriftungen. Die Reihen sind zusätzliche Plätze mit demselben Wert. Pfeiltasten bewegen eine fokussierte Karte.'],
       ['Umsortieren', 'Du kannst Bilder jederzeit auf einen anderen freien Platz oder in die Ablage zurückziehen. Eine volle Spalte nimmt kein weiteres Bild an; die Karte kehrt zurück.'],
+      ['Große Raster', 'Halte die Karte beim Ziehen am oberen oder unteren Boardrand, um weiterzuscrollen.'],
       ['Durchgang abschließen', 'Wenn alle Karten eingeordnet sind, wird Finish round aktiv. Bei einer Vorsortierung führt Continue to Q-Sort zum Raster. Pause unterbricht; Resume setzt den Durchgang später fort.'],
     ]),
     ['Vollbild', 'Das Symbol mit den vier Ecken wechselt in die Vollbildansicht. Esc verlässt sie, ohne die Sortierung zu löschen.'],
@@ -28,6 +29,7 @@ export function ControlsDialog({ mode, sortType, stacksEnabled = true, taskLangu
     ['Inspect an image or video', 'Double-click a card or use its preview icon. Keyboard: Alt + Enter in Setup, Enter while sorting. Esc closes the preview.'],
     ...(mode !== 'end' ? [['Move a card', 'Drag it to a new position. While sorting, arrow keys move a focused card.']] : [['Replay a session', 'Play from the beginning, or move along the timeline.']]),
     ...(sortType !== 'open' && mode !== 'end' ? [['Place cards on the board', 'Drop inside a category to assign a card; elsewhere it stays unsorted. Cards stay where you release them. Final Q-Sort uses fixed slots.']] : []),
+    ...(sortType === 'qsort' && mode === 'sort' ? [['Reach an offscreen place', 'While dragging in the Q-Sort grid, hold the card near the top or bottom edge to scroll.']] : []),
     ...(sortType === 'open' ? [
       ['Move around the board', 'Drag empty space, or hold Space and drag over cards. Middle-button dragging also pans.'],
       ...(mode !== 'end' && stacksEnabled ? [['Create a stack', 'Drop cards onto one another. The outline previews the group before you let go.'], ['Name or move a stack', 'Double-click its name to edit it. Drag its label or border to move the group.']] : mode === 'end' ? [['Explore the result', 'Choose Free view in View to pan and zoom independently of the recording.']] : []),

@@ -1076,6 +1076,7 @@ export function Board({
               dragEnabled={dragEnabled}
               coordinateScale={cameraScale}
               dragConstraintsRef={worldSize ? cameraLayoutRef : canvasRef}
+              scrollContainerRef={qSortSurface && mode === 'sort' ? boardRef : undefined}
               onBringToFront={onBringToFront}
               onMoveEnd={onMoveEnd}
               onResizeStart={onResizeStart}

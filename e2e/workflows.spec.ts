@@ -1,4 +1,4 @@
-import { openProjectMenu } from './helpers/app';
+import { configureQSort, openProjectMenu } from './helpers/app';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import {
   cardFromTop,
@@ -146,6 +146,7 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   const cardTestIds = await createEmptyProjectWithTextCards(page, 4);
 
   await page.getByRole('button', { name: 'Q-Sort' }).click();
+  await configureQSort(page);
   await page.getByRole('button', { name: 'Start sorting' }).click();
 
   const nextStageButton = page.getByRole('button', { name: 'Continue to Q-Sort' });
@@ -181,14 +182,12 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   }
 
   await expect(nextStageButton).toBeEnabled();
-  const preSortCompletion = page.getByTestId('sort-completion');
-  await expect(preSortCompletion).toContainText('First impressions sorted.');
   await nextStageButton.click();
 
   const qSortSurface = page.locator('[data-testid^="surface-qsort-"]');
   const qSortLanes = page.locator('[data-testid^="qsort-lane-"]');
   const qSortBuckets = page.locator('[data-testid^="qsort-bucket-"]');
-  const endButton = page.getByRole('button', { name: 'Finish sorting' });
+  const endButton = page.getByRole('button', { name: 'Finish round' });
   await expect(qSortSurface).toHaveCount(1);
   await expect(qSortLanes).toHaveCount(2);
   await expect(qSortSurface.locator(':scope > .boardSurface__header')).toHaveCount(0);
@@ -261,14 +260,14 @@ test('@smoke completes both q-sort stages through the UI and replays them', asyn
   }
 
   await expect(endButton).toBeEnabled();
-  await expect(page.getByText('Recording · 9 actions')).toBeVisible();
-  const qSortCompletion = page.getByTestId('sort-completion');
-  await expect(qSortCompletion).toContainText('Distribution complete.');
+  await expect(page.getByTestId('recording-status')).toBeVisible();
+  await expect(page.locator('.studyProgress')).toHaveAttribute('aria-label', '4 of 4 placed');
   await endButton.click();
+  await page.getByRole('button', { name: /^Replay round 1(?: ·|$)/ }).click();
 
-  await expect(page.getByRole('button', { name: 'New sorting session' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to study' })).toBeVisible();
   await expect(page.getByTestId('replay-sessions').getByRole('button')).toHaveCount(1);
-  await expect(page.getByText('9 recorded actions')).toBeVisible();
+
   await expect(page.getByRole('button', { name: 'Play recording' })).toBeEnabled();
 
   await page.getByRole('button', { name: 'Play recording' }).click();
@@ -340,81 +339,6 @@ async function seedClosedSortCompleteState(page: Page) {
                 widgetId: categoryId,
                 zoneId: 'content',
                 order: index,
-              },
-            },
-          }));
-          const put = boards.put(board, activeProjectId);
-          put.onerror = () => reject(put.error);
-          put.onsuccess = () => {
-            db.close();
-            resolve();
-          };
-        };
-      };
-    });
-  });
-}
-
-async function seedQSortPreSortCompleteState(page: Page) {
-  await page.evaluate(async () => {
-    const activeProjectId = await new Promise<string | null>((resolve, reject) => {
-      const request = window.indexedDB.open('sortboard-mvp');
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['meta'], 'readonly');
-        const get = tx.objectStore('meta').get('activeProjectId');
-        get.onerror = () => reject(get.error);
-        get.onsuccess = () => {
-          const value = (get.result as { value?: string } | undefined)?.value ?? null;
-          db.close();
-          resolve(value);
-        };
-      };
-    });
-
-    if (!activeProjectId) {
-      throw new Error('Missing active project id');
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const request = window.indexedDB.open('sortboard-mvp');
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(['boards'], 'readwrite');
-        const boards = tx.objectStore('boards');
-        const get = boards.get(activeProjectId);
-        get.onerror = () => reject(get.error);
-        get.onsuccess = () => {
-          const board = get.result as {
-            workflow?: {
-              stages: Array<{ id: string; kind: string }>;
-              widgets: Array<{ id: string; kind: string; stageId?: string; zones?: Array<{ id: string }> }>;
-            };
-            cards: Array<{ widgetAssignments?: Record<string, { widgetId: string; zoneId: string; order: number }> }>;
-            activeStageId?: string | null;
-            updatedAt?: number;
-          };
-          const presortStage = board.workflow?.stages.find((stage) => stage.kind === 'presort');
-          const presortWidget = board.workflow?.widgets.find(
-            (widget) => widget.kind === 'pre-sort' && widget.stageId === presortStage?.id
-          );
-          const zoneIds = presortWidget?.zones?.map((zone) => zone.id).filter(Boolean) || [];
-          if (!presortStage || !presortWidget || zoneIds.length < 2) {
-            reject(new Error('Missing qsort presort state'));
-            return;
-          }
-          board.activeStageId = presortStage.id;
-          board.updatedAt = Date.now();
-          board.cards = board.cards.map((card, index) => ({
-            ...card,
-            widgetAssignments: {
-              ...(card.widgetAssignments || {}),
-              [presortStage.id]: {
-                widgetId: presortWidget.id,
-                zoneId: zoneIds[index % zoneIds.length]!,
-                order: Math.floor(index / zoneIds.length),
               },
             },
           }));
@@ -704,11 +628,14 @@ test('advances from pre-sort into q-sort distribution surfaces', async ({ page }
   await openFreshApp(page);
 
   await page.getByRole('button', { name: 'Q-Sort' }).click();
-  await page.waitForTimeout(700);
-  await seedQSortPreSortCompleteState(page);
-  await page.reload();
-  await waitForAppReady(page);
+  await configureQSort(page);
   await page.getByRole('button', { name: 'Start sorting' }).click();
+  const ids = await cards(page).evaluateAll(nodes => nodes.map(n => n.getAttribute('data-testid')!));
+  for (const id of ids) {
+    await page.getByTestId(id).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  }
   await expect(page.getByRole('button', { name: 'Continue to Q-Sort' })).toBeEnabled();
   await expect(page.locator('[data-testid^="surface-sink-"]')).toHaveCount(2);
 
@@ -718,5 +645,5 @@ test('advances from pre-sort into q-sort distribution surfaces', async ({ page }
   await expect(page.locator('[data-testid^="qsort-slot-"]').first()).toBeVisible();
   await expect.poll(() => page.getByTestId('board-root').evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
   await expect(page.locator('[data-testid^="qsort-bucket-"]').last()).toBeInViewport();
-  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Finish round' })).toBeVisible();
 });

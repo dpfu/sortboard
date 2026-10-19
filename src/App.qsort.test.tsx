@@ -92,114 +92,46 @@ describe('App qsort workflow', () => {
     cleanup();
   });
 
-  it('advances from pre-sort into q-sort and swaps the visible stage surface', async () => {
-    const firstView = await renderAppReady();
-
+  it('requires a task and records a single round with the clean Q-Sort board', async () => {
+    await renderAppReady();
     await userEvent.click(screen.getByRole('button', { name: 'Q-Sort' }));
-
-    const { persist, activeProjectId } = await getActiveBoard();
-    let board = await persist.persistGetBoard(activeProjectId);
-    await waitFor(async () => {
-      board = await persist.persistGetBoard(activeProjectId);
-      expect(board?.workflow?.templateId).toBe('qsort');
-    });
-    if (!board) {
-      throw new Error('missing qsort board');
-    }
-    const qsortBoard = board;
-    expect(qsortBoard.workflow?.templateId).toBe('qsort');
-
-    const presortStage = qsortBoard.workflow!.stages.find((stage) => stage.kind === 'presort')!;
-    const qsortStage = qsortBoard.workflow!.stages.find((stage) => stage.kind === 'qsort')!;
-    const presortWidget = qsortBoard.workflow!.widgets.find(
-      (widget): widget is Extract<(typeof qsortBoard.workflow.widgets)[number], { kind: 'pre-sort' }> =>
-        widget.kind === 'pre-sort' && widget.stageId === presortStage.id
-    )!;
-    const qsortWidget = qsortBoard.workflow!.widgets.find(
-      (widget): widget is Extract<(typeof qsortBoard.workflow.widgets)[number], { kind: 'qsort' }> =>
-        widget.kind === 'qsort' && widget.stageId === qsortStage.id
-    )!;
-
-    await persist.persistPutBoard({
-      ...qsortBoard,
-      version: 2,
-      activeStageId: presortStage.id,
-      cards: qsortBoard.cards.map((card, index) => ({
-        ...card,
-        widgetAssignments: {
-          ...(card.widgetAssignments || {}),
-          [presortStage.id]: {
-            widgetId: presortWidget.id,
-            zoneId: index % 2 === 0 ? presortWidget.zones[0]!.id : presortWidget.zones[1]!.id,
-            order: Math.floor(index / 2),
-          },
-        },
-      })),
-    });
-
-    firstView.unmount();
-    const secondView = await renderAppReady();
-
+    expect(screen.queryByRole('group', { name: 'Setup stage' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
-    expect(await screen.findByRole('button', { name: 'Continue to Q-Sort' })).toBeTruthy();
-    expect(await screen.findByTestId(`surface-work-area-${qsortBoard.workflow!.widgets.find((widget) => widget.kind === 'source' && widget.stageId === presortStage.id)!.id}`)).toBeTruthy();
-    expect(await screen.findByTestId(`surface-sink-${presortWidget.id}-${presortWidget.zones[0]!.id}`)).toBeTruthy();
-    expect(await screen.findByTestId(`surface-sink-${presortWidget.id}-${presortWidget.zones[1]!.id}`)).toBeTruthy();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Continue to Q-Sort' }));
-
-    await waitFor(() => {
-      expect(secondView.container.querySelector(`[data-testid="surface-sink-${presortWidget.id}-${presortWidget.zones[0]!.id}"]`)).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Q-Sort design' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Finish round' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Task for round 1'), { target: { value: 'Which images would you keep?' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Save design' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Start sorting' }));
+    expect(await screen.findByRole('heading', { name: 'Which images would you keep?' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Finish round' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue to Q-Sort' })).toBeNull();
+    const { persist, activeProjectId } = await getActiveBoard();
+    await waitFor(async () => {
+      const sessions = await persist.persistListSessions(activeProjectId);
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].recording.surfaceLayoutVersion).toBe(4);
+      expect(sessions[0].recording.studyRound?.design?.rounds).toHaveLength(1);
+      expect(sessions[0].recording.workflowAtStart?.stages.map(s => s.kind)).toEqual(['qsort']);
     });
-    expect(await screen.findByTestId(`surface-qsort-${qsortWidget.id}`)).toBeTruthy();
-    expect(await screen.findByTestId(`qsort-rail-${qsortWidget.id}`)).toBeTruthy();
-    expect(await screen.findByTestId(`qsort-distribution-${qsortWidget.id}`)).toBeTruthy();
-    expect(secondView.container.querySelector(`.widgetZone--bucket`)).toBeNull();
-    expect(secondView.container.querySelector(`[data-testid^="qsort-slot-${qsortWidget.id}-"]`)).toBeTruthy();
-    await waitFor(() => {
-      const boardElement = secondView.container.querySelector('.board') as HTMLDivElement | null;
-      expect(boardElement).toBeTruthy();
-      expect(boardElement?.scrollLeft || 0).toBe(0);
-    });
-    expect(secondView.container.querySelector('[data-testid^="surface-qsort-"] > .boardSurface__header')).toBeNull();
-
-    const centerBucket = qsortWidget.buckets[Math.floor(qsortWidget.buckets.length / 2)]!;
-    const edgeBucket = qsortWidget.buckets[0]!;
-    const centerColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${centerBucket.id}`);
-    const edgeColumn = await screen.findByTestId(`qsort-column-${qsortWidget.id}-${edgeBucket.id}`);
-    expect(parseFloat(centerColumn.style.height)).toBeGreaterThan(parseFloat(edgeColumn.style.height));
-    expect(screen.getByRole('button', { name: 'Finish sorting' })).toBeTruthy();
-
-    expect(activeProjectId).toBeTruthy();
   });
 
-  it('explains and blocks a Q-Sort whose distribution is too small', async () => {
+  it('validates capacities in the common editor and keeps custom scale labels when fitting', async () => {
     await renderAppReady();
-
     await userEvent.click(screen.getByRole('button', { name: 'Q-Sort' }));
-    const qSortStageButton = screen.getAllByRole('button', { name: 'Q-Sort' }).at(-1)!;
-    await userEvent.click(qSortStageButton);
-
-    await userEvent.click(document.querySelector('[data-testid^="surface-qsort-"] button.boardSurface__header') as HTMLElement);
-    const capacityInputs = await screen.findAllByLabelText(/^Capacity for /);
-    const firstLabel = screen.getByLabelText('Label for scale position 1') as HTMLInputElement;
-    fireEvent.change(firstLabel, { target: { value: 'Strongly disagree' } });
-    const positiveCapacity = capacityInputs.find((input) => Number((input as HTMLInputElement).value) > 0) as
-      | HTMLInputElement
-      | undefined;
-    expect(positiveCapacity).toBeTruthy();
-    fireEvent.change(positiveCapacity!, { target: { value: '0' } });
-
-    await waitFor(() => {
-      const start = screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement;
-      expect(start.disabled).toBe(true);
-      expect(screen.getByText(/The distribution has \d+ places for 24 cards\. Open the Q-Sort stage/)).toBeTruthy();
-    });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Regenerate distribution' }));
-    await waitFor(() => {
-      expect((screen.getByRole('button', { name: 'Start sorting' }) as HTMLButtonElement).disabled).toBe(false);
-      expect((screen.getByLabelText('Label for scale position 1') as HTMLInputElement).value).toBe('Strongly disagree');
-    });
+    await userEvent.click(screen.getByRole('button', { name: 'Set up tasks and rounds' }));
+    fireEvent.change(screen.getByLabelText('Task for round 1'), { target: { value: 'Rank these cards.' } });
+    fireEvent.change(screen.getByLabelText('Label at position 1'), { target: { value: 'Strongly disagree' } });
+    fireEvent.change(screen.getByLabelText('Places at position 1'), { target: { value: '0' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Save design' }));
+    expect(screen.getByRole('alert').textContent).toContain('places for 24 cards');
+    await userEvent.click(screen.getByRole('button', { name: 'Fit to 24 cards' }));
+    expect((screen.getByLabelText('Label at position 1') as HTMLInputElement).value).toBe('Strongly disagree');
+    await userEvent.click(screen.getByRole('button', { name: 'Save design' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const { persist, activeProjectId } = await getActiveBoard();
+    const project = (await persist.persistListProjects()).find(p => p.id === activeProjectId)!;
+    expect(project.study?.scale.reduce((sum, s) => sum + s.capacity, 0)).toBe(24);
+    expect(project.study?.scale[0].label).toBe('Strongly disagree');
   });
 });

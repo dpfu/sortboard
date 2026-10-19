@@ -1,4 +1,4 @@
-import { openDisplay, openProjectMenu, openReplayView } from './helpers/app';
+import { configureQSort, openDisplay, openProjectMenu, openReplayView } from './helpers/app';
 import { expect, test, type Page } from '@playwright/test';
 import { cards, exportProjectZip, handleDialog, importProjectZip, openFreshApp, waitForAppReady } from './helpers/app';
 
@@ -14,6 +14,7 @@ test('defaults new projects to full screen and preserves opting out through sort
   await option(page).uncheck();
   for (const type of ['Closed sort', 'Q-Sort', 'Open sort']) {
     await page.getByRole('button', { name: type, exact: true }).click();
+    if (type === 'Q-Sort') await configureQSort(page);
     await openDisplay(page);
     await expect(option(page)).not.toBeChecked();
   }
@@ -99,11 +100,15 @@ for (const type of ['Closed sort', 'Q-Sort']) {
   test(`starts ${type} in full screen and exits when returning to Setup`, async ({ page }) => {
     await openFreshApp(page);
     await page.getByRole('button', { name: type, exact: true }).click();
+    if (type === 'Q-Sort') await configureQSort(page);
     await page.getByRole('button', { name: 'Start sorting' }).click();
     await expect(exit(page)).toBeEnabled();
     expect(await fullscreenTarget(page)).toBe('app app--sort');
     await expect(cards(page)).toHaveCount(24);
-    await handleDialog(page, () => page.getByRole('button', { name: 'Leave sorting', exact: true }).click());
+    if (type === 'Q-Sort') {
+      await page.getByRole('button', { name: 'Pause', exact: true }).click();
+      await page.getByRole('button', { name: 'Workspace', exact: true }).click();
+    } else await handleDialog(page, () => page.getByRole('button', { name: 'Leave sorting', exact: true }).click());
     await openDisplay(page);
     await expect(option(page)).toBeChecked();
     expect(await fullscreenTarget(page)).toBeNull();

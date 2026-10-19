@@ -1,4 +1,4 @@
-import { openProjectMenu } from './helpers/app';
+import { configureQSort, openProjectMenu } from './helpers/app';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import fs from 'node:fs/promises';
 import JSZip from 'jszip';
@@ -38,10 +38,11 @@ for (const [type, count] of [['Open sort', 60], ['Closed sort', 15], ['Q-Sort', 
     await page.reload();
     await expect(cards(page)).toHaveCount(count);
     await expect.poll(() => cards(page).locator('img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
+    if (type === 'Q-Sort') await configureQSort(page);
     await page.getByRole('button', { name: 'Start sorting' }).click();
     await expect(page.locator('.layout--sort')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exit full screen', exact: true })).toBeEnabled();
-    await expect(page.getByText('Instructions', { exact: true })).toBeVisible();
+    if (type !== 'Q-Sort') await expect(page.getByText('Instructions', { exact: true })).toBeVisible();
     await expect(page.locator('.detailsPanel')).toHaveCount(0);
   });
 }
@@ -103,6 +104,7 @@ test('completes the 24-image Q-Sort demo and exports its replay', async ({ page 
   await expect(page.getByTestId(previousCard)).toHaveCount(0);
   await expect(cards(page)).toHaveCount(24);
   const ids = await cards(page).evaluateAll(elements => elements.map(element => element.getAttribute('data-testid')!));
+  await configureQSort(page);
   await page.getByRole('button', { name: 'Start sorting' }).click();
   for (const [index, id] of ids.entries()) {
     await placeCard(page, id, page.locator('[data-testid^="surface-work-area-"]'), ids.length - index);
@@ -112,10 +114,13 @@ test('completes the 24-image Q-Sort demo and exports its replay', async ({ page 
   for (const [index, id] of ids.entries()) {
     await placeCard(page, id, page.locator('[data-testid^="qsort-lane-"]'), ids.length - index);
   }
-  await expect(page.getByRole('button', { name: 'Finish sorting' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Finish round' })).toBeEnabled();
   const counts = await page.locator('.widgetBucket__meta').allTextContents();
   expect(counts.map(value => value.replace(/\s/g, ''))).toEqual(['2/2','3/3','4/4','6/6','4/4','3/3','2/2']);
-  await page.getByRole('button', { name: 'Finish sorting' }).click();
+  await page.getByRole('button', { name: 'Finish round' }).click();
+  await page.getByRole('button', { name: 'Workspace', exact: true }).click();
+  await page.getByRole('button', { name: /Recordings \(/ }).click();
+  await page.getByTestId('replay-sessions').getByRole('button').first().click();
   await expect(page.getByText('49 recorded actions', { exact: true })).toBeVisible();
   await page.getByTestId('replay-timeline').focus();
   await page.keyboard.press('End');

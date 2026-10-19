@@ -1,4 +1,4 @@
-import { openProjectMenu } from './helpers/app';
+import { configureQSort, openProjectMenu } from './helpers/app';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import {
   cardFromTop,
@@ -328,6 +328,7 @@ test('@smoke moves all 24 cards through Q-Sort pre-sort and reaches the outer bu
   expect(cardTestIds).toHaveLength(24);
 
   await page.getByRole('button', { name: 'Q-Sort' }).click();
+  await configureQSort(page);
   await page.getByRole('button', { name: 'Start sorting' }).click();
   await expect(page.getByTestId('recording-status')).toBeVisible();
 
@@ -404,11 +405,11 @@ test('@smoke moves all 24 cards through Q-Sort pre-sort and reaches the outer bu
   await expect(page.locator('[data-testid^="qsort-lane-"]').nth(laneWithCards).locator('.boardSurface__count')).toHaveText(
     String(laneCounts[laneWithCards] - 1)
   );
-  await expect(page.getByText('Recording · 26 actions')).toBeVisible();
+  await expect(page.getByTestId('recording-status')).toHaveAttribute('title', 'Recording · 26 actions');
 
   const returnTray = page.locator('[data-testid^="qsort-lane-"]').nth(laneWithCards);
   await dragVisibleCardToTarget(page, exposedCard, returnTray);
   await expect(outerBucket.locator('.widgetBucket__meta')).toHaveText(`0 / ${outerCapacity}`);
   await expect(returnTray.locator('.boardSurface__count')).toHaveText(String(laneCounts[laneWithCards]));
-  await expect(page.getByText('Recording · 27 actions')).toBeVisible();
+  await expect(page.getByTestId('recording-status')).toHaveAttribute('title', 'Recording · 27 actions');
 });

@@ -1425,7 +1425,7 @@ export default function App() {
     ? { width: recordingSession.boardW, height: recordingSession.boardH }
     : boardViewport, [mode, recordingSession?.boardW, recordingSession?.boardH, boardViewport]);
 
-  const currentSurfaceLayoutVersion = mode === 'sort' ? recordingSession?.surfaceLayoutVersion || 1 : guidedStudy ? 4 : 3;
+  const currentSurfaceLayoutVersion = mode === 'sort' ? recordingSession?.surfaceLayoutVersion || 1 : sortConfig.type === 'qsort' ? 4 : 3;
 
   const reflowCardsForStage = React.useCallback(
     (nextCards: CardData[], nextWorkflow: SortWorkflowData, stageId: string, nextMode = modeRef.current, viewport = surfaceViewport, layoutVersion?: 1 | 2 | 3 | 4) => {
@@ -4419,30 +4419,24 @@ export default function App() {
           boardSize.height || 800,
           cardsRef.current.length
         );
+        const grid = nextWorkflow.widgets.find(widget => widget.kind === 'qsort')!;
+        if (grid.kind !== 'qsort') return;
+        nextWorkflow.stages = nextWorkflow.stages.filter(stage => stage.kind === 'qsort').map(stage => ({ ...stage, order: 0 }));
+        nextWorkflow.widgets = [grid];
+        grid.title = 'Q-Sort';
+        grid.lanes = [{ id: 'images', label: 'Cards to place' }];
         const stageId = getDefaultActiveStageId(nextWorkflow);
-        const source = stageId ? getSourceWidget(nextWorkflow, stageId) : null;
-        const seeded = source
-          ? seedStageAssignments(
-              cardsRef.current.map((card) => ({ ...card, stackId: undefined, stackOrder: undefined })),
-              stageId!,
-              source.id,
-              WIDGET_ZONE_CONTENT
-            )
-          : cardsRef.current.map((card) => ({ ...card, stackId: undefined, stackOrder: undefined }));
-        const nextCards = stageId ? reflowCardsForStage(seeded, nextWorkflow, stageId) : seeded;
-        const preSortWidget =
-          stageId
-            ? nextWorkflow.widgets.find(
-                (widget): widget is Extract<BoardWidgetData, { kind: 'pre-sort' }> =>
-                  widget.kind === 'pre-sort' && widget.stageId === stageId
-              )
-            : null;
+        const seeded = seedStageAssignments(
+          cardsRef.current.map(card => ({ ...card, stackId: undefined, stackOrder: undefined })),
+          stageId!, grid.id, 'images'
+        );
+        const nextCards = reflowCardsForStage(seeded, nextWorkflow, stageId!, 'setup', boardViewport, 4);
         commitBoardState(nextCards, []);
         setWorkflow(nextWorkflow);
         setActiveStageId(stageId);
         setSelectedStackId(null);
         setSelectedCardIds([]);
-        setSelectedWidgetId(preSortWidget?.id || null);
+        setSelectedWidgetId(null);
       } else {
         setWorkflow(createWorkflowForTemplate('open', boardSize.width || 1200, boardSize.height || 800, cardsRef.current.length));
         setActiveStageId(null);
@@ -5136,7 +5130,7 @@ export default function App() {
           ? 'Add at least one category before starting.'
           : 'Finish configuring this sort before starting.'
         : qSortSetupCapacity != null && (guidedStudy ? guidedStudy.scale.reduce((sum, s) => sum + s.capacity, 0) !== cards.length : qSortSetupCapacity < cards.length)
-          ? `The distribution has ${countLabel(qSortSetupCapacity, 'place')} for ${countLabel(cards.length, 'card')}. ${guidedStudy ? 'Open Edit Q-Sort design and fit the distribution.' : 'Open the Q-Sort stage and regenerate it before starting.'}`
+          ? `The distribution has ${countLabel(qSortSetupCapacity, 'place')} for ${countLabel(cards.length, 'card')}. Open the Q-Sort design editor and fit the distribution.`
           : closedSetupCapacity != null && closedSetupCapacity < cards.length
             ? `The categories have ${countLabel(closedSetupCapacity, 'place')} for ${countLabel(cards.length, 'card')}. Increase a capacity before starting.`
             : null;
@@ -5145,6 +5139,21 @@ export default function App() {
     isProjectHydrated &&
     !isProjectBusy &&
     !sortingSetupIssue;
+  const startPreparedSort = () => {
+    if (sortConfig.type !== 'qsort') { startSortingWorkflow(); return; }
+    // All live Q-Sorts use the task-based flow. Restore preparation before
+    // leaving a replay so its displayed positions never become the setup.
+    if (mode === 'end') {
+      returnToSetupFromReplay();
+      if (guidedStudy) setShowStudyWorkspace(false);
+      else setShowStudySetup(true);
+    } else if (!guidedStudy) setShowStudySetup(true);
+    else {
+      const next = studyRounds.findIndex(round => !round?.studyRound?.completedAt);
+      if (next < 0) setShowStudyWorkspace(false);
+      else void startStudyRound(next);
+    }
+  };
   const hasNextWorkflowStage =
     sortConfig.type === 'qsort' && activeWorkflowStageId ? !!getNextStageId(workflow, activeWorkflowStageId) : false;
   const isCurrentWorkflowStageComplete =
@@ -5316,15 +5325,12 @@ export default function App() {
           <button type="button" className={mode === 'end' ? 'isActive' : ''} aria-label={`Recordings (${sessions.length})`} aria-current={mode === 'end' ? 'page' : undefined} disabled={projectInteractionDisabled} onClick={() => { if (mode === 'setup') void openRecordings(); }}><History />Recordings<span className="navCount">{sessions.length}</span></button>
         </nav>
         <div className="appHeader__tools">
-          {guidedStudy ? <button className="btn btn--ghost" onClick={() => setShowStudyWorkspace(false)}>Guided study</button> : null}
+          {guidedStudy ? <button className="btn btn--ghost" onClick={() => setShowStudyWorkspace(false)}>Participant view</button> : null}
           {activeProject?.instructions ? <details className="projectInstructions"><summary aria-label="Instructions" title="Instructions"><BookOpen /><span className="toolbarLabel">Instructions</span></summary><p>{activeProject.instructions}</p></details> : null}
           <button className="btn btn--ghost btn--tiny" type="button" aria-label="Controls" title="Controls" onClick={() => setShowControls(true)}><HelpCircle /><span className="toolbarLabel">Controls</span></button>
           {mode === 'setup' ? <>
             <button className="btn btn--ghost btn--icon" type="button" aria-label="Undo" title="Undo" onClick={undoSetup} disabled={!canUndoSetup}><Undo2 /></button>
-            <button className="btn appHeader__start" type="button" onClick={() => {
-              if (!guidedStudy) startSortingWorkflow();
-              else { const next = studyRounds.findIndex(r => !r?.studyRound?.completedAt); if (next < 0) setShowStudyWorkspace(false); else void startStudyRound(next); }
-            }} disabled={!canStartSorting} aria-describedby={sortingSetupIssue ? 'sorting-setup-issue' : undefined}>Start sorting<ArrowRight /></button>
+            <button className="btn appHeader__start" type="button" onClick={startPreparedSort} disabled={!canStartSorting} aria-describedby={sortingSetupIssue ? 'sorting-setup-issue' : undefined}>Start sorting<ArrowRight /></button>
           </> : null}
         </div>
       </header> : null}
@@ -5495,9 +5501,9 @@ export default function App() {
                 </div>
               ) : null}
 
-              {sortConfig.type === 'qsort' && workflow.stages.length > 0 ? (
+              {sortConfig.type === 'qsort' && guidedStudy && workflow.stages.length > 1 ? (
                 <div className="columns">
-                  <div className="columns__label">Stage</div>
+                  <div className="columns__label">Preview</div>
                   <div className="segmented segmented--compact" role="group" aria-label="Setup stage">
                     {workflow.stages
                       .slice()
@@ -5632,7 +5638,7 @@ export default function App() {
             />
             {showSetupDetailsDrawer ? <>
               {isNarrowSetupLayout ? <button className="detailsDrawerBackdrop" type="button" tabIndex={-1} aria-label="Close details panel" onClick={() => setIsDetailsDrawerOpen(false)} /> : null}
-              <CardDetailsPanel context={detailsPanelContext} onEditQSortDesign={guidedStudy ? () => setShowStudySetup(true) : undefined} isDrawer={isNarrowSetupLayout} floating={!isNarrowSetupLayout} onClose={() => setIsDetailsDrawerOpen(false)} />
+              <CardDetailsPanel context={detailsPanelContext} onEditQSortDesign={sortConfig.type === 'qsort' ? () => setShowStudySetup(true) : undefined} isDrawer={isNarrowSetupLayout} floating={!isNarrowSetupLayout} onClose={() => setIsDetailsDrawerOpen(false)} />
             </> : null}
             {!isDetailsDrawerOpen && (selectedCardCount > 0 || selectedStackCount > 0 || selectedWidgetId) ? <button className="btn btn--ghost detailsOpenButton" onClick={() => setIsDetailsDrawerOpen(true)}><PanelRightOpen />Details</button> : null}
           </main>
@@ -5647,7 +5653,7 @@ export default function App() {
               </span>
               <span className="studyToolbarSpacer" />
               <button className="btn btn--ghost sortBar__icon" aria-label="Controls" title="Controls" onClick={() => setShowControls(true)}><HelpCircle /></button>
-              <span className="sortBar__recIndicator" data-testid="recording-status" role="status" aria-label="Recording sorting movements" title="Recording sorting movements"><span className="srOnly">Recording</span></span>
+              <span className="sortBar__recIndicator" data-testid="recording-status" role="status" aria-label="Recording sorting movements" title={`Recording · ${countLabel(sortMoveCount, 'action')}`}><span className="srOnly">Recording</span></span>
               <button className="btn btn--ghost sortBar__icon" aria-label={isSortFullscreen ? 'Exit full screen' : 'Full screen'} title={isSortFullscreen ? 'Exit full screen' : 'Full screen'} disabled={isProjectBusy || !fullscreen.supported} onClick={handleSortFullscreen}>{isSortFullscreen ? <Minimize /> : <Maximize />}</button>
               <span className="studyProgress" aria-label={`${studyPlacedCount} of ${cards.length} placed`} title={`${studyPlacedCount} of ${cards.length} placed`}>{studyPlacedCount}<span>/</span>{cards.length}</span>
               <button className="btn sortBar__finish" disabled={isProjectBusy || !canEndSorting} onClick={hasNextWorkflowStage ? handleAdvanceSortStage : () => void endSorting()}>{hasNextWorkflowStage ? 'Continue to Q-Sort' : 'Finish round'}<ArrowRight /></button>
@@ -5739,7 +5745,7 @@ export default function App() {
         <div className="layout layout--sort layout--replay">
           {guidedStudy && !showStudyWorkspace ? <p className="studyReplayHint" lang={guidedStudy.taskLanguage || 'en'}>{studyCopy(guidedStudy).replayHint}</p> : <div className="recordingsHeader">
             <div><strong>{replayRecording ? 'Recording' : 'Recordings'}</strong>{replayRecording ? <span className="hint">{countLabel(replayRecording.segments.length, 'recorded action')}{replayCameraChangeCount ? ` · ${countLabel(replayCameraChangeCount, 'view change')}` : ''}</span> : null}</div>
-            <button className="btn btn--ghost" type="button" disabled={!canStartSorting || isReplaying} onClick={startSortingWorkflow}><Plus />New sorting session</button>
+            <button className="btn btn--ghost" type="button" disabled={!canStartSorting || isReplaying} onClick={startPreparedSort}><Plus />New sorting session</button>
             <div className="recordingsHeader__save">
               <span className="hint" role="status" data-testid="project-status">{projectStatus || 'Saved in this browser.'}</span>
               <button className="btn btn--ghost" type="button" disabled={projectInteractionDisabled} onClick={handleExportProject}><Download />Export project</button>

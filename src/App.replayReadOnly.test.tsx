@@ -508,11 +508,35 @@ describe('App replay read-only behavior', () => {
     });
   });
 
+  it('opens the common design editor from an older Q-Sort replay without keeping replay positions', async () => {
+    const seeded = qRecording('2026-01-04T00:00:00.000Z');
+    await seedProject([seeded.recording]);
+    const initial = (await persistGetBoard(PROJECT_ID))!;
+    await persistPutBoard({ ...initial, sortConfig: { type: 'qsort' },
+      workflow: seeded.recording.workflowAtStart!, activeStageId: seeded.recording.activeStageIdAtStart,
+      cards: seeded.recording.cardsAtStart });
+    await renderAppReady();
+    await userEvent.click(screen.getByRole('button', { name: /Recordings \(/ }));
+    await screen.findByRole('button', { name: 'New sorting session' });
+    const preparation = (await persistGetBoard(PROJECT_ID))!.cards;
+    await userEvent.click(screen.getByTitle(seeded.recording.createdAt));
+    await userEvent.click(screen.getByRole('button', { name: 'New sorting session' }));
+    expect(await screen.findByRole('dialog', { name: 'Q-Sort design' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(async () => expect((await persistGetBoard(PROJECT_ID))!.cards).toEqual(preparation));
+    expect(await persistListSessions(PROJECT_ID)).toHaveLength(1);
+  });
+
   it('records Q-Sort from the real Pre-Sort stage even when the Q-Sort setup tab was open', async () => {
     await seedProject();
     await renderAppReady();
     await userEvent.click(screen.getByRole('button', { name: 'Q-Sort' }));
 
+    await userEvent.click(screen.getByRole('button', { name: 'Set up tasks and rounds' }));
+    fireEvent.change(screen.getByLabelText('Task for round 1'), { target: { value: 'Rank these cards.' } });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Pre-sort before each round' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save design' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const qStageTab = screen.getAllByRole('button', { name: 'Q-Sort' }).at(-1)!;
     await userEvent.click(qStageTab);
     await waitFor(() => expect(document.querySelector('[data-testid^="surface-qsort-"]')).toBeTruthy());

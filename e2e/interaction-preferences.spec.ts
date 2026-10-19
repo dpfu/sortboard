@@ -1,4 +1,4 @@
-import { openProjectMenu, openReplayView } from './helpers/app';
+import { configureQSort, openProjectMenu, openReplayView } from './helpers/app';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { cards, openFreshApp } from './helpers/app';
 
@@ -56,6 +56,7 @@ test('pans an overflowing blank board with a native Chromium touch gesture', asy
   test.skip(browserName !== 'chromium', 'Native touch dispatch is covered in Chromium.');
   await openFreshApp(page);
   await page.getByRole('button', { name: 'Q-Sort' }).click();
+  await configureQSort(page);
 
   const board = page.getByTestId('board-root');
   await expect.poll(() => board.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
@@ -91,6 +92,7 @@ test('pans an actual-size Q-Sort replay when the touch starts on a static card',
   await page.getByRole('button', { name: 'Text card', exact: true }).click();
   await expect(cards(page)).toHaveCount(1);
   await page.getByRole('button', { name: 'Q-Sort', exact: true }).click();
+  await configureQSort(page);
   await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
   await expect(page.getByTestId('recording-status')).toBeVisible();
 
@@ -101,10 +103,11 @@ test('pans an actual-size Q-Sort replay when the touch starts on a static card',
   await expect(nextStage).toBeEnabled();
   await nextStage.click();
   await card.focus();
-  const endSorting = page.getByRole('button', { name: 'Finish sorting', exact: true });
+  const endSorting = page.getByRole('button', { name: 'Finish round', exact: true });
   await moveFocusedCardUntil(page, endSorting);
   await expect(endSorting).toBeEnabled();
   await endSorting.click();
+  await page.getByRole('button', { name: /^Replay round 1(?: ·|$)/ }).click();
 
   const timeline = page.getByTestId('replay-timeline');
   await timeline.focus();

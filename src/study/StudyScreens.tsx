@@ -18,7 +18,7 @@ export function StudyScreens({ study, recordings, cards, busy, status, onStart, 
   const copy = studyCopy(study);
   const previousScores = previous && !finished ? studyScores(study, previous) : new Map<string, number>();
   return <div className="studyShell">
-    <header className="studyHeader"><span><PanelsTopLeft />SortBoard <span className="studyHeader__divider">/</span> Guided study</span>
+    <header className="studyHeader"><span><PanelsTopLeft />SortBoard <span className="studyHeader__divider">/</span> Q-Sort</span>
       <button className="btn btn--ghost btn--tiny" onClick={onWorkspace} disabled={busy}>Workspace</button></header>
     <main className={`studyPage${finished ? ' studyPage--comparison' : ''}`} lang={study.taskLanguage || 'en'} aria-busy={busy}>
       <p className="studyEyebrow">{finished ? copy.completed : next > 0 ? `Round ${next} of ${study.rounds.length} · ${copy.saved}` : copy.introduction}</p>

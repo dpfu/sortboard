@@ -12,16 +12,20 @@ export function StudySetupDialog({ study, projectName, instructions, workflow, c
   onSave: (study: StudyDefinition) => Promise<void>; onClose: () => void;
 }) {
   const dialog = React.useRef<HTMLDialogElement>(null);
+  const legacyPreSort = !study ? workflow.widgets.find(w => w.kind === 'pre-sort') : undefined;
+  const initialPreSort = study?.preSort || (legacyPreSort?.kind === 'pre-sort'
+    ? { labels: legacyPreSort.zones.map(zone => zone.label) as [string, string] } : undefined);
   const [draft, setDraft] = React.useState<StudyDefinition>(() => {
     if (study) return normalizeStudy(study)!;
     const widget = workflow.widgets.find(w => w.kind === 'qsort');
     const buckets = widget?.buckets || buildNormalDistributionBuckets(cardCount, 7);
     return { version: 1, id: nanoid(), title: projectName, introduction: '', reference: '', credits: '',
       anchors: { disagree: 'Disagree', undecided: 'Undecided', agree: 'Agree' },
+      ...(initialPreSort ? { preSort: initialPreSort } : {}),
       scale: buckets.map((b, i) => ({ value: Number.isFinite(Number(b.label)) ? Number(b.label) : i - Math.floor(buckets.length / 2), label: b.label, capacity: b.capacity })),
       rounds: [{ id: nanoid(), title: 'Round 1', prompt: instructions || '' }] };
   });
-  const [preSortLabels, setPreSortLabels] = React.useState<[string, string]>(study?.preSort?.labels || ['More', 'Less']);
+  const [preSortLabels, setPreSortLabels] = React.useState<[string, string]>(initialPreSort?.labels || ['More', 'Less']);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const anchors = studyCopy(draft).scale;

@@ -1,4 +1,4 @@
-import { openProjectMenu } from './helpers/app';
+import { configureQSort, openProjectMenu } from './helpers/app';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { cards, openFreshApp } from './helpers/app';
 
@@ -202,6 +202,7 @@ test.describe('keyboard card workflows', () => {
     await page.setViewportSize({ width: 900, height: 720 });
     const cardTestIds = await createTextCardProject(page, 4);
     await page.getByRole('button', { name: 'Q-Sort', exact: true }).click();
+    await configureQSort(page);
     await page.getByRole('button', { name: 'Start sorting', exact: true }).click();
 
     const source = page.locator('[data-testid^="surface-work-area-"]');
@@ -220,7 +221,7 @@ test.describe('keyboard card workflows', () => {
     const board = page.getByTestId('board-root');
     const lanes = page.locator('[data-testid^="qsort-lane-"]');
     const buckets = page.locator('[data-testid^="qsort-bucket-"]');
-    const endButton = page.getByRole('button', { name: 'Finish sorting', exact: true });
+    const endButton = page.getByRole('button', { name: 'Finish round', exact: true });
     await expect(lanes).toHaveCount(2);
     await expect.poll(() => surfaceCountSum(lanes)).toBe(4);
     await expect(endButton).toBeDisabled();
@@ -258,10 +259,11 @@ test.describe('keyboard card workflows', () => {
 
     const finalBucketLabels = await buckets.locator('.widgetBucket__meta').allTextContents();
     expect(finalBucketLabels.some((label) => /^[1-9]\d*\s*\/\s*[1-9]\d*$/.test(label.trim()))).toBe(true);
-    await expect(page.getByText('Recording · 9 actions', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('recording-status')).toBeVisible();
     await expect(endButton).toBeEnabled();
     await endButton.click();
-    await expect(page.getByText('9 recorded actions', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /^Replay round 1(?: ·|$)/ }).click();
+
 
     await seekReplayToEnd(page);
     await expect(lanes).toHaveCount(2);

@@ -44,6 +44,15 @@ export async function openFreshApp(page: Page) {
   await waitForAppReady(page);
 }
 
+export async function configureQSort(page: Page, preSort = true) {
+  await page.getByRole('button', { name: 'Set up tasks and rounds', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Q-Sort design', exact: true });
+  await editor.getByLabel('Task for round 1', { exact: true }).fill('Rank these cards by how strongly you agree.');
+  await editor.getByRole('checkbox', { name: 'Pre-sort before each round', exact: true }).setChecked(preSort);
+  await editor.getByRole('button', { name: 'Save design', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+}
+
 async function persistedBoardCardCount(page: Page) {
   return page.evaluate(async (dbName) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {

@@ -568,7 +568,8 @@ function buildQSortGridScene(
   return {
     ...scene,
     canvasW: Math.max(viewport.width, width + pad * 2),
-    canvasH: Math.max(viewport.height, distributionY + distributionRect.h + pad),
+    // Leave room to move the last row clear of the drag-scroll edge.
+    canvasH: Math.max(viewport.height, distributionY + distributionRect.h + (cleanStudy ? 96 : pad)),
     surfaces: [{ ...surface, layoutVersion, promptRect, x: pad, y: top, w: width,
       h: distributionY + distributionRect.h - top, leftColumnRect, distributionRect,
       baselineY: bucketY + bucketHeaderH, lanes, buckets }],
