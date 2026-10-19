@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createTestProject } from '../testFixtures/project';
 import { testStudy } from '../testFixtures/study';
-import { normalizeStudy, normalizeStudyRound, prepareStudyRound, studyRecordings, studyScores } from './model';
+import { normalizeStudy, normalizeStudyRound, prepareStudyRound, studyRecordings, studyScores, studyDistribution } from './model';
 import type { CardData, RecordingSession } from '../types';
 import { buildStageSurfaceScene, reflowCardsForStage, getQSortCardDisplayDimensions } from '../stageSurface';
 
@@ -85,5 +85,19 @@ describe('guided study data', () => {
     expect([...studyScores(testStudy, rec).values()]).toEqual(Array(12).fill(3));
     expect([...studyScores({ ...testStudy, scale: testStudy.scale.map(s => ({ ...s, value: s.value * 10 })) }, rec).values()]).toEqual(Array(12).fill(3));
     expect(studyRecordings(testStudy, [{ recording: rec }])).toEqual([rec, undefined]);
+  });
+  it('shows the recorded column order and scale in miniature distributions', () => {
+    const prepared = prepareStudyRound(testStudy, createTestProject().board.cards.slice(0, 12) as CardData[], 1280, 800);
+    const widget = prepared.workflow.widgets.find(w => w.kind === 'qsort')!;
+    const cards = prepared.cards.slice(0, 2).map((card, i) => ({ ...card, widgetAssignments: {
+      [widget.stageId]: { widgetId: widget.id, zoneId: 'score-3', order: 1 - i },
+    } }));
+    const recording = { version: 5, createdAt: new Date().toISOString(), cardsAtStart: cards, segments: [], workflowAtStart: prepared.workflow,
+      activeStageIdAtStart: prepared.activeStageId, studyRound: { ...testStudy.rounds[0], design: normalizeStudy(testStudy) } } as unknown as RecordingSession;
+    const before = JSON.stringify(recording);
+    const distribution = studyDistribution({ ...testStudy, scale: testStudy.scale.map(s => ({ ...s, label: 'Changed', value: 99 })) }, recording);
+    expect(distribution[3]).toEqual({ ...testStudy.scale[3], cardIds: [cards[1].id, cards[0].id] });
+    expect(distribution[0].cardIds).toEqual([]);
+    expect(JSON.stringify(recording)).toBe(before);
   });
 });

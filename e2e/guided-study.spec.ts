@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs/promises';
 import JSZip from 'jszip';
 import { testStudy, testStudyArchive } from '../src/testFixtures/study';
+import { studyScores } from '../src/study/model';
 import { dragMouseFromTo, resetAppState, openFreshApp } from './helpers/app';
 
 async function loadStudy(page: Page) {
@@ -137,7 +138,8 @@ test('authors three rounds with optional pre-sort and resumes the ranking stage 
     await page.getByRole('button', { name: 'Finish round', exact: true }).click();
     if (round < 2) await page.getByRole('button', { name: `Continue to round ${round + 2}`, exact: true }).click();
   }
-  await expect(page.locator('.studyComparison thead th')).toHaveCount(4);
+  await expect(page.locator('.studyCompareRound')).toHaveCount(3);
+  await expect(page.locator('.studyCompareTile.is-selected')).toHaveCount(3);
   const stored = await storedStudy(page);
   expect(stored.sessions).toHaveLength(3);
   expect(stored.sessions.every((s: any) => s.recording.studyRound.completedAt && s.recording.segments.some((seg: any) => seg.type === 'stage-transition'))).toBe(true);
@@ -164,7 +166,8 @@ test('creates a Q-Sort from blank with text cards and exports a restorable one-t
   await expect(page.getByRole('heading', { name: 'Rank these ideas by usefulness.', exact: true })).toBeVisible();
   await rankAll(page, false, 3);
   await page.getByRole('button', { name: 'Finish round', exact: true }).click();
-  await expect(page.locator('.studyImage .cardPreview__text')).toHaveCount(3);
+  await expect(page.locator('.studyComparePick .cardPreview__text')).toHaveCount(3);
+  await expect(page.locator('.studyCompare__hero .cardPreview__text')).toHaveCount(1);
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export study', exact: true }).click();
   const file = info.outputPath('single-task-text.sortboard.zip');
@@ -175,7 +178,7 @@ test('creates a Q-Sort from blank with text cards and exports a restorable one-t
   expect(recorded.studyRound.design.scale.map((s: any) => s.capacity)).toEqual([1, 1, 1]);
   await page.getByRole('button', { name: 'Workspace', exact: true }).click();
   await page.getByTestId('project-import-input').setInputFiles(file);
-  await expect(page.locator('.studyImage .cardPreview__text')).toHaveCount(3);
+  await expect(page.locator('.studyComparePick .cardPreview__text')).toHaveCount(3);
 });
 
 test('@smoke completes both guided rounds, preserves the first result, replays and exports a restorable study', async ({ page }, info) => {
@@ -212,6 +215,31 @@ test('@smoke completes both guided rounds, preserves the first result, replays a
   await page.getByRole('button', { name: 'Finish round', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Compare your two perspectives' })).toBeVisible();
   await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.locator('.studyComparePick')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Choose images', exact: true }).click();
+  const chooser = page.getByRole('dialog', { name: 'Choose images to discuss' });
+  await expect(chooser.getByRole('button', { name: 'Include image 05', exact: true })).toBeDisabled();
+  await chooser.getByRole('button', { name: 'Include image 01', exact: true }).click();
+  await chooser.getByRole('button', { name: 'Include image 05', exact: true }).click();
+  await chooser.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Choose images', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Compare image 05', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Compare image 05', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Compare image 01', exact: true })).toHaveCount(0);
+  const comparisonRecords = (await storedStudy(page)).sessions.map((s: any) => s.recording);
+  const selected = comparisonRecords[0].cardsAtStart.find((c: any) => c.meta.name === '05');
+  for (const [i, round] of testStudy.rounds.entries()) {
+    const recording = comparisonRecords.find((r: any) => r.studyRound.id === round.id);
+    const score = studyScores(testStudy, recording).get(selected.id)!;
+    const panel = page.locator('.studyCompareRound').nth(i);
+    await expect(panel.locator('.studyCompareTile.is-selected')).toHaveAttribute('data-card-id', selected.id);
+    await expect(panel.locator('.studyCompareRound__score')).toHaveText(score > 0 ? `+${score}` : String(score).replace('-', '−'));
+    await expect(panel.locator('.studyCompareRound__prompt')).toHaveText(round.prompt);
+  }
+  await page.getByRole('button', { name: 'Enlarge image 05', exact: true }).click();
+  await expect(page.getByTestId('image-preview-dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.screenshot({ path: info.outputPath('03-comparison.png'), fullPage: true });
   await page.getByRole('button', { name: /Replay round 1/ }).click();
   await expect(page.getByRole('button', { name: 'Play recording', exact: true })).toBeEnabled();
@@ -220,6 +248,21 @@ test('@smoke completes both guided rounds, preserves the first result, replays a
   await page.getByRole('button', { name: 'Play recording', exact: true }).click();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('button', { name: 'Back to study', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Compare image 05', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Compare image 01', exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Compare image 05', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Choose images', exact: true }).click();
+  await chooser.getByRole('button', { name: 'Include image 03', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(chooser).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Choose images', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Compare image 03', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Choose images', exact: true }).click();
+  await chooser.getByRole('button', { name: 'Include image 02', exact: true }).click();
+  await chooser.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.locator('.studyComparePick')).toHaveCount(3);
+  expect((await storedStudy(page)).sessions.map((s: any) => s.recording)).toEqual(comparisonRecords);
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export study', exact: true }).click();
   const download = await downloading; const file = info.outputPath('completed-study.sortboard.zip'); await download.saveAs(file);
@@ -366,6 +409,13 @@ test('@smoke runs the German seminar study after one project import through comp
   await rankAll(page, true);
   await page.getByRole('button', { name: 'Finish round', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Zwei Perspektiven vergleichen', exact: true })).toBeVisible();
+  await expect(page.locator('.studyCompareRound')).toHaveCount(2);
+  for (const round of await page.locator('.studyCompareRound').all()) {
+    await expect(round.locator('.studyCompareTile')).toHaveCount(12);
+    await expect(round.locator('.studyCompareTile img')).toHaveCount(12);
+    await expect(round.locator('.studyCompareTile.is-selected')).toHaveCount(1);
+  }
+  await page.getByRole('button', { name: 'Compare image 03', exact: true }).click();
   await page.getByRole('button', { name: /Replay round 1/ }).click();
   await expect(page.locator('.studyReplayHint')).toContainText('nach den Gründen fragen');
   await expect(page.getByRole('button', { name: 'New sorting session', exact: true })).toHaveCount(0);
@@ -373,6 +423,7 @@ test('@smoke runs the German seminar study after one project import through comp
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('button', { name: 'Back to study', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Zwei Perspektiven vergleichen', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Compare image 03', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('textbox')).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Zwei Perspektiven vergleichen', exact: true })).toBeVisible();

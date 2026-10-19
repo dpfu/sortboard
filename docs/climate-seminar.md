@@ -13,7 +13,7 @@ Open **https://dpfu.github.io/sortboard/?study=climate-images** on the seminar c
 1. **Importance:** “Dieses Bild gibt mir das Gefühl, dass der Klimawandel wichtig ist.” Place all twelve images, then select **Finish round**. Discuss the extremes and difficult decisions. Use **Replay round 1** beside the result to revisit a moment before continuing.
 2. Select **Continue to round 2**. The same images are reshuffled on an empty grid. The first result and its recording remain saved.
 3. **Ability to act:** “Dieses Bild gibt mir das Gefühl, dass ich etwas gegen den Klimawandel tun kann.” Complete and discuss this sort too.
-4. Compare the scores and changes for each image. Discuss the reasons for changed positions. These are descriptive placements, not Q-method factors or an effect estimate.
+4. Use **Choose images** to select up to four images to discuss. Select a thumbnail to see the image enlarged beside both distributions; its position is highlighted in each. Both task statements remain visible. **Discussion prompts** opens the comparison questions. These are descriptive placements, not Q-method factors or an effect estimate.
 5. Use **Replay round 1 / 2** to revisit a hesitation or revision. **Play recording**, **Pause**, and the timeline control playback; **Back to study** returns to the discussion or final comparison.
 6. Select **Export study**, check the downloaded ZIP, and hand it to the instructor using the course's agreed channel. The archive contains both recordings, task statements, images, image credits and `results.csv`. Importing it restores the study in SortBoard.
 

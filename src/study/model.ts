@@ -104,19 +104,22 @@ export function prepareStudyRound(study: StudyDefinition, cards: CardData[], wid
   })) };
 }
 
-export function studyScores(study: StudyDefinition, recording: RecordingSession): Map<string, number> {
+export function studyDistribution(study: StudyDefinition, recording: RecordingSession) {
   const scale = recording.studyRound?.design?.scale || study.scale;
   const index = buildReplayIndex(recording);
   const final = replayCardsAt(recording, index, Math.max(1, index.durationMs + 1));
   const widget = recording.workflowAtStart.widgets.find(w => w.kind === 'qsort');
-  const scores = new Map<string, number>();
-  if (widget?.kind !== 'qsort') return scores;
-  for (const card of final) {
-    const assignment = card.widgetAssignments?.[widget.stageId];
-    const position = widget.buckets.findIndex(b => b.id === assignment?.zoneId && assignment?.widgetId === widget.id);
-    if (position >= 0 && scale[position]) scores.set(card.id, scale[position].value);
-  }
-  return scores;
+  return scale.map((position, i) => ({ ...position, cardIds: widget?.kind === 'qsort' ? final
+    .filter(card => {
+      const assignment = card.widgetAssignments?.[widget.stageId];
+      return assignment?.widgetId === widget.id && assignment.zoneId === widget.buckets[i]?.id;
+    })
+    .sort((a, b) => (a.widgetAssignments?.[widget.stageId]?.order ?? 0) - (b.widgetAssignments?.[widget.stageId]?.order ?? 0))
+    .map(card => card.id) : [] }));
+}
+
+export function studyScores(study: StudyDefinition, recording: RecordingSession): Map<string, number> {
+  return new Map(studyDistribution(study, recording).flatMap(position => position.cardIds.map(id => [id, position.value] as const)));
 }
 
 export function studyResultsCsv(study: StudyDefinition, recordings: RecordingSession[]) {

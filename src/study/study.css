@@ -30,19 +30,78 @@
 .studyResultImage img { width: 100%; height: 58px; object-fit: contain; display: block; }
 .studyResultImage .cardPreview { height: 58px; }
 .studyResultImage span { font-size: 11px; }
-.studyComparison { overflow: auto; margin: 28px 0; }
-.studyComparison table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d5dfd7; }
-.studyComparison caption { text-align: left; font-weight: 650; margin-bottom: 12px; }
-.studyComparison td, .studyComparison th { padding: 12px; border-bottom: 1px solid #e1e8e3; text-align: center; }
-.studyComparison thead th { font-size: 13px; background: #eaf0eb; }
-.studyDifference { color: #466450; font-weight: 650; font-variant-numeric: tabular-nums; }
 .studyExported { padding: 14px; background: #eaf0eb; border-radius: 8px; }
 .studyExported svg { width: 18px; height: 18px; margin-right: 8px; vertical-align: middle; }
 .studyReplayHint { padding: 10px 24px; margin: 0; font-size: 13px; line-height: 1.5; background: #eaf0eb; }
-.studyImage { display: inline-flex; align-items: center; gap: 14px; padding: 0; background: none; border: 0; cursor: zoom-in; color: inherit; font: inherit; }
-.studyImage img { width: 100px; height: 68px; object-fit: contain; border-radius: 5px; }
-.studyImage .cardPreview { width: 100px; height: 68px; border-radius: 5px; }
-.studyImage .cardPreview__text, .studyResultImage .cardPreview__text { font-size: 11px; padding: 6px; }
+.studyResultImage .cardPreview__text { font-size: 11px; padding: 6px; }
+.studyPage--comparison { max-width: 1200px; padding-top: 16px; }
+.studyPage--comparison > .studyEyebrow { margin: 0; }
+.studyPage--comparison > h1 { font-size: clamp(28px, 3vw, 32px); margin: 8px 0 16px; }
+.studyCompare__stage { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.12fr); gap: 24px; }
+.studyCompare__focus { margin: 0; min-width: 0; display: flex; flex-direction: column; }
+.studyCompare__hero { position: relative; flex: 1; min-height: 340px; padding: 0; border: 0; border-radius: 12px; background: var(--panel-bg); cursor: zoom-in; }
+.studyCompare__hero > .cardPreview { position: absolute; inset: 18px; width: calc(100% - 36px); height: calc(100% - 36px); }
+.studyCompare__hero .cardPreview__img { object-fit: contain; }
+.studyCompare__focus figcaption { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 2px 0; font-size: 14px; }
+.studyCompare__focus figcaption strong { overflow-wrap: anywhere; }
+.studyCompare__movement { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+.studyCompare__rounds { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.studyCompareRound { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-bg); }
+.studyCompareRound header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.studyCompareRound header > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.studyCompareRound__number { display: block; color: var(--muted); font-size: 11px; }
+.studyCompareRound h3 { margin: 2px 0 0; font-size: 14px; font-weight: 600; }
+.studyCompareRound__score { flex-shrink: 0; padding: 4px 8px; min-width: 36px; text-align: center; border-radius: 6px; background: var(--accent-soft); font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.studyCompareRound .studyCompareRound__prompt { margin: 6px 0 10px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.studyCompareRound__scroll { overflow-x: auto; padding: 2px; }
+.studyCompareGrid { display: grid; gap: 5px; }
+.studyCompareColumn { min-width: 0; padding: 6px 3px; border-radius: 6px; background: var(--bg); }
+.studyCompareColumn.is-selected { background: var(--accent-soft); }
+.studyCompareColumn__label { display: block; margin-bottom: 6px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.studyCompareColumn.is-selected .studyCompareColumn__label { font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.studyCompareTile { height: 24px; padding: 2px; margin-bottom: 4px; border-radius: 4px; background: var(--panel-bg); }
+.studyCompareTile:last-child { margin-bottom: 0; }
+.studyCompareTile > .cardPreview { opacity: .35; }
+.studyCompareTile.is-selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+.studyCompareTile.is-selected > .cardPreview { opacity: 1; }
+.studyCompareTile .cardPreview__img { object-fit: contain; }
+.studyCompareTile .cardPreview__text { padding: 2px; font-size: 11px; }
+.studyCompareTile .cardPreview__videoMeta, .studyComparePick .cardPreview__videoMeta { display: none; }
+.studyCompare__selectionHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 16px 0 8px; }
+.studyCompare__selectionHeading > span { font-size: 12px; color: var(--muted); }
+.studyCompare__picks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.studyComparePick { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-bg); color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.studyComparePick[aria-pressed=true] { border-color: var(--accent); background: var(--accent-soft); }
+.studyComparePick > .cardPreview { width: 45px; height: 46px; flex-shrink: 0; border-radius: 4px; }
+.studyComparePick .cardPreview__text { font-size: 11px; padding: 3px; }
+.studyComparePick > span { display: flex; flex-direction: column; min-width: 0; gap: 4px; font-size: 12px; overflow-wrap: anywhere; }
+.studyComparePick > span > span { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.studyComparisonQuestions { margin-top: 24px; font-size: 13px; }
+.studyComparisonQuestions summary { cursor: pointer; font-weight: 600; }
+.studyCompareChooser { width: min(720px, calc(100vw - 36px)); padding: 0; max-height: calc(100vh - 48px); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; background: var(--panel-bg); box-shadow: var(--shadow-lift); }
+.studyCompareChooser::backdrop { background: #142d224d; }
+.studyCompareChooser header, .studyCompareChooser footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; }
+.studyCompareChooser h2 { margin: 0; font-size: 18px; }
+.studyCompareChooser footer { border-top: 1px solid var(--line); font-size: 13px; }
+.studyCompareChooser__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; padding: 4px 20px 20px; max-height: 55vh; overflow-y: auto; }
+.studyCompareChoice { min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font: inherit; color: inherit; cursor: pointer; }
+.studyCompareChoice[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
+.studyCompareChoice:disabled { opacity: .5; cursor: default; }
+.studyCompareChoice > .cardPreview { height: 90px; }
+.studyCompareChoice > span { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.studyCompareChoice svg { width: 14px; height: 14px; flex-shrink: 0; }
+@media (max-width: 800px) {
+  .studyCompare__stage { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .studyCompare__hero { height: 330px; min-height: 0; flex: none; }
+  .studyCompare__picks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .studyCompareRound { padding: 10px; }
+  .studyCompareGrid { gap: 3px; }
+  .studyCompareColumn { padding: 5px 2px; }
+  .studyComparePick { padding: 7px; gap: 6px; }
+  .studyComparePick > .cardPreview { width: 32px; }
+}
 .sortBar--study .studySortPrompt { min-width: 0; display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; }
 .studySortPrompt small { font-size: 11px; color: #5e7565; }
 .studySortPrompt strong { font-size: clamp(14px, 1.4vw, 19px); line-height: 1.35; }
