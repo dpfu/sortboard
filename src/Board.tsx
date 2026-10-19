@@ -915,7 +915,7 @@ export function Board({
               >
                 <div className="boardQSort__distributionHeader">
                   <div>
-                    <div className="boardQSort__distributionTitle">Rank the cards</div>
+                    <div className="boardQSort__distributionTitle">{surface.lanes.length === 1 ? 'Strongly disagree ← Your agreement → Strongly agree' : 'Rank the cards'}</div>
                     {surface.layoutVersion !== 3 ? <div className="boardQSort__distributionHelp">
                       Drag from either tray into an empty slot.
                     </div> : null}

@@ -1,0 +1,43 @@
+.studyShell { height: 100%; overflow: auto; background: #f4f7f4; color: #24372c; }
+.studyHeader { height: 64px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #d9e2db; background: #fff; }
+.studyHeader > span { display: flex; align-items: center; gap: 10px; font-weight: 650; }
+.studyHeader svg { width: 19px; height: 19px; }
+.studyHeader__divider { color: #a7b3aa; font-weight: 400; margin: 0 4px; }
+.studyPage { max-width: 900px; margin: 0 auto; padding: 48px 36px 64px; }
+.studyEyebrow { font-size: 12px; font-weight: 650; color: #52735e; letter-spacing: .065em; text-transform: uppercase; }
+.studyPage h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 12px 0 24px; letter-spacing: -.025em; }
+.studyPage h2 { font-size: 22px; line-height: 1.45; margin: 12px 0; }
+.studyPage p { line-height: 1.65; }
+.studyIntro { font-size: 18px; }
+.studySteps { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 18px 0; color: #466450; font-size: 13px; }
+.studyNext, .studyReflection { padding: 26px; border: 1px solid #d3dfd5; border-radius: 16px; background: #fff; margin: 24px 0; }
+.studyPrimary { background: #315d46; color: white; padding: 13px 20px; margin-top: 12px; }
+.studyReflection > p:first-child { display: flex; align-items: center; gap: 8px; color: #456d53; font-size: 13px; }
+.studyReflection label { display: block; font-size: 13px; font-weight: 600; margin-top: 20px; }
+.studyReflection textarea { width: 100%; box-sizing: border-box; margin: 8px 0; padding: 12px; border: 1px solid #cbd8cd; border-radius: 8px; font: inherit; resize: vertical; }
+.studyCredits { margin-top: 32px; color: #53695a; font-size: 12px; }
+.studyCredits summary { cursor: pointer; }
+.studyCreditText { white-space: pre-wrap; overflow-wrap: anywhere; }
+.studyResultsActions { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+.studyResultsActions .studyPrimary { margin-top: 0; }
+.studyRoundResult { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 22px 0 30px; }
+.studyRoundResult > div { background: #f2f5f2; padding: 8px 4px; border-radius: 6px; text-align: center; }
+.studyRoundResult strong { display: block; font-size: 12px; margin-bottom: 10px; }
+.studyResultImage { display: block; padding: 5px; width: 100%; border: 0; background: white; margin: 5px 0; border-radius: 4px; cursor: zoom-in; color: inherit; }
+.studyResultImage img { width: 100%; height: 58px; object-fit: contain; display: block; }
+.studyResultImage span { font-size: 11px; }
+.studyComparison { overflow: auto; margin: 28px 0; }
+.studyComparison table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d5dfd7; }
+.studyComparison caption { text-align: left; font-weight: 650; margin-bottom: 12px; }
+.studyComparison td, .studyComparison th { padding: 12px; border-bottom: 1px solid #e1e8e3; text-align: center; }
+.studyComparison thead th { font-size: 13px; background: #eaf0eb; }
+.studyImage { display: inline-flex; align-items: center; gap: 14px; padding: 0; background: none; border: 0; cursor: zoom-in; color: inherit; font: inherit; }
+.studyImage img { width: 100px; height: 68px; object-fit: contain; border-radius: 5px; }
+.sortBar--study .studySortPrompt { min-width: 0; display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; }
+.studySortPrompt small { font-size: 11px; color: #5e7565; }
+.studySortPrompt strong { font-size: clamp(14px, 1.4vw, 19px); line-height: 1.35; }
+.sortBar.sortBar--study { display: flex; min-height: 82px; gap: 18px; align-items: center; padding: 12px 24px; box-sizing: border-box; }
+.studyScaleAnchors { display: flex; justify-content: space-between; font-size: 12px; color: #42614d; gap: 16px; padding: 8px 0; }
+.studyStatus { font-size: 13px; color: #496a54; }
+.studyStatus[role=alert] { color: #9b2f32; }
+@media (max-width: 720px) { .studyPage { padding: 28px 18px; } .studyHeader { padding: 0 18px; } .sortBar--study { flex-wrap: wrap; padding: 10px 16px; } .studySortPrompt { flex-basis: 70%; } }

@@ -1,6 +1,9 @@
 import { ProjectMenu } from './ProjectMenu';
 import { ControlsDialog } from './ControlsDialog';
 import { WelcomeDialog } from './WelcomeDialog';
+import { StudyScreens } from './study/StudyScreens';
+import { prepareStudyRound, studyRecordings, journalStudyRecording, readStudyJournal, clearStudyJournal } from './study/model';
+import { persistStudyRoundStart, persistCreateStudyParticipant } from './persist';
 import { buildStackBadges, stackFrame, stackFrameAt } from './stackRecording';
 import * as React from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCheck, CircleAlert, Download, FilePlus2, FolderOpen, HelpCircle, History, ImagePlus, LayoutDashboard, Maximize, Minimize, Minus, PanelRightOpen, PanelsTopLeft, Pause, Pencil, Play, Plus, Scan, Settings2, SkipBack, SkipForward, Trash2, Type, Undo2, Upload, X } from 'lucide-react';
@@ -600,8 +603,10 @@ export default function App() {
   const [projectStatus, setProjectStatus] = React.useState<string>('');
   const [isProjectBusy, setIsProjectBusy] = React.useState(false);
   const [isFirstVisit, setIsFirstVisit] = React.useState(false);
+  const [projectBootstrapped, setProjectBootstrapped] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showDemoProjects, setShowDemoProjects] = React.useState(false);
+  const [showStudyWorkspace, setShowStudyWorkspace] = React.useState(false);
   const setupUndoPastByProjectRef = React.useRef<Map<string, SetupSnapshotV1[]>>(new Map());
   const [setupUndoPast, setSetupUndoPast] = React.useState<SetupSnapshotV1[]>([]);
   const [selectedCardIds, setSelectedCardIds] = React.useState<string[]>([]);
@@ -619,6 +624,8 @@ export default function App() {
     () => projects.find((p) => p.id === activeProjectId) || null,
     [activeProjectId, projects]
   );
+  const guidedStudy = !showStudyWorkspace ? activeProject?.study : undefined;
+  React.useEffect(() => setShowStudyWorkspace(false), [activeProjectId]);
   const selectedCards = React.useMemo(() => {
     if (selectedCardIds.length === 0) return [] as CardData[];
     const byId = new Map(cards.map((card) => [card.id, card]));
@@ -1219,6 +1226,7 @@ export default function App() {
           }
           completedSessionSaveRevisionRef.current.set(snapshot.id, Math.max(completedRevision, revision));
           acknowledgeCameraTrack(authoritative.boardId, authoritative.recording);
+          clearStudyJournal(authoritative.boardId, authoritative.recording);
           await persistTouchProject(authoritative.boardId, authoritative.updatedAt);
           if (discardedSessionIdsRef.current.has(snapshot.id)) return;
           if (latestSessionSaveRevisionRef.current.get(snapshot.id) !== revision) return;
@@ -1275,6 +1283,12 @@ export default function App() {
     },
     [boardId, cancelPendingCameraSave, isProjectHydrated, isRecording, mode, persistSessionSnapshot, recordingSession]
   );
+
+  React.useLayoutEffect(() => {
+    if (boardId && mode === 'sort' && isRecording && recordingSession?.studyRound) {
+      journalStudyRecording(boardId, sanitizeRecording(recordingSession));
+    }
+  }, [boardId, mode, isRecording, recordingSession]);
 
   const flushCurrentRecordingSession = React.useCallback(
     async (label: string) => {
@@ -1565,6 +1579,7 @@ export default function App() {
 
       if (!cancelled) {
         setProjects(listed);
+        setProjectBootstrapped(true);
         activateProject(active);
         if (firstVisit) setIsFirstVisit(true);
       }
@@ -1611,6 +1626,17 @@ export default function App() {
       ]);
       if (cancelled) return;
 
+      const studyTail = readStudyJournal(boardId);
+      if (studyTail) {
+        const saved = persistedSessions.find(s => s.id === studyTail.createdAt);
+        if (saved && !saved.recording.studyRound?.completedAt && studyTail.segments.length >= saved.recording.segments.length) {
+          const recovered = { ...saved, recording: studyTail, updatedAt: Date.now() };
+          if (await runSafePersistence('recover study progress', () => persistPutSession(recovered))) {
+            saved.recording = studyTail;
+            clearStudyJournal(boardId, studyTail);
+          }
+        } else if (saved?.recording.studyRound?.completedAt) clearStudyJournal(boardId);
+      }
       for (const session of persistedSessions) {
         const recovered = recoverCameraTrack(boardId, session.recording);
         if (recovered !== session.recording) {
@@ -2192,6 +2218,33 @@ export default function App() {
     finishInFlightRef.current = true;
     setIsProjectBusy(true);
     try {
+      if (guidedStudy && recordingSession?.studyRound && boardId) {
+        const completed = { ...sanitizeRecording(recordingSession), studyRound: {
+          ...recordingSession.studyRound, completedAt: new Date().toISOString(),
+        } };
+        cancelPendingCameraSave();
+        if (!(await persistSessionSnapshot({ version: 1, id: completed.createdAt, boardId,
+          updatedAt: Date.now(), recording: completed }, 'save completed study round'))) {
+          setProjectStatus('Could not save this round. Keep this tab open and try Finish round again.');
+          return;
+        }
+        clearStudyJournal(boardId);
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        stopSampler();
+        stopReplayImmediate();
+        setRecordingSession(completed);
+        if (sessionSetupSnapshotRef.current) {
+          const setup = sessionSetupSnapshotRef.current;
+          commitBoardState(setup.cards.map(c => ({ ...c })), []);
+          setWorkflow(setup.workflow);
+          setActiveStageId(setup.activeStageId);
+        }
+        await fullscreen.exit(appFullscreenRef.current);
+        setMode('setup');
+        setProjectStatus('Round saved in this browser.');
+        return;
+      }
       if (!(await flushCurrentRecordingSession('save finished recording'))) {
         setProjectStatus('Could not save the recording. Please try finishing again.');
         return;
@@ -2213,7 +2266,7 @@ export default function App() {
       finishInFlightRef.current = false;
       setIsProjectBusy(false);
     }
-  }, [flushCurrentRecordingSession, fullscreen.exit, recordingSession, showReplaySession, stopReplay, stopSampler]);
+  }, [guidedStudy, boardId, cancelPendingCameraSave, persistSessionSnapshot, commitBoardState, stopReplayImmediate, flushCurrentRecordingSession, fullscreen.exit, recordingSession, showReplaySession, stopReplay, stopSampler]);
 
   const returnToSetupFromReplay = React.useCallback(() => {
     stopReplayImmediate();
@@ -2327,7 +2380,7 @@ export default function App() {
     } finally { setIsProjectBusy(false); }
   }, [activeProjectId, activeStageId, cards, flushCurrentBoardSnapshot, isProjectBusy, mode, selectSession, sessions, stacks, stopReplayImmediate, workflow]);
 
-  const addTextCard = React.useCallback(() => {
+  const addTextCard = React.useCallback(async () => {
     if (mode !== 'setup' || !activeProjectId) return;
     pushSetupUndoSnapshotIfNeeded(activeProjectId);
     zTop.current += 1;
@@ -2363,8 +2416,11 @@ export default function App() {
       }
       setSelectedWidgetId(seedSource.widget.id);
     }
-    commitBoardState(nextCards, stacksRef.current);
-  }, [activeProjectId, commitBoardState, mode, pushSetupUndoSnapshotIfNeeded, reflowCardsForStage, sortConfig.type]);
+    const snapshot = buildImmediateBoardSnapshot();
+    if (!snapshot || !(await persistBoardSnapshot({ ...snapshot, cards: toPersistedCards(nextCards),
+      activeStageId: seedSource?.stageId || snapshot.activeStageId, updatedAt: Date.now() }, 'save new text card', true))) return;
+    if (activeProjectIdRef.current === activeProjectId) commitBoardState(nextCards, stacksRef.current);
+  }, [activeProjectId, buildImmediateBoardSnapshot, persistBoardSnapshot, commitBoardState, mode, pushSetupUndoSnapshotIfNeeded, reflowCardsForStage, sortConfig.type]);
 
   const addLocalMedia = React.useCallback((files: File[]) => {
     if (modeRef.current !== 'setup') return;
@@ -2819,6 +2875,144 @@ export default function App() {
   const handleImportProjectFile = React.useCallback((file: File) => {
     void importProjectArchive(file).catch(() => { /* The project status contains the error. */ });
   }, [importProjectArchive]);
+
+  const studyRounds = guidedStudy ? studyRecordings(guidedStudy, sessions) : [];
+  const studyActionRef = React.useRef(false);
+  const startStudyRound = async (roundIndex: number) => {
+    if (!guidedStudy || !boardId || studyActionRef.current || isProjectBusy) return;
+    studyActionRef.current = true;
+    setIsProjectBusy(true);
+    try {
+      if (startInFullscreen) await fullscreen.enter(appFullscreenRef.current);
+      if (!(await flushCurrentBoardSnapshot('save before study round', boardId))) {
+        setProjectStatus('Could not save the latest changes. Please try starting the round again.');
+        return;
+      }
+      const saved = studyRounds[roundIndex];
+      let nextCards: CardData[];
+      let nextWorkflow: SortWorkflowData;
+      let stageId: string;
+      let session: RecordingSession;
+      let offset = 0;
+      if (saved && !saved.studyRound?.completedAt) {
+        const hydrated = await hydrateCardsFromPersisted(saved.cardsAtStart);
+        session = { ...saved, cardsAtStart: hydrated };
+        const index = buildReplayIndex(session);
+        offset = Math.max(1, index.durationMs + 1);
+        nextCards = replayCardsAt(session, index, offset);
+        nextWorkflow = session.workflowAtStart;
+        stageId = session.activeStageIdAtStart!;
+      } else {
+        const viewport = currentBrowserViewport();
+        const prepared = prepareStudyRound(guidedStudy, cardsRef.current, viewport.width, viewport.height);
+        stageId = prepared.activeStageId;
+        nextWorkflow = prepared.workflow;
+        nextCards = reflowCardsForStage(prepared.cards, nextWorkflow, stageId, 'sort', viewport);
+        session = createFreshSortingSession(nextCards, nextWorkflow, stageId, []).session;
+        session.studyRound = { ...guidedStudy.rounds[roundIndex] };
+        const snapshot = buildImmediateBoardSnapshot();
+        if (!snapshot) throw new Error('The study has not finished loading.');
+        await persistStudyRoundStart({ ...snapshot, cards: toPersistedCards(nextCards), stacks: [],
+          workflow: toPersistedWorkflow(nextWorkflow), activeStageId: stageId,
+          activeSessionId: session.createdAt, updatedAt: Date.now() }, sanitizeRecording(session));
+      }
+      stopReplayImmediate();
+      stopSampler();
+      sessionSetupSnapshotRef.current = { cards: session.cardsAtStart.map(c => ({ ...c })), stacks: [],
+        workflow: nextWorkflow, activeStageId: stageId };
+      commitBoardState(nextCards, []);
+      setWorkflow(nextWorkflow);
+      setActiveStageId(stageId);
+      setRecordingSession(session);
+      setSessions(previous => [{ id: session.createdAt, updatedAt: Date.now(), recording: sanitizeRecording(session) },
+        ...previous.filter(s => s.id !== session.createdAt)]);
+      recordingRef.current.startPerf = performance.now() - offset;
+      recordingRef.current.lastSampleMs = -1;
+      recordingRef.current.activeSeg = null;
+      const camera = cameraAt(session.cameraTrack, offset, defaultCameraView(session.boardW, session.boardH));
+      lastSortCameraRef.current = camera;
+      setSortViewScale(camera.scale);
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setSelectedCardIds([]);
+      setSelectedWidgetId(null);
+      setProjectStatus('Saved in this browser.');
+      setMode('sort');
+    } catch (error) {
+      setProjectStatus(`Could not start the round: ${error instanceof Error ? error.message : 'Please try again.'}`);
+    } finally { studyActionRef.current = false; setIsProjectBusy(false); }
+  };
+  const pauseStudyRound = async () => {
+    if (isProjectBusy) return;
+    setIsProjectBusy(true);
+    try {
+      if (!(await flushCurrentRecordingSession('pause study round'))) {
+        setProjectStatus('Could not save your progress. Keep this tab open and try Pause again.');
+        return;
+      }
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      stopSampler();
+      if (sessionSetupSnapshotRef.current) {
+        const setup = sessionSetupSnapshotRef.current;
+        commitBoardState(setup.cards.map(c => ({ ...c })), []);
+        setWorkflow(setup.workflow);
+        setActiveStageId(setup.activeStageId);
+      }
+      await fullscreen.exit(appFullscreenRef.current);
+      setMode('setup');
+      setProjectStatus('Your progress is saved. Resume whenever you are ready.');
+    } finally { setIsProjectBusy(false); }
+  };
+  const saveStudyNotes = async (recording: RecordingSession, notes: string) => {
+    if (!boardId || !recording.studyRound) return false;
+    const saved = await persistSessionSnapshot({ version: 1, id: recording.createdAt, boardId, updatedAt: Date.now(),
+      recording: sanitizeRecording({ ...recording, studyRound: { ...recording.studyRound, reflection: notes } }) }, 'save discussion notes');
+    setProjectStatus(saved ? 'Discussion notes saved.' : 'Could not save the discussion notes. Please try again.');
+    return saved;
+  };
+  const newStudyParticipant = async () => {
+    if (!activeProject?.study || !boardId || isProjectBusy) return;
+    setIsProjectBusy(true);
+    try {
+      if (!(await flushCurrentBoardSnapshot('save before new participant', boardId))) return;
+      const snapshot = buildImmediateBoardSnapshot();
+      if (!snapshot) throw new Error('The study has not finished loading.');
+      const id = nanoid();
+      const now = Date.now();
+      const project = { ...activeProject, id, name: `${activeProject.study.title} · ${new Date(now).toLocaleString('en-GB')}`,
+        createdAt: now, updatedAt: now };
+      const prepared = prepareStudyRound(project.study!, cardsRef.current, 1200, 800);
+      await persistCreateStudyParticipant(project, { ...snapshot, id, updatedAt: now, activeSessionId: undefined,
+        cards: toPersistedCards(prepared.cards), stacks: [], workflow: prepared.workflow, activeStageId: prepared.activeStageId });
+      await refreshProjects();
+      activateProject(id);
+      setProjectStatus('Ready for a new participant.');
+      setMode('setup');
+    } catch (error) { setProjectStatus(`Could not prepare a new participant: ${String(error)}`); }
+    finally { setIsProjectBusy(false); }
+  };
+  const studyLinkHandled = React.useRef(false);
+  React.useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('study');
+    if (!projectBootstrapped || isProjectBusy || studyLinkHandled.current || !slug || !/^[a-z0-9-]+$/.test(slug)) return;
+    studyLinkHandled.current = true;
+    const existing = projects.find(p => p.id === activeProjectId && p.study?.id === slug) || projects.find(p => p.study?.id === slug);
+    if (existing) {
+      void persistSetActiveProjectId(existing.id);
+      activateProject(existing.id);
+      setIsFirstVisit(false);
+    } else {
+      void (async () => {
+        try {
+          const response = await fetch(`${import.meta.env.BASE_URL}__local-study/${slug}.sortboard.zip`);
+          if (!response.ok || response.headers.get('content-type')?.includes('text/html')) throw new Error('Import the prepared study ZIP to begin.');
+          await importProjectArchive(await response.blob());
+        } catch (error) { setProjectStatus(`Study loading failed. ${error instanceof Error ? error.message : 'Please import the study ZIP.'}`); }
+      })();
+    }
+  }, [projectBootstrapped, activeProjectId, isProjectBusy, projects, activateProject, importProjectArchive]);
+
 
   // Start IndexedDB writes as part of the commit. A page navigation cannot
   // reliably wait for asynchronous work first started from pagehide.
@@ -5013,6 +5207,14 @@ export default function App() {
     </div>
   );
 
+  if (guidedStudy && mode === 'setup' && isProjectHydrated) return <div className="app app--study" ref={appFullscreenRef}>
+    <StudyScreens study={guidedStudy} recordings={studyRounds} cards={cards} busy={isProjectBusy} status={projectStatus}
+      onStart={index => void startStudyRound(index)} onReplay={recording => { void selectSession(recording.createdAt).then(() => setMode('end')); }}
+      onExport={() => void handleExportProject()} onNew={() => void newStudyParticipant()} onNotes={saveStudyNotes}
+      onWorkspace={() => setShowStudyWorkspace(true)} onPreview={card => openMediaPreview(card.id)} />
+    {previewCard ? <VideoPreviewDialog card={previewCard} onClose={closeMediaPreview} showMetadata={false} /> : null}
+  </div>;
+
   return (
     <div className={`app app--${mode}`} ref={appFullscreenRef}>
       {isFirstVisit && !showDemoProjects ? <WelcomeDialog busy={isProjectBusy} status={projectStatus}
@@ -5039,7 +5241,7 @@ export default function App() {
           e.currentTarget.value = '';
         }}
       />
-      {mode !== 'sort' ? <header className="appHeader">
+      {guidedStudy && mode === 'end' ? <header className="studyHeader"><button className="btn btn--ghost" onClick={returnToSetupFromReplay}><ArrowLeft />Back to study</button><strong>{replayRecording?.studyRound?.title}</strong></header> : mode !== 'sort' ? <header className="appHeader">
         <span className="appHeader__brand"><PanelsTopLeft /><span>SortBoard</span></span>
         <ProjectMenu name={activeProject?.name || 'No project yet'} disabled={projectInteractionDisabled}>
           {renderProjectControls()}
@@ -5049,6 +5251,7 @@ export default function App() {
           <button type="button" className={mode === 'end' ? 'isActive' : ''} aria-label={`Recordings (${sessions.length})`} aria-current={mode === 'end' ? 'page' : undefined} disabled={projectInteractionDisabled} onClick={() => { if (mode === 'setup') void openRecordings(); }}><History />Recordings<span className="navCount">{sessions.length}</span></button>
         </nav>
         <div className="appHeader__tools">
+          {activeProject?.study ? <button className="btn btn--ghost" onClick={() => setShowStudyWorkspace(false)}>Guided study</button> : null}
           {activeProject?.instructions ? <details className="projectInstructions"><summary aria-label="Instructions" title="Instructions"><BookOpen /><span className="toolbarLabel">Instructions</span></summary><p>{activeProject.instructions}</p></details> : null}
           <button className="btn btn--ghost btn--tiny" type="button" aria-label="Controls" title="Controls" onClick={() => setShowControls(true)}><HelpCircle /><span className="toolbarLabel">Controls</span></button>
           {mode === 'setup' ? <>
@@ -5363,7 +5566,18 @@ export default function App() {
         </div>
       ) : mode === 'sort' ? (
         <div className="layout layout--sort">
-          <div className="sortBar">
+          <div className={`sortBar ${guidedStudy ? 'sortBar--study' : ''}`}>
+            {guidedStudy ? <>
+              <button className="btn btn--ghost btn--tiny" disabled={isProjectBusy} onClick={() => void pauseStudyRound()}>Pause</button>
+              <div className="studySortPrompt"><small>Round {guidedStudy.rounds.findIndex(r => r.id === recordingSession?.studyRound?.id) + 1} of {guidedStudy.rounds.length} · {recordingSession?.studyRound?.title}</small>
+                <strong>{recordingSession?.studyRound?.prompt}</strong></div>
+              <button className="btn btn--ghost btn--tiny" onClick={() => setShowControls(true)}>Controls</button>
+              <span className="sortBar__recIndicator" data-testid="recording-status" title={`Recording · ${countLabel(sortMoveCount, 'action')}`}>Recording</span>
+              <button className="btn btn--ghost sortBar__icon" aria-label={isSortFullscreen ? 'Exit full screen' : 'Full screen'} disabled={isProjectBusy || !fullscreen.supported} onClick={handleSortFullscreen}>{isSortFullscreen ? <Minimize /> : <Maximize />}</button>
+              <button className="btn sortBar__finish" disabled={isProjectBusy || !canEndSorting} onClick={() => void endSorting()}>Finish round<ArrowRight /></button>
+              {projectStatus.startsWith('Could not') ? <span role="alert">{projectStatus}</span> : null}
+            </> : <>
+
             <button className="btn btn--ghost sortBar__icon" type="button" aria-label="Leave sorting" title="Leave sorting"
               disabled={isProjectBusy || isReplaying || fullscreen.pending} onClick={handleBackToSetupFromSort}>
               <ArrowLeft />
@@ -5397,6 +5611,7 @@ export default function App() {
             {sortCompletionHint ? <span className="srOnly" id="sort-completion-hint">{sortCompletionHint}</span> : null}
             {projectStatus.startsWith('Could not save') ? <span className="fullscreenStatus" role="alert">{projectStatus}</span> : null}
             {fullscreen.message ? <span className="fullscreenStatus" role="status">{fullscreen.message}</span> : null}
+            </>}
           </div>
 
           <main className="main" {...(isProjectBusy ? { inert: '' } : {})}>
@@ -5636,7 +5851,7 @@ export default function App() {
                       onClick={() => void selectSession(s.id)}
                       title={s.id}
                     >
-                      <span className="replaySession__date">{new Date(s.id).toLocaleString('en-GB')}</span>
+                      <span className="replaySession__date">{s.recording.studyRound?.title || new Date(s.id).toLocaleString('en-GB')}</span>
                       <span className="replaySession__meta">
                         {getTemplateLabel(s.recording.sortConfig.type)} · {countLabel(s.recording.segments.length, 'action')}
                         {countRecordedViewChanges(s.recording.cameraTrack) > 0

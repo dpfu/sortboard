@@ -224,6 +224,7 @@ export interface StackKeyframe {
 }
 
 export interface RecordingSession {
+  studyRound?: import('./study/model').StudyRoundRecording;
   version: 5;
   createdAt: string; // ISO
   cardW: number;

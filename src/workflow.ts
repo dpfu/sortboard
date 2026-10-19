@@ -292,6 +292,7 @@ export function isWorkflowConfiguredForSorting(workflow: SortWorkflowData | null
     return !!getSourceWidget(workflow, stageId) && getClosedCategoryWidgets(workflow, stageId).length > 0;
   }
   const stages = workflow.stages;
+  if (stages.length === 1 && stages[0].kind === 'qsort') return !!getQSortWidget(workflow, stages[0].id);
   if (stages.length < 2) return false;
   const presort = stages.find((stage) => stage.kind === 'presort');
   const qsort = stages.find((stage) => stage.kind === 'qsort');

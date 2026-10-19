@@ -37,6 +37,15 @@ In Closed sort and Pre-Sort, cards stay where you release them. Dropping inside 
 
 Replay opens at the final result. **Go to start**, **Play recording**, and **Show result** control playback. **View** contains recorded-camera versus free-view navigation and display sizing. The recorded viewport remains fixed and is fitted into the current window.
 
+
+## Guided studies
+
+A prepared project can include a guided sequence of Q-Sort tasks using the same images and grid. Importing such a project opens its introduction directly. Participants sort under one visible statement at a time, discuss each saved result, and continue to an empty grid with the images reshuffled. A paused or interrupted round can be resumed. At the end, participants can compare scores and replay each round.
+
+**Export study** includes the original media, task statements, recordings, optional discussion notes, image credits and a `results.csv` table. **New participant** creates a fresh project while preserving earlier results. The regular Open, Closed and two-stage Q-Sort workflows remain available in the workspace.
+
+The teaching material is supplied as a separate local project archive. It is not bundled in the public app. To build the climate-image teaching package from an existing attributed collection, use `python3 scripts/prepare_climate_study.py --materials /path/to/image-materials`. The local development shortcut `?study=climate-images` opens it after preparation; deployed builds use the normal project import.
+
 ## Image demos
 
 The optional demo library contains 30 DiffusionDB / Imagegen pairs. Choose the suggested Open (60 images), Closed (15), or Q-Sort (24) selection, select your own images, or start with an empty template. Q-Sort capacities follow the selected image count. Each demo creates a separate browser-local project with task instructions and source details in card Notes.

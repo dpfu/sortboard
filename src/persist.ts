@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { normalizeStudy, normalizeStudyRound, studyResultsCsv, type StudyDefinition } from './study/model';
 import {
   TEXT_CARD_COLOR_KEYS,
   type BoardWidgetData,
@@ -82,6 +83,7 @@ export type PersistedAssetV1 = {
 };
 
 export type PersistedProjectV1 = {
+  study?: StudyDefinition;
   version: 1;
   id: string;
   name: string;
@@ -924,6 +926,7 @@ function normalizeRecording(recording: RecordingSession): RecordingSession {
     workflowAtStart,
     activeStageIdAtStart: requestedStageId || getDefaultActiveStageId(workflowAtStart) || undefined,
     surfaceLayoutVersion: recording.surfaceLayoutVersion === 2 || recording.surfaceLayoutVersion === 3 ? recording.surfaceLayoutVersion : undefined,
+    studyRound: normalizeStudyRound(recording.studyRound),
     cardsAtStart: normalizeRuntimeCards(recording.cardsAtStart),
     segments,
     cameraTrack: normalizeCameraTrack(recording.cameraTrack, recording.boardW, recording.boardH),
@@ -1130,6 +1133,7 @@ function normalizeProject(value: unknown): PersistedProjectV1 {
     id: value.id,
     name: value.name,
     instructions: normalizeOptionalString(value.instructions),
+    study: normalizeStudy(value.study),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
@@ -1413,6 +1417,29 @@ export async function persistGarbageCollectUnreferencedAssets() {
   return { removed };
 }
 
+export async function persistCreateStudyParticipant(project: PersistedProjectV1, board: PersistedBoardV1) {
+  const db = await getDB();
+  const normalizedProject = normalizeProject(project);
+  const normalizedBoard = normalizeBoard(board);
+  if (project.id !== board.id) throw new Error('The study project and board must match.');
+  const tx = db.transaction(['projects', 'boards', 'meta'], 'readwrite');
+  await tx.objectStore('projects').put(normalizedProject, project.id);
+  await tx.objectStore('boards').put(normalizedBoard, board.id);
+  await tx.objectStore('meta').put({ key: 'activeProjectId', value: project.id }, 'activeProjectId');
+  await tx.done;
+}
+
+export async function persistStudyRoundStart(board: PersistedBoardV1, recording: RecordingSession) {
+  const db = await getDB();
+  const normalizedBoard = normalizeBoard(board);
+  const normalizedRecording = normalizeRecording(recording);
+  const tx = db.transaction(['boards', 'sessions'], 'readwrite');
+  await tx.objectStore('boards').put(normalizedBoard, board.id);
+  await tx.objectStore('sessions').put({ version: 1, id: recording.createdAt, boardId: board.id,
+    updatedAt: Date.now(), recording: normalizedRecording }, recording.createdAt);
+  await tx.done;
+}
+
 export async function persistExportProjectZip(projectId: string): Promise<Blob> {
   const JSZip = await loadJSZip();
   const db = await getDB();
@@ -1461,6 +1488,14 @@ export async function persistExportProjectZip(projectId: string): Promise<Blob> 
   zip.file('board.json', JSON.stringify(board, null, 2));
   zip.file('sessions.json', JSON.stringify(sessions, null, 2));
   zip.file('assets.json', JSON.stringify(assets, null, 2));
+  if (project.study) {
+    zip.file('results.csv', studyResultsCsv(project.study, sessions.map(s => s.recording)));
+    zip.file('image-credits.txt', project.study.credits);
+    zip.file('discussion-notes.txt', project.study.rounds.map((round, index) => {
+      const recorded = sessions.find(s => s.recording.studyRound?.id === round.id && s.recording.studyRound.completedAt)?.recording.studyRound;
+      return `Round ${index + 1}: ${recorded?.title || round.title}\n${recorded?.prompt || round.prompt}\n\n${recorded?.reflection || 'No notes recorded.'}`;
+    }).join('\n\n---\n\n'));
+  }
 
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
@@ -1572,6 +1607,7 @@ export async function persistImportProjectZip(file: Blob): Promise<{ projectId: 
     id: projectId,
     name: projectName,
     instructions: normalizeOptionalString(importedProject.instructions),
+    study: normalizeStudy(importedProject.study),
     createdAt: now,
     updatedAt: now,
   };

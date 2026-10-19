@@ -53,6 +53,11 @@ Project ZIP exports contain the board state, sessions, asset metadata, media blo
 
 SortBoard is pre-release software and does not migrate older persistence formats. A local schema change may reset browser data, and ZIP import accepts only the current archive format. Invalid or unsupported archives are rejected before a project is created.
 
+
+Guided studies add an optional `study` definition to project metadata and a frozen `studyRound` statement/completion marker to each recording. `src/study/` owns task validation, image reshuffling, score comparison, discussion screens and a same-tab recovery journal. App connects these screens to the existing board, recorder and replay; there is no separate sorting engine or storage database. A guided Q-Sort can have one neutral tray and skip Pre-Sort. Round setup and its initial recording are saved atomically before sorting starts. Finishing only advances after the completed recording is saved. New participants receive a separate project that reuses the stored media assets.
+
+Study definitions and round metadata survive normal ZIP export/import. Guided exports also contain a derived score CSV and image credits. Existing projects and recording versions remain readable; this optional metadata does not change the IndexedDB schema. The climate package is generated under ignored `output/` and is served only by the local development middleware, never copied into a production build.
+
 ## Recording and replay
 
 Setup is the canonical persisted board. Starting a sort captures its prepared state and creates a recording automatically. Live sorting is saved in the recording; returning to Setup or starting another session restores the preparation. Finishing awaits the recording save and opens its final result. Save errors leave sorting available for retry. Recordings can also be opened directly from Setup after a reload.

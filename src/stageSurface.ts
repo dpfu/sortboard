@@ -517,12 +517,13 @@ function buildQSortGridScene(
   if (!surface) return scene;
   const pad = 24;
   const gap = 8;
-  const top = mode === 'setup' ? 20 : 84;
+  const singleTray = surface.lanes.length === 1;
+  const top = mode === 'setup' ? 20 : singleTray ? 124 : 84;
   const width = Math.max(672, viewport.width - pad * 2);
   const laneW = Math.floor((width - QSORT_LANE_GAP * (surface.lanes.length - 1)) / surface.lanes.length);
   const columns = Math.max(1, Math.floor((laneW - 24 + gap) / 92));
   const cellW = Math.floor((laneW - 24 - gap * (columns - 1)) / columns);
-  const cellH = clamp(Math.round(cellW * 0.9), 68, 88);
+  const cellH = clamp(Math.round(cellW * 0.9), 68, singleTray ? 80 : 88);
   const presort = workflow.widgets.find((entry): entry is PreSortWidgetData => entry.kind === 'pre-sort');
   // Keep each card's tray place when others are ranked. The pre-sort assignment
   // remains in the recording even after its Q-Sort assignment changes.
@@ -545,7 +546,7 @@ function buildQSortGridScene(
   const bucketW = Math.floor((width - QSORT_BUCKET_GAP * (surface.buckets.length - 1)) / surface.buckets.length);
   const headerH = 44;
   const bucketHeaderH = 48;
-  const slotH = clamp(Math.floor((viewport.height - distributionY - headerH - bucketHeaderH - pad - gap * (maxCapacity - 1)) / maxCapacity), 88, 112);
+  const slotH = clamp(Math.floor((viewport.height - distributionY - headerH - bucketHeaderH - pad - gap * (maxCapacity - 1)) / maxCapacity), singleTray ? 64 : 88, 112);
   const bucketY = distributionY + headerH;
   const buckets = surface.buckets.map((bucket, index) => {
     const x = pad + index * (bucketW + QSORT_BUCKET_GAP);
