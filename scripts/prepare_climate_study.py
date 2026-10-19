@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a local teaching project from an existing, attributed image collection."""
+"""Build a German teaching project from an attributed image collection."""
 import argparse
 import csv
 import hashlib
@@ -64,24 +64,24 @@ def main():
             'meta': {'name': row['id'], 'notes': credit, 'tags': [], 'aspectRatio': width / height, 'originalFileName': path.name},
             'widgetAssignments': {stage_id: {'widgetId': widget_id, 'zoneId': 'images', 'order': index}}})
         blobs[archive_path] = data
-    study = {'version': 1, 'id': 'climate-images', 'title': 'Climate images',
-        'introduction': 'Explore how the same twelve images can feel different under two statements. Sort them once for the importance of climate change, then again for your ability to act. We will pause after each round to discuss your choices.',
-        'reference': 'Teaching adaptation of Metag et al. (2016), Perceptions of Climate Change Imagery, Science Communication 38(2), 197-227. https://doi.org/10.1177/1075547016635181\nThis exercise uses an independently selected set of 12 images and a smaller seven-column grid. The original study used 40 images and nine columns. It is not a replication of the original image set or a Q-factor analysis.',
+    study = {'version': 1, 'taskLanguage': 'de', 'id': 'climate-images', 'title': 'Klimabilder',
+        'introduction': 'Dieselben zwölf Bilder unter zwei Perspektiven: Zuerst sortierst du nach der Wichtigkeit des Klimawandels, danach nach deiner eigenen Handlungsmöglichkeit. Nach jedem Durchgang besprecht ihr die Entscheidungen; am Ende vergleicht ihr beide Sortierungen und schaut ausgewählte Momente im Replay an.',
+        'reference': 'Lehrübung nach Metag et al. (2016), Perceptions of Climate Change Imagery, Science Communication 38(2), 197–227. https://doi.org/10.1177/1075547016635181\nDie zwölf Bilder sind eine eigene Auswahl. Die Studie verwendete 40 Bilder und neun Skalenpositionen; hier sind es zwölf Bilder und sieben Positionen. Dies ist keine Replikation und keine Q-Faktorenanalyse. Ein Foto von trockenem Boden oder Hochwasser belegt für sich keine Klimawandel-Ursache.',
         'credits': '\n\n'.join(credits),
-        'scale': [{'value': i - 3, 'label': '0 · Undecided' if i == 3 else f'{i - 3:+}' if i > 3 else str(i - 3), 'capacity': c} for i, c in enumerate(capacities)],
+        'scale': [{'value': i - 3, 'label': f'{i - 3:+}' if i > 3 else str(i - 3), 'capacity': c} for i, c in enumerate(capacities)],
         'rounds': [
-            {'id': 'importance', 'title': 'Importance', 'prompt': 'This image makes me feel that climate change is important.'},
-            {'id': 'ability-to-act', 'title': 'Ability to act', 'prompt': 'This image makes me feel I can do something about climate change.'},
+            {'id': 'importance', 'title': 'Wichtigkeit', 'prompt': 'Dieses Bild gibt mir das Gefühl, dass der Klimawandel wichtig ist.'},
+            {'id': 'ability-to-act', 'title': 'Handlungsmöglichkeit', 'prompt': 'Dieses Bild gibt mir das Gefühl, dass ich etwas gegen den Klimawandel tun kann.'},
         ]}
-    widget = {'id': widget_id, 'kind': 'qsort', 'stageId': stage_id, 'title': 'Your agreement', 'createdAt': now,
-        'x': 24, 'y': 80, 'w': 1100, 'h': 650, 'z': 1, 'lanes': [{'id': 'images', 'label': 'Images to place'}],
+    widget = {'id': widget_id, 'kind': 'qsort', 'stageId': stage_id, 'title': 'Starke Ablehnung ← Deine Zustimmung → Starke Zustimmung', 'createdAt': now,
+        'x': 24, 'y': 80, 'w': 1100, 'h': 650, 'z': 1, 'lanes': [{'id': 'images', 'label': 'Bilder zum Einordnen'}],
         'buckets': [{'id': f'score-{i}', 'label': s['label'], 'capacity': s['capacity']} for i, s in enumerate(study['scale'])]}
     board = {'version': 2, 'id': 'climate-images', 'updatedAt': now,
         'sortConfig': {'type': 'qsort', 'stacksEnabled': False, 'zoomEnabled': False, 'startInFullscreen': True},
         'cardW': 200, 'cardH': 140, 'cardLayoutMode': 'as-is', 'stacks': [],
         'workflow': {'templateId': 'qsort', 'stages': [{'id': stage_id, 'kind': 'qsort', 'name': 'Q-Sort', 'order': 0}], 'widgets': [widget]},
         'activeStageId': stage_id, 'cards': cards}
-    project = {'version': 1, 'id': 'climate-images', 'name': 'Climate images', 'createdAt': now, 'updatedAt': now, 'study': study}
+    project = {'version': 1, 'id': 'climate-images', 'name': 'Klimabilder', 'createdAt': now, 'updatedAt': now, 'study': study}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(args.output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
         for name, payload in {'manifest.json': {'format': 'sortboard-project-export', 'version': 1},
@@ -90,6 +90,7 @@ def main():
         for name, data in blobs.items():
             archive.writestr(name, data)
         archive.writestr('image-credits.txt', study['credits'])
+    args.output.with_name('climate-images-credits.txt').write_text(study['credits'], encoding='utf-8')
     if args.copy_to:
         args.copy_to.mkdir(parents=True, exist_ok=True)
         shutil.copy2(args.output, args.copy_to / args.output.name)

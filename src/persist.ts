@@ -1491,10 +1491,12 @@ export async function persistExportProjectZip(projectId: string): Promise<Blob> 
   if (project.study) {
     zip.file('results.csv', studyResultsCsv(project.study, sessions.map(s => s.recording)));
     zip.file('image-credits.txt', project.study.credits);
-    zip.file('discussion-notes.txt', project.study.rounds.map((round, index) => {
+    const discussionNotes = project.study.rounds.map((round, index) => {
       const recorded = sessions.find(s => s.recording.studyRound?.id === round.id && s.recording.studyRound.completedAt)?.recording.studyRound;
       return `Round ${index + 1}: ${recorded?.title || round.title}\n${recorded?.prompt || round.prompt}\n\n${recorded?.reflection || 'No notes recorded.'}`;
-    }).join('\n\n---\n\n'));
+    }).join('\n\n---\n\n');
+    const comparisonNotes = sessions.find(s => s.recording.studyRound?.id === project.study!.rounds.at(-1)?.id && s.recording.studyRound?.completedAt)?.recording.studyRound?.comparisonNotes;
+    zip.file('discussion-notes.txt', `${discussionNotes}\n\n---\n\nComparison across rounds\n\n${comparisonNotes || 'No comparison notes recorded.'}`);
   }
 
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });

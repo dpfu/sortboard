@@ -8,13 +8,16 @@
 .studyPage h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 12px 0 24px; letter-spacing: -.025em; }
 .studyPage h2 { font-size: 22px; line-height: 1.45; margin: 12px 0; }
 .studyPage p { line-height: 1.65; }
+.studyPage li { line-height: 1.65; margin: 8px 0; }
+.studyCompanions { font-size: 13px; margin: 20px 0; }
+.studyCompanions summary { cursor: pointer; font-weight: 600; }
 .studyIntro { font-size: 18px; }
 .studySteps { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 18px 0; color: #466450; font-size: 13px; }
-.studyNext, .studyReflection { padding: 26px; border: 1px solid #d3dfd5; border-radius: 16px; background: #fff; margin: 24px 0; }
+.studyNext, .studyReflection, .studyReviewStep { padding: 26px; border: 1px solid #d3dfd5; border-radius: 16px; background: #fff; margin: 24px 0; }
 .studyPrimary { background: #315d46; color: white; padding: 13px 20px; margin-top: 12px; }
 .studyReflection > p:first-child { display: flex; align-items: center; gap: 8px; color: #456d53; font-size: 13px; }
-.studyReflection label { display: block; font-size: 13px; font-weight: 600; margin-top: 20px; }
-.studyReflection textarea { width: 100%; box-sizing: border-box; margin: 8px 0; padding: 12px; border: 1px solid #cbd8cd; border-radius: 8px; font: inherit; resize: vertical; }
+.studyPage label { display: block; font-size: 13px; font-weight: 600; margin-top: 20px; }
+.studyPage textarea { width: 100%; box-sizing: border-box; margin: 8px 0; padding: 12px; border: 1px solid #cbd8cd; border-radius: 8px; font: inherit; resize: vertical; }
 .studyCredits { margin-top: 32px; color: #53695a; font-size: 12px; }
 .studyCredits summary { cursor: pointer; }
 .studyCreditText { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -31,6 +34,10 @@
 .studyComparison caption { text-align: left; font-weight: 650; margin-bottom: 12px; }
 .studyComparison td, .studyComparison th { padding: 12px; border-bottom: 1px solid #e1e8e3; text-align: center; }
 .studyComparison thead th { font-size: 13px; background: #eaf0eb; }
+.studyDifference { color: #466450; font-weight: 650; font-variant-numeric: tabular-nums; }
+.studyExported { padding: 14px; background: #eaf0eb; border-radius: 8px; }
+.studyExported svg { width: 18px; height: 18px; margin-right: 8px; vertical-align: middle; }
+.studyReplayHint { padding: 10px 24px; margin: 0; font-size: 13px; line-height: 1.5; background: #eaf0eb; }
 .studyImage { display: inline-flex; align-items: center; gap: 14px; padding: 0; background: none; border: 0; cursor: zoom-in; color: inherit; font: inherit; }
 .studyImage img { width: 100px; height: 68px; object-fit: contain; border-radius: 5px; }
 .sortBar--study .studySortPrompt { min-width: 0; display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; }

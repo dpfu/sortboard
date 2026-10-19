@@ -94,9 +94,14 @@ test('completes the 24-image Q-Sort demo and exports its replay', async ({ page 
   test.setTimeout(120000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openFreshApp(page);
+  const previousCard = (await cards(page).first().getAttribute('data-testid'))!;
   const dialog = await openDemos(page, 'Q-Sort');
   await dialog.getByRole('button', { name: 'Open demo with 24 images' }).click();
   await expect(dialog).not.toBeVisible({ timeout: 30000 });
+  // The previous project also has 24 cards. Wait for its replacement, not just
+  // the closed dialog, before collecting the new demo's card identities.
+  await expect(page.getByTestId(previousCard)).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(24);
   const ids = await cards(page).evaluateAll(elements => elements.map(element => element.getAttribute('data-testid')!));
   await page.getByRole('button', { name: 'Start sorting' }).click();
   for (const [index, id] of ids.entries()) {

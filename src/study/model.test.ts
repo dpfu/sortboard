@@ -1,10 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { createTestProject } from '../testFixtures/project';
 import { testStudy } from '../testFixtures/study';
-import { normalizeStudy, prepareStudyRound, studyRecordings, studyScores } from './model';
+import { normalizeStudy, normalizeStudyRound, prepareStudyRound, studyRecordings, studyScores } from './model';
 import type { CardData, RecordingSession } from '../types';
 
 describe('guided study data', () => {
+  it('preserves German task language and comparison notes without changing English studies', () => {
+    expect(normalizeStudy({ ...testStudy, taskLanguage: 'de' })?.taskLanguage).toBe('de');
+    expect(normalizeStudy(testStudy)?.taskLanguage).toBeUndefined();
+    const round = { ...testStudy.rounds[1], comparisonNotes: 'Wichtigkeit ist nicht gleich Handlungsmöglichkeit.' };
+    expect(normalizeStudyRound(round)?.comparisonNotes).toBe(round.comparisonNotes);
+    expect(() => normalizeStudyRound({ ...round, comparisonNotes: [] })).toThrow('Invalid study round');
+  });
   it('clears assignments and reshuffles the same identities without modifying the preceding sort', () => {
     const cards = createTestProject().board.cards.slice(0, 12) as CardData[];
     const first = prepareStudyRound(testStudy, cards, 1280, 800, () => .5);

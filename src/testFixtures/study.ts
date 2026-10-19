@@ -10,17 +10,17 @@ export const testStudy: StudyDefinition = {
     { id: 'ability-to-act', title: 'Ability to act', prompt: 'This image makes me feel I can do something about climate change.' }],
 };
 
-export async function testStudyArchive() {
+export async function testStudyArchive(study: StudyDefinition = testStudy) {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const { project, board, assets } = createTestProject();
   board.cards = board.cards.slice(0, 12).map((c, i) => ({ ...c, meta: { ...c.meta, name: String(i + 1).padStart(2, '0') } }));
-  const prepared = prepareStudyRound(testStudy, board.cards as CardData[], 1200, 800);
+  const prepared = prepareStudyRound(study, board.cards as CardData[], 1200, 800);
   board.cards = prepared.cards;
   board.workflow = prepared.workflow;
   board.activeStageId = prepared.activeStageId;
   board.sortConfig = { type: 'qsort', stacksEnabled: false, zoomEnabled: false, startInFullscreen: true };
-  project.study = testStudy;
+  project.study = study;
   zip.file('manifest.json', JSON.stringify({ format: 'sortboard-project-export', version: 1 }));
   zip.file('project.json', JSON.stringify(project)); zip.file('board.json', JSON.stringify(board)); zip.file('sessions.json', '[]');
   zip.file('assets.json', JSON.stringify(assets.slice(0, 12).map(a => ({ id: a.id, mime: a.mime, file: `assets/${a.id}.svg` }))));

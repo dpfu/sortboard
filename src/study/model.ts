@@ -4,6 +4,7 @@ import type { CardData, RecordingSession } from '../types';
 
 export interface StudyDefinition {
   version: 1;
+  taskLanguage?: 'de';
   id: string;
   title: string;
   introduction: string;
@@ -19,12 +20,13 @@ export interface StudyRoundRecording {
   prompt: string;
   completedAt?: string;
   reflection?: string;
+  comparisonNotes?: string;
 }
 
 export function normalizeStudy(value: unknown): StudyDefinition | undefined {
   if (value == null) return undefined;
   const v = value as StudyDefinition;
-  if (v.version !== 1 || !v.id || !v.title || typeof v.introduction !== 'string' ||
+  if (v.version !== 1 || (v.taskLanguage !== undefined && v.taskLanguage !== 'de') || !v.id || !v.title || typeof v.introduction !== 'string' ||
       typeof v.reference !== 'string' || typeof v.credits !== 'string' ||
       !Array.isArray(v.scale) || v.scale.length < 3 || v.scale.length > 15 ||
       !Array.isArray(v.rounds) || v.rounds.length !== 2 ||
@@ -34,7 +36,7 @@ export function normalizeStudy(value: unknown): StudyDefinition | undefined {
       v.scale.some(s => !Number.isFinite(s.value) || typeof s.label !== 'string' || !Number.isInteger(s.capacity) || s.capacity < 0)) {
     throw new Error('Invalid guided study configuration.');
   }
-  return { version: 1, id: v.id, title: v.title, introduction: v.introduction, reference: v.reference,
+  return { version: 1, ...(v.taskLanguage ? { taskLanguage: v.taskLanguage } : {}), id: v.id, title: v.title, introduction: v.introduction, reference: v.reference,
     credits: v.credits, scale: v.scale.map(s => ({ value: s.value, label: s.label, capacity: s.capacity })),
     rounds: v.rounds.map(r => ({ id: r.id, title: r.title, prompt: r.prompt })) };
 }
@@ -44,8 +46,9 @@ export function normalizeStudyRound(value: unknown): StudyRoundRecording | undef
   const v = value as StudyRoundRecording;
   if (!v.id || !v.title || !v.prompt || [v.id, v.title, v.prompt].some(x => typeof x !== 'string') ||
       (v.completedAt !== undefined && !Number.isFinite(Date.parse(v.completedAt))) ||
-      (v.reflection !== undefined && typeof v.reflection !== 'string')) throw new Error('Invalid study round.');
-  return { id: v.id, title: v.title, prompt: v.prompt, completedAt: v.completedAt, reflection: v.reflection };
+      (v.reflection !== undefined && typeof v.reflection !== 'string') ||
+      (v.comparisonNotes !== undefined && typeof v.comparisonNotes !== 'string')) throw new Error('Invalid study round.');
+  return { id: v.id, title: v.title, prompt: v.prompt, completedAt: v.completedAt, reflection: v.reflection, comparisonNotes: v.comparisonNotes };
 }
 
 export function studyRecordings(study: StudyDefinition, sessions: Array<{ recording: RecordingSession }>) {
@@ -72,8 +75,8 @@ export function prepareStudyRound(study: StudyDefinition, cards: CardData[], wid
   stage.order = 0;
   const widget = workflow.widgets.find(w => w.kind === 'qsort')!;
   if (widget.kind !== 'qsort') throw new Error('Missing Q-Sort grid.');
-  widget.title = 'Your agreement';
-  widget.lanes = [{ id: 'images', label: 'Images to place' }];
+  widget.title = study.taskLanguage === 'de' ? 'Starke Ablehnung ← Deine Zustimmung → Starke Zustimmung' : 'Strongly disagree ← Your agreement → Strongly agree';
+  widget.lanes = [{ id: 'images', label: study.taskLanguage === 'de' ? 'Bilder zum Einordnen' : 'Images to place' }];
   widget.buckets = study.scale.map((s, i) => ({ id: `score-${i}`, label: s.label, capacity: s.capacity }));
   workflow.stages = [stage];
   workflow.widgets = [widget];

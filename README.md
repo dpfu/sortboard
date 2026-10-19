@@ -44,7 +44,9 @@ A prepared project can include a guided sequence of Q-Sort tasks using the same 
 
 **Export study** includes the original media, task statements, recordings, optional discussion notes, image credits and a `results.csv` table. **New participant** creates a fresh project while preserving earlier results. The regular Open, Closed and two-stage Q-Sort workflows remain available in the workspace.
 
-The teaching material is supplied as a separate local project archive. It is not bundled in the public app. To build the climate-image teaching package from an existing attributed collection, use `python3 scripts/prepare_climate_study.py --materials /path/to/image-materials`. The local development shortcut `?study=climate-images` opens it after preparation; deployed builds use the normal project import.
+**[Seminar entry](https://dpfu.github.io/sortboard/?study=climate-images):** import the separately provided climate-image project ZIP once on the seminar computer, then select **Start sorting**. It contains twelve images and two German tasks. Instructions and reflection questions are German; app controls remain English. The final screen guides the group through comparison, replay and downloading its work. On later visits the link reopens the matching project. Results remain in that browser and are not submitted automatically. See the [seminar guide](docs/climate-seminar.md).
+
+To rebuild the teaching project from its existing attributed collection, use `python3 scripts/prepare_climate_study.py --materials /path/to/image-materials`. The archive is generated under ignored `output/` for separate transfer. Image credits stay in the project and its exports; the teaching images and participant results are not bundled in the public site. Prepared studies can also be opened through normal project import.
 
 ## Image demos
 

@@ -2,6 +2,7 @@ import { ProjectMenu } from './ProjectMenu';
 import { ControlsDialog } from './ControlsDialog';
 import { WelcomeDialog } from './WelcomeDialog';
 import { StudyScreens } from './study/StudyScreens';
+import { studyCopy } from './study/copy';
 import { prepareStudyRound, studyRecordings, journalStudyRecording, readStudyJournal, clearStudyJournal } from './study/model';
 import { persistStudyRoundStart, persistCreateStudyParticipant } from './persist';
 import { buildStackBadges, stackFrame, stackFrameAt } from './stackRecording';
@@ -607,6 +608,8 @@ export default function App() {
   const [showControls, setShowControls] = React.useState(false);
   const [showDemoProjects, setShowDemoProjects] = React.useState(false);
   const [showStudyWorkspace, setShowStudyWorkspace] = React.useState(false);
+  const [isStudyLoading, setIsStudyLoading] = React.useState(() => /^[a-z0-9-]+$/.test(new URLSearchParams(window.location.search).get('study') || ''));
+  const [needsStudyImport, setNeedsStudyImport] = React.useState(false);
   const setupUndoPastByProjectRef = React.useRef<Map<string, SetupSnapshotV1[]>>(new Map());
   const [setupUndoPast, setSetupUndoPast] = React.useState<SetupSnapshotV1[]>([]);
   const [selectedCardIds, setSelectedCardIds] = React.useState<string[]>([]);
@@ -2862,6 +2865,7 @@ export default function App() {
         setMode('setup');
         setProjectStatus('Project imported.');
         setIsFirstVisit(false);
+        setNeedsStudyImport(false);
       } catch (err) {
         setProjectStatus(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
         throw err;
@@ -2964,10 +2968,11 @@ export default function App() {
       setProjectStatus('Your progress is saved. Resume whenever you are ready.');
     } finally { setIsProjectBusy(false); }
   };
-  const saveStudyNotes = async (recording: RecordingSession, notes: string) => {
+  const saveStudyNotes = async (recording: RecordingSession, notes: string, comparisonNotes?: string) => {
     if (!boardId || !recording.studyRound) return false;
     const saved = await persistSessionSnapshot({ version: 1, id: recording.createdAt, boardId, updatedAt: Date.now(),
-      recording: sanitizeRecording({ ...recording, studyRound: { ...recording.studyRound, reflection: notes } }) }, 'save discussion notes');
+      recording: sanitizeRecording({ ...recording, studyRound: { ...recording.studyRound, reflection: notes,
+        ...(comparisonNotes !== undefined ? { comparisonNotes } : {}) } }) }, 'save discussion notes');
     setProjectStatus(saved ? 'Discussion notes saved.' : 'Could not save the discussion notes. Please try again.');
     return saved;
   };
@@ -3002,16 +3007,13 @@ export default function App() {
       void persistSetActiveProjectId(existing.id);
       activateProject(existing.id);
       setIsFirstVisit(false);
+      setIsStudyLoading(false);
     } else {
-      void (async () => {
-        try {
-          const response = await fetch(`${import.meta.env.BASE_URL}__local-study/${slug}.sortboard.zip`);
-          if (!response.ok || response.headers.get('content-type')?.includes('text/html')) throw new Error('Import the prepared study ZIP to begin.');
-          await importProjectArchive(await response.blob());
-        } catch (error) { setProjectStatus(`Study loading failed. ${error instanceof Error ? error.message : 'Please import the study ZIP.'}`); }
-      })();
+      setNeedsStudyImport(true);
+      setIsFirstVisit(false);
+      setIsStudyLoading(false);
     }
-  }, [projectBootstrapped, activeProjectId, isProjectBusy, projects, activateProject, importProjectArchive]);
+  }, [projectBootstrapped, activeProjectId, isProjectBusy, projects, activateProject]);
 
 
   // Start IndexedDB writes as part of the commit. A page navigation cannot
@@ -5207,6 +5209,21 @@ export default function App() {
     </div>
   );
 
+  if (isStudyLoading) return <div className="app app--study"><div className="studyShell"><main className="studyPage" role="status"><h1>Preparing study…</h1><p>Checking for a prepared project in this browser.</p></main></div></div>;
+
+  if (needsStudyImport) return <div className="app app--study"><div className="studyShell">
+    <header className="studyHeader"><span><PanelsTopLeft />SortBoard / Study setup</span><a href={import.meta.env.BASE_URL}>Open workspace</a></header>
+    <main className="studyPage" lang="de"><p className="studyEyebrow">Am Seminarrechner vorbereiten</p><h1>Sortierprojekt öffnen</h1>
+      <p className="studyIntro">Importiere die vorbereitete Projekt-ZIP. Sie enthält die Bilder, beide Aufgaben und das Raster. Du musst nichts einstellen.</p>
+      <p>Danach öffnet sich die Einführung. Mit <strong>Start sorting</strong> beginnt die Übung; dann kann die Gruppe selbstständig weiterarbeiten.</p>
+      <p className="hint">Die Daten bleiben in diesem Browser. Am Ende sichert die Gruppe ihre Ergebnisse mit Export study.</p>
+      <button className="btn studyPrimary" disabled={isProjectBusy} onClick={handleImportProject}><Upload />Import project</button>
+      <input ref={projectImportInputRef} data-testid="project-import-input" type="file" className="srOnly" aria-hidden="true" tabIndex={-1} accept=".zip,.sortboard.zip,application/zip"
+        onChange={e => { const file = e.currentTarget.files?.[0]; if (file) handleImportProjectFile(file); e.currentTarget.value = ''; }} />
+      {projectStatus ? <p className="studyStatus" role={/failed|could not/i.test(projectStatus) ? 'alert' : 'status'}>{projectStatus}</p> : null}
+    </main>
+  </div></div>;
+
   if (guidedStudy && mode === 'setup' && isProjectHydrated) return <div className="app app--study" ref={appFullscreenRef}>
     <StudyScreens study={guidedStudy} recordings={studyRounds} cards={cards} busy={isProjectBusy} status={projectStatus}
       onStart={index => void startStudyRound(index)} onReplay={recording => { void selectSession(recording.createdAt).then(() => setMode('end')); }}
@@ -5569,7 +5586,7 @@ export default function App() {
           <div className={`sortBar ${guidedStudy ? 'sortBar--study' : ''}`}>
             {guidedStudy ? <>
               <button className="btn btn--ghost btn--tiny" disabled={isProjectBusy} onClick={() => void pauseStudyRound()}>Pause</button>
-              <div className="studySortPrompt"><small>Round {guidedStudy.rounds.findIndex(r => r.id === recordingSession?.studyRound?.id) + 1} of {guidedStudy.rounds.length} · {recordingSession?.studyRound?.title}</small>
+              <div className="studySortPrompt" lang={guidedStudy.taskLanguage || 'en'}><small>Round {guidedStudy.rounds.findIndex(r => r.id === recordingSession?.studyRound?.id) + 1} of {guidedStudy.rounds.length} · {recordingSession?.studyRound?.title}</small>
                 <strong>{recordingSession?.studyRound?.prompt}</strong></div>
               <button className="btn btn--ghost btn--tiny" onClick={() => setShowControls(true)}>Controls</button>
               <span className="sortBar__recIndicator" data-testid="recording-status" title={`Recording · ${countLabel(sortMoveCount, 'action')}`}>Recording</span>
@@ -5651,14 +5668,14 @@ export default function App() {
         </div>
       ) : (
         <div className="layout layout--sort layout--replay">
-          <div className="recordingsHeader">
+          {guidedStudy ? <p className="studyReplayHint" lang={guidedStudy.taskLanguage || 'en'}>{studyCopy(guidedStudy).replayHint}</p> : <div className="recordingsHeader">
             <div><strong>{replayRecording ? 'Recording' : 'Recordings'}</strong>{replayRecording ? <span className="hint">{countLabel(replayRecording.segments.length, 'recorded action')}{replayCameraChangeCount ? ` · ${countLabel(replayCameraChangeCount, 'view change')}` : ''}</span> : null}</div>
             <button className="btn btn--ghost" type="button" disabled={!canStartSorting || isReplaying} onClick={startSortingWorkflow}><Plus />New sorting session</button>
             <div className="recordingsHeader__save">
               <span className="hint" role="status" data-testid="project-status">{projectStatus || 'Saved in this browser.'}</span>
               <button className="btn btn--ghost" type="button" disabled={projectInteractionDisabled} onClick={handleExportProject}><Download />Export project</button>
             </div>
-          </div>
+          </div>}
 
           <main className="main main--replay">
             {!replayRecording ? <section className="recordingsEmpty"><h2>No recordings yet</h2><p>Finish a sort to create a replay.</p><button className="btn" onClick={returnToSetupFromReplay}>Prepare a sort</button></section> : <section className="replayStage">
@@ -5756,7 +5773,7 @@ export default function App() {
                 <div className="replayTimeLabel">{formatTimeMs(replayTimeMs)}</div>
               </div>
                 {mode === 'end' && previewCard ? <VideoPreviewDialog card={previewCard} onClose={closeMediaPreview} showMetadata={false} /> : null}
-                {mode === 'end' && showControls ? <ControlsDialog mode={mode} stacksEnabled={replayRecording?.sortConfig.stacksEnabled !== false} sortType={replayRecording?.sortConfig.type || sortConfig.type} onClose={() => setShowControls(false)} /> : null}
+                {mode === 'end' && showControls ? <ControlsDialog mode={mode} taskLanguage={guidedStudy?.taskLanguage} stacksEnabled={replayRecording?.sortConfig.stacksEnabled !== false} sortType={replayRecording?.sortConfig.type || sortConfig.type} onClose={() => setShowControls(false)} /> : null}
                 <div className="replayBoard" ref={replayBoardHostRef}>
                   {replayWindowChanged && !replayResizeWarningDismissed ? (
                     <div className="replayResizeWarning" role="alert">
@@ -5866,7 +5883,7 @@ export default function App() {
           </main>
         </div>
       )}
-      {showControls && (mode !== 'end' || !replayRecording) ? <ControlsDialog mode={mode} stacksEnabled={stacksEnabled} sortType={mode === 'end' ? replayRecording?.sortConfig.type || sortConfig.type : sortConfig.type} onClose={() => setShowControls(false)} /> : null}
+      {showControls && (mode !== 'end' || !replayRecording) ? <ControlsDialog mode={mode} taskLanguage={guidedStudy?.taskLanguage} stacksEnabled={stacksEnabled} sortType={mode === 'end' ? replayRecording?.sortConfig.type || sortConfig.type : sortConfig.type} onClose={() => setShowControls(false)} /> : null}
       {previewCard && mode !== 'end' ? <VideoPreviewDialog card={previewCard} onClose={closeMediaPreview} showMetadata={mode === 'setup'} /> : null}
     </div>
   );
